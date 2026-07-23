@@ -1,3 +1,20 @@
-sessao/
+# Dependências
 node_modules/
+
+# Sessão do WhatsApp
+auth/
+sessao/
+
+# Variáveis de ambiente
 .env
+
+# Logs
+*.log
+logs/
+
+# Arquivos temporários
+tmp/
+temp/
+
+# Cache
+.cache/
