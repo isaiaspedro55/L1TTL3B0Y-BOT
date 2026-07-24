@@ -209,10 +209,9 @@ function generateToken(user){
 }
 
 function authMiddleware(req,res,next){
-  // Public routes
-  const publicPaths = ['/login','/register','/health','/ping','/','/api/auth/login','/api/auth/register','/public'];
+  // Public routes - dashboard operacional sem enterprise obrigatório
+  const publicPaths = ['/login','/register','/health','/ping','/','/api/auth/login','/api/auth/register','/public','/dashboard','/connect','/api/status','/api/connection','/api/pairing','/api/qr','/api/logs','/api/stats-full','/api/groups','/api/files','/api/rank','/api/commands'];
   if(publicPaths.some(p=>req.path.startsWith(p))) return next();
-  if(req.path==='/api/status' && (req.headers.accept||'').includes('application/json')) return next(); // allow status JSON public? No, protect? We'll allow for uptime check
 
   // Check token from cookie or header
   let token = req.cookies?.enterprise_token || req.headers.authorization?.replace('Bearer ','') || req.query.token;
