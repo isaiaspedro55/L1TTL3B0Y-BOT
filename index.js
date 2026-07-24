@@ -50,24 +50,16 @@ try { ButtonV2 = require("@systemzero/baileys/lib/MB.cjs").ButtonV2; }
 catch(e) { console.log("⚠️ ButtonV2:", e.message); }
 
 const CONFIG = {
-  PREFIXO: (process.env.PREFIX || "!").split(',')[0].trim() || "!",
-  // MULTIPREFIXO - suporta ! . / # $ etc, configurável via PREFIXES ou PREFIX com vírgulas
-  // Ex: PREFIXES="!,.,/,#,$" ou PREFIX="!"
+  PREFIXO: (()=>{ try{ const d=fs.existsSync("./dados/prefixos.json")?fs.readJsonSync("./dados/prefixos.json"):null; return d?.global || (process.env.PREFIX||"!").split(',')[0].trim() || "!"; }catch{ return (process.env.PREFIX||"!").split(',')[0].trim() || "!"; }})(),
+  // PREFIXOS mantido para compatibilidade, mas agora é só o prefixo universal (único)
   PREFIXOS: (() => {
-    const raw = process.env.PREFIXES || process.env.PREFIX || "!,.,/,#,$,%,-";
-    // Se MULTIPREFIX=true, usa lista padrão grande
-    const defaultMulti = ["!", ".", "/", "#", "$", "%", "&", "-", "+"];
-    const parsed = raw.split(',').map(p=>p.trim()).filter(p=>p.length>0);
-    // Se ALLOW_NO_PREFIX=true, permite sem prefixo também
-    const allowNoPrefix = process.env.ALLOW_NO_PREFIX === "true";
-    let list = parsed.length ? parsed : defaultMulti;
-    // Garante que PREFIXO principal está na lista
-    const main = (process.env.PREFIX || "!").split(',')[0].trim();
-    if(!list.includes(main)) list.unshift(main);
-    if(allowNoPrefix && !list.includes('')) list.push('');
-    // Sempre inclui ! . / para compatibilidade
-    ["!", ".", "/"].forEach(p=>{ if(!list.includes(p)) list.push(p); });
-    return [...new Set(list)]; // remove duplicados
+    try{
+      const d=fs.existsSync("./dados/prefixos.json")?fs.readJsonSync("./dados/prefixos.json"):null;
+      const global = d?.global || (process.env.PREFIX||"!").split(',')[0].trim();
+      return [global];
+    }catch{
+      return [(process.env.PREFIX||"!").split(',')[0].trim()];
+    }
   })(),
   NUMERO_BOT: (process.env.BOT_NUMBER || "244954260707").replace(/\D/g,""),
   NUMEROS_ADM: (process.env.OWNER_NUMBERS || "926612801,244926612801,169853876965546").split(",").map(s=>s.trim()),
@@ -84,33 +76,49 @@ const CONFIG = {
   PORT: parseInt(process.env.PORT || "10000"),
 };
 
-// Helper para detectar prefixo usado (multiprefixo)
-function detectarPrefixoUsado(texto){
+// Helper para detectar prefixo usado - SISTEMA DE PREFIXO ÚNICO UNIVERSAL + POR GRUPO
+// Cada grupo pode ter seu prefixo custom, ou usa global. Não responde a vários, só 1 por vez.
+// Também responde à palavra "prefixo" sem prefixo para mostrar prefixo atual com botão copiar
+function detectarPrefixoUsado(texto, jid=null){
   if(!texto) return null;
   const t = texto.trim();
-  // Ordena prefixos por tamanho decrescente para evitar conflito ! vs !!
-  const ordered = [...CONFIG.PREFIXOS].sort((a,b)=>b.length - a.length);
-  for(const p of ordered){
-    if(p === '') continue; // vazio tratado depois
-    if(t.startsWith(p)) return p;
+  // Se texto é exatamente "prefixo" ou "prefixos" (sem prefixo) - seu pedido
+  if(t.toLowerCase() === 'prefixo' || t.toLowerCase() === 'prefixos'){
+    return '__PALAVRA_PREFIXO__';
   }
-  // Se permite sem prefixo e texto é comando conhecido sem prefixo
-  if(CONFIG.PREFIXOS.includes('') || process.env.ALLOW_NO_PREFIX === "true"){
+  // Pega prefixo do grupo ou global
+  let prefixoDoChat = CONFIG.PREFIXO;
+  try{
+    if(jid && fs.existsSync("./dados/prefixos.json")){
+      const data = fs.readJsonSync("./dados/prefixos.json");
+      if(jid.endsWith("@g.us") && data.grupos && data.grupos[jid]){
+        prefixoDoChat = data.grupos[jid];
+      }else{
+        prefixoDoChat = data.global || CONFIG.PREFIXO;
+      }
+    }
+  }catch{}
+  if(t.startsWith(prefixoDoChat)) return prefixoDoChat;
+  // Fallback: se ALLOW_NO_PREFIX true e é comando conhecido, aceita vazio
+  if(process.env.ALLOW_NO_PREFIX === "true"){
     const firstWord = t.split(/\s+/)[0].toLowerCase();
     if(TODOS_COMANDOS && TODOS_COMANDOS.has(firstWord)) return '';
   }
   return null;
 }
 
-function extrairComandoComPrefixo(texto){
-  const prefixo = detectarPrefixoUsado(texto);
-  if(prefixo===null) return null;
-  const semPrefixo = texto.slice(prefixo.length).trim();
+function extrairComandoComPrefixo(texto, jid=null){
+  const prefixoDetectado = detectarPrefixoUsado(texto, jid);
+  if(prefixoDetectado===null) return null;
+  if(prefixoDetectado==='__PALAVRA_PREFIXO__'){
+    return { prefixo: '', comando: 'prefixo', args: [], textoSemPrefixo: 'prefixo', isPalavraPrefixo: true, jid };
+  }
+  const semPrefixo = texto.slice(prefixoDetectado.length).trim();
   if(!semPrefixo) return null;
   const partes = semPrefixo.split(/\s+/);
   const comando = (partes.shift()||'').toLowerCase();
   const args = partes;
-  return { prefixo, comando, args, textoSemPrefixo: semPrefixo };
+  return { prefixo: prefixoDetectado, comando, args, textoSemPrefixo: semPrefixo, isPalavraPrefixo: false, jid };
 }
 
 if (mongoModule && CONFIG.MONGODB_URI) {
@@ -766,14 +774,64 @@ const ARQUIVO_RANK        = "./dados/rank.json";
 const ARQUIVO_STATS       = "./dados/stats.json";
 const ARQUIVO_ATIVOS      = "./dados/ativos.json";
 const ARQUIVO_SILENCIADOS = "./dados/silenciados.json";
+const ARQUIVO_PREFIXOS    = "./dados/prefixos.json";
 if(!fs.existsSync(ARQUIVO_RANK))        fs.writeJsonSync(ARQUIVO_RANK,{});
 if(!fs.existsSync(ARQUIVO_STATS))       fs.writeJsonSync(ARQUIVO_STATS,{total:0,comandos:{},usuarios:{}});
 if(!fs.existsSync(ARQUIVO_ATIVOS))      fs.writeJsonSync(ARQUIVO_ATIVOS,{});
 if(!fs.existsSync(ARQUIVO_SILENCIADOS)) fs.writeJsonSync(ARQUIVO_SILENCIADOS,{});
+if(!fs.existsSync(ARQUIVO_PREFIXOS))    fs.writeJsonSync(ARQUIVO_PREFIXOS,{global: "!", grupos:{}});
 
 try{const s=fs.readJsonSync(ARQUIVO_SILENCIADOS); for(const[j,l] of Object.entries(s)) membrosSilenciados[j]=l;}catch{}
 function salvarSilenciados(){try{fs.writeJsonSync(ARQUIVO_SILENCIADOS,membrosSilenciados);}catch{}}
 function salvarNoBuffer(jid,d){if(!bufferMsgs[jid]) bufferMsgs[jid]=[]; bufferMsgs[jid].push(d); if(bufferMsgs[jid].length>MAX_BUFFER) bufferMsgs[jid].shift();}
+
+// ===== SISTEMA DE PREFIXO UNIVERSAL + POR GRUPO =====
+function carregarPrefixos(){
+  try{
+    if(!fs.existsSync(ARQUIVO_PREFIXOS)) return {global:"!", grupos:{}};
+    const data = fs.readJsonSync(ARQUIVO_PREFIXOS);
+    if(!data.global) data.global = "!";
+    if(!data.grupos) data.grupos = {};
+    return data;
+  }catch{
+    return {global:"!", grupos:{}};
+  }
+}
+function salvarPrefixos(data){
+  try{ fs.writeJsonSync(ARQUIVO_PREFIXOS, data); }catch(e){ console.log("❌ Erro salvar prefixos:", e.message); }
+}
+function getPrefixoDoGrupo(jid){
+  try{
+    const data = carregarPrefixos();
+    if(jid && jid.endsWith("@g.us") && data.grupos[jid]) return data.grupos[jid];
+    return data.global || CONFIG.PREFIXO || "!";
+  }catch{
+    return CONFIG.PREFIXO || "!";
+  }
+}
+function setPrefixoGrupo(jid, novoPrefixo){
+  const data = carregarPrefixos();
+  if(!data.grupos) data.grupos = {};
+  data.grupos[jid] = novoPrefixo;
+  salvarPrefixos(data);
+  return true;
+}
+function setPrefixoGlobal(novoPrefixo){
+  const data = carregarPrefixos();
+  data.global = novoPrefixo;
+  salvarPrefixos(data);
+  CONFIG.PREFIXO = novoPrefixo; // atualiza memória
+  return true;
+}
+function getPrefixoGlobal(){
+  const data = carregarPrefixos();
+  return data.global || "!";
+}
+// Inicializa PREFIXO global salvo
+try{
+  const saved = carregarPrefixos();
+  if(saved.global) CONFIG.PREFIXO = saved.global;
+}catch{}
 
 const TODOS_COMANDOS = new Set([
   "menu","ajuda","sobre","setfoto","alugar","addai",
@@ -2202,10 +2260,10 @@ async function startBot(){
           return;
         }
 
-        // Gate senha + menu numerado - MULTIPREFIXO
-        const prefixoDetectado = detectarPrefixoUsado(texto);
-        if(!prefixoDetectado && CONFIG.PREFIXOS.includes('')===false){
-          // Não é comando, pode ser menu numerado ou senha
+        // Gate senha + menu numerado - SISTEMA PREFIXO ÚNICO UNIVERSAL + POR GRUPO
+        const prefixoDetectadoRaw = detectarPrefixoUsado(texto, jid);
+        // Se não detectou prefixo e não é palavra "prefixo", trata como possível senha ou menu numerado
+        if(!prefixoDetectadoRaw){
           if(/^[0-9]$/.test(texto.trim())){
             const chaveMenu=`${jid}_${sender}`;
             const estadoMenu=menuEsperandoResposta.get(chaveMenu);
@@ -2221,15 +2279,19 @@ async function startBot(){
           }
           if(!isDono&&!senhasAprovadas.has(sender)){
             if(isGrupo&&isAdmin){senhasAprovadas.add(sender);}
-            else if(texto.trim()===CONFIG.SENHA_BOT){senhasAprovadas.add(sender); await enviarSemFoto(sock,jid,`✅ *Acesso permitido!* 🎉\nEscreve *${CONFIG.PREFIXO}menu* para começar. (prefixos: ${CONFIG.PREFIXOS.join(' ')})`,msg);}
+            else if(texto.trim()===CONFIG.SENHA_BOT){
+              const prefAtual = getPrefixoDoGrupo(jid);
+              senhasAprovadas.add(sender); 
+              await enviarSemFoto(sock,jid,`✅ *Acesso permitido!* 🎉\nEscreve *${prefAtual}menu* para começar.`,msg);
+            }
           }
           return;
         }
 
         if(!isDono&&!verificarRateLimit(sender)){await reagir(sock,msg,"⏳"); return;}
 
-        // MULTIPREFIXO: extrai comando corretamente
-        const parsed = extrairComandoComPrefixo(texto);
+        // PREFIXO ÚNICO: extrai comando corretamente com jid
+        const parsed = extrairComandoComPrefixo(texto, jid);
         if(!parsed){
           // Fallback: tenta sem prefixo se ALLOW_NO_PREFIX
           if(CONFIG.PREFIXOS.includes('') || process.env.ALLOW_NO_PREFIX==='true'){
@@ -2339,7 +2401,100 @@ _Após pagamento, envia comprovativo!_ 🧾`;
         if(comando==="set"){const novaSenha=args.join(" ").replace(/['"]/g,"").trim(); if(!novaSenha){await enviarSemFoto(sock,jid,`🔑 *${CONFIG.PREFIXO}set [nova_senha]*`); return;} CONFIG.SENHA_BOT=novaSenha; senhasAprovadas.clear(); await enviarSemFoto(sock,jid,`✅ *Senha alterada:* *${novaSenha}*`); await reagir(sock,msg,"🔑"); return;}
         if(comando==="id"){const numExtraido=sender.split("@")[0].split(":")[0]; await enviarSemFoto(sock,jid,`📱 *JID*\n✦ ─────────── ✦\n_${sender}_\nNúmero: _${numExtraido}_\n👑 Dono: ${isDono?"✅":"❌"} | 👮 Admin: ${isAdmin?"✅":"❌"}`); await reagir(sock,msg,"📱"); return;}
         if(comando==="out"){if(!isGrupo){await enviarSemFoto(sock,jid,"❌ Só em grupos."); return;} try{await sock.sendMessage(jid,{text:`👋 *Bot a sair...*`}); await new Promise(r=>setTimeout(r,1000)); await sock.groupLeave(jid);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}; return;}
-        if(comando==="prefixo"||comando==="prefixos"){if(!args[0]){await enviarComFoto(sock,jid,`⚙️ Prefixo: *${CONFIG.PREFIXO}*`,ppBotUrl); return;} const antigoP=CONFIG.PREFIXO; CONFIG.PREFIXO=args[0].trim().charAt(0); await enviarComFoto(sock,jid,`✅ Prefixo: *${antigoP}* → *${CONFIG.PREFIXO}*`,ppBotUrl); return;}
+        if(comando==="prefixo"||comando==="prefixos"){
+          const prefixoAtualGlobal = getPrefixoGlobal();
+          const prefixoAtualGrupo = getPrefixoDoGrupo(jid);
+          const isGroupWithCustom = jid.endsWith("@g.us") && prefixoAtualGrupo !== prefixoAtualGlobal;
+
+          // Sem argumento: mostra prefixo atual com botão copiar (seu pedido)
+          if(!args[0]){
+            const prefMostrar = isGroupWithCustom ? prefixoAtualGrupo : prefixoAtualGlobal;
+            const tipo = isGroupWithCustom ? "deste grupo" : "global (universal)";
+            const textoPrefixo = `┌─⊱ 『 ⚙️ PREFIXO ATUAL 』 ⊰─┐\n│\n◎ ─ O prefixo ${tipo} é: *${prefMostrar}*\n│\n◎ ─ Global: *${prefixoAtualGlobal}*${isGroupWithCustom ? `\n◎ ─ Este grupo: *${prefixoAtualGrupo}*` : ''}\n│\n◎ ─ Use: *${prefMostrar}menu* para ver comandos\n│\n◎ ─ Para trocar:\n│   • Grupo (admin): *${prefMostrar}prefixo [novo]*\n│   • Global (dono): *${prefMostrar}prefixo [novo] global*\n│\n└──────────────────────────────⊰`;
+
+            // Tenta enviar com botão copiar
+            try{
+              const copyButton = {
+                name: "cta_copy",
+                buttonParamsJson: JSON.stringify({
+                  display_text: "📋 Copiar prefixo",
+                  copy_code: prefMostrar
+                })
+              };
+              const quickButton = {
+                name: "quick_reply",
+                buttonParamsJson: JSON.stringify({
+                  display_text: "🔄 Trocar prefixo",
+                  id: `${prefMostrar}prefixo`
+                })
+              };
+              // Usa interactiveMessage com copy button
+              const msgContent = {
+                interactiveMessage: {
+                  body: { text: textoPrefixo },
+                  footer: { text: "🌀 L1TTL3B0Y • Prefixo Universal" },
+                  nativeFlowMessage: { buttons: [copyButton, quickButton] }
+                }
+              };
+              const msgW = generateWAMessageFromContent(jid, msgContent, {});
+              await sock.relayMessage(jid, msgW.message, { messageId: msgW.key.id });
+            }catch(e){
+              // Fallback sem botão copiar
+              await enviarComFoto(sock, jid, textoPrefixo, ppBotUrl, msg);
+            }
+            await reagir(sock,msg,"⚙️");
+            return;
+          }
+
+          // Com argumento: trocar prefixo
+          let novoPrefixo = args[0].trim();
+          // Validação: 1 caractere, não pode ser letra/número? Permite símbolos comuns
+          if(novoPrefixo.length > 3){
+            await enviarComFoto(sock,jid,`❌ Prefixo muito longo! Use 1 caractere: ! . / # $ % etc\nEx: *${prefixoAtualGrupo}prefixo !*`,ppBotUrl);
+            return;
+          }
+          if(!novoPrefixo){
+            await enviarComFoto(sock,jid,`❌ Prefixo inválido!`,ppBotUrl);
+            return;
+          }
+
+          const isGlobalRequest = args[1]?.toLowerCase() === 'global' || args[1]?.toLowerCase() === 'geral' || !isGrupo;
+
+          if(isGlobalRequest){
+            if(!isDono){
+              await enviarComFoto(sock,jid,`🔒 Apenas o dono pode trocar o prefixo global!`,ppBotUrl);
+              return;
+            }
+            const antigoGlobal = getPrefixoGlobal();
+            setPrefixoGlobal(novoPrefixo);
+            // Salva no Mongo se conectado
+            if(mongoModule && mongoConectado){
+              try{ await mongoModule.setConfig("PREFIXO_GLOBAL", novoPrefixo, true); }catch{}
+            }
+            await enviarComFoto(sock,jid,`✅ *Prefixo global trocado!*\n\n◎ ─ Antigo: *${antigoGlobal}*\n◎ ─ Novo: *${novoPrefixo}*\n\n_Todos os grupos sem prefixo custom agora usarão *${novoPrefixo}*_\n_Use *${novoPrefixo}menu*`,ppBotUrl);
+            await reagir(sock,msg,"✅");
+            addBotLog(`Prefixo global trocado ${antigoGlobal} → ${novoPrefixo} por ${sender}`, 'info');
+          }else{
+            // Troca prefixo do grupo
+            if(!isGrupo){
+              await enviarComFoto(sock,jid,`❌ Este comando de grupo só funciona em grupos! Para global use *${prefixoAtualGlobal}prefixo ${novoPrefixo} global*`,ppBotUrl);
+              return;
+            }
+            if(!isAdmin && !isDono){
+              await enviarComFoto(sock,jid,`🔒 Apenas admins podem trocar o prefixo deste grupo!`,ppBotUrl);
+              return;
+            }
+            const antigoGrupo = getPrefixoDoGrupo(jid);
+            setPrefixoGrupo(jid, novoPrefixo);
+            if(mongoModule && mongoConectado){
+              try{ await mongoModule.setConfig(`PREFIXO_GRUPO_${jid}`, novoPrefixo, true); }catch{}
+            }
+            await enviarComFoto(sock,jid,`✅ *Prefixo deste grupo trocado!*\n\n◎ ─ Antigo: *${antigoGrupo}*\n◎ ─ Novo: *${novoPrefixo}*\n◎ ─ Global: *${prefixoAtualGlobal}* (continua igual)\n\n_Neste grupo use: *${novoPrefixo}menu*_\n_Para voltar ao global, use *${novoPrefixo}prefixo ${prefixoAtualGlobal}*`,ppBotUrl);
+            await reagir(sock,msg,"✅");
+            addBotLog(`Prefixo grupo ${jid} trocado ${antigoGrupo} → ${novoPrefixo} por ${sender}`, 'info');
+          }
+          return;
+        }
         if(comando==="bloq"){comandosBloqueados.add(jid); await enviarComFoto(sock,jid,`🔒 *Comandos bloqueados!*`,ppBotUrl); await reagir(sock,msg,"🔒"); return;}
         if(comando==="desbloq"){comandosBloqueados.delete(jid); await enviarComFoto(sock,jid,`🔓 *Comandos desbloqueados!*`,ppBotUrl); await reagir(sock,msg,"🔓"); return;}
         if(comando==="add"&&isGrupo){if(!args[0]){await enviarComFoto(sock,jid,`📱 *${CONFIG.PREFIXO}add [número]*`,ppBotUrl); return;} let numero=args[0].replace(/[^\d]/g,""); if(numero.startsWith("00")) numero=numero.slice(2); if(numero.startsWith("244")&&numero.length===12){}else if(numero.length===9) numero=`244${numero}`; else if(numero.startsWith("0")&&numero.length===10) numero=`244${numero.slice(1)}`; await enviarSemFoto(sock,jid,`📱 A adicionar *+${numero}*...\n⏳`); try{const result=await sock.groupParticipantsUpdate(jid,[`${numero}@s.whatsapp.net`],"add"); const status=result?.[0]?.status; if(status===200){await enviarComFoto(sock,jid,`✅ *+${numero}* adicionado!`,ppBotUrl); await reagir(sock,msg,"✅");}else if(status===408){await enviarSemFoto(sock,jid,`❌ Sem WhatsApp.`);}else if(status===403){await enviarSemFoto(sock,jid,`⚠️ Não permite adição.`);}else{await reagir(sock,msg,"✅");}}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
