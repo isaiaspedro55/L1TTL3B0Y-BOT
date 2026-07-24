@@ -25,6 +25,12 @@ services:
         value: 10000
       - key: PREFIX
         value: "!"
+      - key: PREFIXES
+        value: "!,.,/,#,$,%,-,+"
+      - key: MULTIPREFIX
+        value: true
+      - key: ALLOW_NO_PREFIX
+        value: false
       - key: BOT_NUMBER
         value: "244954260707"
       - key: OWNER_NUMBERS

@@ -50,7 +50,25 @@ try { ButtonV2 = require("@systemzero/baileys/lib/MB.cjs").ButtonV2; }
 catch(e) { console.log("⚠️ ButtonV2:", e.message); }
 
 const CONFIG = {
-  PREFIXO: process.env.PREFIX || "!",
+  PREFIXO: (process.env.PREFIX || "!").split(',')[0].trim() || "!",
+  // MULTIPREFIXO - suporta ! . / # $ etc, configurável via PREFIXES ou PREFIX com vírgulas
+  // Ex: PREFIXES="!,.,/,#,$" ou PREFIX="!"
+  PREFIXOS: (() => {
+    const raw = process.env.PREFIXES || process.env.PREFIX || "!,.,/,#,$,%,-";
+    // Se MULTIPREFIX=true, usa lista padrão grande
+    const defaultMulti = ["!", ".", "/", "#", "$", "%", "&", "-", "+"];
+    const parsed = raw.split(',').map(p=>p.trim()).filter(p=>p.length>0);
+    // Se ALLOW_NO_PREFIX=true, permite sem prefixo também
+    const allowNoPrefix = process.env.ALLOW_NO_PREFIX === "true";
+    let list = parsed.length ? parsed : defaultMulti;
+    // Garante que PREFIXO principal está na lista
+    const main = (process.env.PREFIX || "!").split(',')[0].trim();
+    if(!list.includes(main)) list.unshift(main);
+    if(allowNoPrefix && !list.includes('')) list.push('');
+    // Sempre inclui ! . / para compatibilidade
+    ["!", ".", "/"].forEach(p=>{ if(!list.includes(p)) list.push(p); });
+    return [...new Set(list)]; // remove duplicados
+  })(),
   NUMERO_BOT: (process.env.BOT_NUMBER || "244954260707").replace(/\D/g,""),
   NUMEROS_ADM: (process.env.OWNER_NUMBERS || "926612801,244926612801,169853876965546").split(",").map(s=>s.trim()),
   GROQ_KEY: process.env.GROQ_API_KEY || "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",
@@ -65,6 +83,35 @@ const CONFIG = {
   RENDER_URL: process.env.RENDER_EXTERNAL_URL || "",
   PORT: parseInt(process.env.PORT || "10000"),
 };
+
+// Helper para detectar prefixo usado (multiprefixo)
+function detectarPrefixoUsado(texto){
+  if(!texto) return null;
+  const t = texto.trim();
+  // Ordena prefixos por tamanho decrescente para evitar conflito ! vs !!
+  const ordered = [...CONFIG.PREFIXOS].sort((a,b)=>b.length - a.length);
+  for(const p of ordered){
+    if(p === '') continue; // vazio tratado depois
+    if(t.startsWith(p)) return p;
+  }
+  // Se permite sem prefixo e texto é comando conhecido sem prefixo
+  if(CONFIG.PREFIXOS.includes('') || process.env.ALLOW_NO_PREFIX === "true"){
+    const firstWord = t.split(/\s+/)[0].toLowerCase();
+    if(TODOS_COMANDOS && TODOS_COMANDOS.has(firstWord)) return '';
+  }
+  return null;
+}
+
+function extrairComandoComPrefixo(texto){
+  const prefixo = detectarPrefixoUsado(texto);
+  if(prefixo===null) return null;
+  const semPrefixo = texto.slice(prefixo.length).trim();
+  if(!semPrefixo) return null;
+  const partes = semPrefixo.split(/\s+/);
+  const comando = (partes.shift()||'').toLowerCase();
+  const args = partes;
+  return { prefixo, comando, args, textoSemPrefixo: semPrefixo };
+}
 
 if (mongoModule && CONFIG.MONGODB_URI) {
   (async () => {
@@ -2100,14 +2147,17 @@ async function startBot(){
           }catch(e){ console.log("⚠️ interResp parse:", e.message); }
         }
 
-        // !ergue-se
-        if(isDono&&isGrupo&&texto===`${CONFIG.PREFIXO}ergue-se`){
-          gruposAtivados.add(jid);
-          const caption=`✅ *ERGUE-TE!* 🤴🏽\n✦ ─────────── ✦\n\nAs tuas Ordens meu senhor! ✨️👑\n\n🔒 Anti-link: *ACTIVO*\n🚫 Anti-menção: *ACTIVO*\n⛔ Anti-status: *ACTIVO*\n\n_Usa *${CONFIG.PREFIXO}menu*!_`;
-          await reagir(sock,msg,"✅");
-          const gifOk=await enviarGif(sock,jid,caption);
-          if(!gifOk) await enviarComFoto(sock,jid,caption,ppBotUrl);
-          return;
+        // !ergue-se - MULTIPREFIXO
+        {
+          const ergue = extrairComandoComPrefixo(texto);
+          if(ergue && ergue.comando === 'ergue-se' && isDono && isGrupo){
+            gruposAtivados.add(jid);
+            const caption=`✅ *ERGUE-TE!* 🤴🏽\n✦ ─────────── ✦\n\nAs tuas Ordens meu senhor! ✨️👑\n\n🔒 Anti-link: *ACTIVO*\n🚫 Anti-menção: *ACTIVO*\n⛔ Anti-status: *ACTIVO*\n\n_Usa *${CONFIG.PREFIXO}menu*_ (prefixos: ${CONFIG.PREFIXOS.join(' ')})!`;
+            await reagir(sock,msg,"✅");
+            const gifOk=await enviarGif(sock,jid,caption);
+            if(!gifOk) await enviarComFoto(sock,jid,caption,ppBotUrl);
+            return;
+          }
         }
 
         if(isGrupo&&!isDono&&!gruposAtivados.has(jid)) return;
@@ -2152,8 +2202,10 @@ async function startBot(){
           return;
         }
 
-        // Gate senha + menu numerado
-        if(!texto.startsWith(CONFIG.PREFIXO)){
+        // Gate senha + menu numerado - MULTIPREFIXO
+        const prefixoDetectado = detectarPrefixoUsado(texto);
+        if(!prefixoDetectado && CONFIG.PREFIXOS.includes('')===false){
+          // Não é comando, pode ser menu numerado ou senha
           if(/^[0-9]$/.test(texto.trim())){
             const chaveMenu=`${jid}_${sender}`;
             const estadoMenu=menuEsperandoResposta.get(chaveMenu);
@@ -2169,14 +2221,35 @@ async function startBot(){
           }
           if(!isDono&&!senhasAprovadas.has(sender)){
             if(isGrupo&&isAdmin){senhasAprovadas.add(sender);}
-            else if(texto.trim()===CONFIG.SENHA_BOT){senhasAprovadas.add(sender); await enviarSemFoto(sock,jid,`✅ *Acesso permitido!* 🎉\nEscreve *${CONFIG.PREFIXO}menu* para começar.`,msg);}
+            else if(texto.trim()===CONFIG.SENHA_BOT){senhasAprovadas.add(sender); await enviarSemFoto(sock,jid,`✅ *Acesso permitido!* 🎉\nEscreve *${CONFIG.PREFIXO}menu* para começar. (prefixos: ${CONFIG.PREFIXOS.join(' ')})`,msg);}
           }
           return;
         }
 
         if(!isDono&&!verificarRateLimit(sender)){await reagir(sock,msg,"⏳"); return;}
-        const args=texto.slice(CONFIG.PREFIXO.length).trim().split(/\s+/);
-        const comando=args.shift().toLowerCase();
+
+        // MULTIPREFIXO: extrai comando corretamente
+        const parsed = extrairComandoComPrefixo(texto);
+        if(!parsed){
+          // Fallback: tenta sem prefixo se ALLOW_NO_PREFIX
+          if(CONFIG.PREFIXOS.includes('') || process.env.ALLOW_NO_PREFIX==='true'){
+            const tmp = texto.trim().split(/\s+/);
+            const cmdTmp = (tmp.shift()||'').toLowerCase();
+            if(TODOS_COMANDOS.has(cmdTmp)){
+              var args = tmp;
+              var comando = cmdTmp;
+            }else{
+              return;
+            }
+          }else{
+            return;
+          }
+        } else {
+          var args = parsed.args;
+          var comando = parsed.comando;
+          // Atualiza PREFIXO usado para mostrar no menu? Mantém principal
+          // Se quiser, pode salvar prefixo usado: const prefixoUsado = parsed.prefixo;
+        }
 
         if(!isDono&&!senhasAprovadas.has(sender)){
           if(isGrupo&&isAdmin){senhasAprovadas.add(sender);}
