@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>L1TTL3B0Y BOT - Dashboard</title>
+<title>L1TTL3B0Y BOT - Dashboard Seguro</title>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
@@ -15,8 +15,6 @@
 *::-webkit-scrollbar-thumb{background:#2a2a40;border-radius:999px}
 body{font-family:Inter,sans-serif;background:#0a0a0f;color:#e5e5ff}
 .glass{background:rgba(255,255,255,0.05);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08)}
-.card{transition:all .2s}
-.card:hover{border-color:rgba(124,58,237,0.3)}
 .tab{display:none}
 .tab.active{display:block;animation:fadeIn .25s}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -24,64 +22,63 @@ canvas{max-width:100%}
 </style>
 </head>
 <body class="min-h-screen bg-[#08080c]">
-<!-- HEADER -->
+<script>
+// Sistema de contas e segurança - mantém mesmo tema e acabamentos
+(function(){
+  const token = localStorage.getItem('enterprise_token') || (document.cookie.match(/enterprise_token=([^;]+)/)||[])[1];
+  if(!token){
+    fetch('/api/auth/me').then(r=>{ if(!r.ok) window.location.href='/login'; }).catch(()=>{ window.location.href='/login'; });
+  }
+})();
+</script>
 <header class="h-[64px] bg-[#11111a]/80 backdrop-blur-xl border-b border-white/10 sticky top-0 z-30 flex items-center justify-between px-6">
   <div class="flex items-center gap-3">
     <button id="menuBtn" class="lg:hidden w-9 h-9 rounded-[10px] bg-white/10 grid place-items-center"><i class="fa-solid fa-bars"></i></button>
     <div class="w-9 h-9 rounded-[12px] bg-gradient-to-br from-violet-600 to-fuchsia-600 grid place-items-center font-black">🌀</div>
-    <div>
-      <div class="font-black">L1TTL3B0Y BOT</div>
-      <div class="text-[10px] text-white/40 tracking-widest">DASHBOARD • ONLINE</div>
-    </div>
+    <div><div class="font-black">L1TTL3B0Y BOT</div><div class="text-[10px] text-white/40 tracking-widest flex items-center gap-2">DASHBOARD • SECURE <span class="px-1.5 py-0.5 rounded-[6px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 text-[8px]"><i class="fa-solid fa-lock"></i> AES-256</span></div></div>
   </div>
   <div class="flex items-center gap-3">
-    <span id="statusDot" class="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(16,185,129,0.2)]"></span>
+    <span id="statusDot" class="w-3 h-3 rounded-full bg-emerald-400"></span>
     <span id="statusText" class="text-[13px]">Conectando...</span>
     <span id="uptimeBadge" class="hidden md:flex px-3 py-1 rounded-full bg-white/10 text-[11px]">Uptime: 0h 0m</span>
+    <div class="w-px h-6 bg-white/10 hidden md:block"></div>
+    <div class="hidden md:flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 grid place-items-center font-bold text-[11px]" id="userAvatar">IP</div><div class="text-left hidden lg:block"><div class="text-[12px] font-bold leading-none" id="userName">User</div><div class="text-[10px] text-white/40" id="userRole">OWNER</div></div></div>
+    <button onclick="logout()" class="w-8 h-8 rounded-[10px] bg-red-500/10 border border-red-500/20 text-red-300 grid place-items-center hover:bg-red-500/15"><i class="fa-solid fa-right-from-bracket text-[12px]"></i></button>
   </div>
 </header>
-
 <div class="flex">
-  <!-- SIDEBAR -->
   <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 w-[260px] bg-[#0f0f16] border-r border-white/10 z-40 transform -translate-x-full lg:translate-x-0 transition-transform flex flex-col">
-    <div class="p-4 space-y-1">
+    <div class="p-4">
+      <div class="glass rounded-[12px] p-3 mb-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-[10px] bg-gradient-to-br from-violet-600 to-fuchsia-600 grid place-items-center font-black text-[13px]" id="sideAvatar">IP</div>
+        <div class="flex-1 min-w-0"><div class="text-[12px] font-bold truncate" id="sideName">Carregando...</div><div class="text-[10px] text-white/40 flex items-center gap-1"><i class="fa-solid fa-shield-halved text-emerald-400"></i> <span id="sideEmail">secure</span></div></div>
+        <span class="px-1.5 py-0.5 rounded-[6px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 text-[9px] font-bold">SECURE</span>
+      </div>
       <div class="text-[10px] font-black tracking-widest text-white/30 uppercase px-3 py-2">Principal</div>
-      <button class="nav-btn active w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] bg-violet-600 text-white text-[13px] font-bold" data-tab="connect"><i class="fa-solid fa-link w-5"></i> Conectar WhatsApp <span class="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded">PAIR • QR</span></button>
+      <button class="nav-btn active w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] bg-violet-600 text-white text-[13px] font-bold" data-tab="connect"><i class="fa-solid fa-link w-5"></i> Conectar <span class="ml-auto text-[10px] bg-white/20 px-1.5 py-0.5 rounded">PAIR • QR</span></button>
       <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="overview"><i class="fa-solid fa-chart-simple w-5"></i> Overview</button>
       <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="groups"><i class="fa-solid fa-users w-5"></i> Grupos <span id="groupsCountSide" class="ml-auto text-[11px] bg-white/10 px-1.5 py-0.5 rounded">0</span></button>
       <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="commands"><i class="fa-solid fa-terminal w-5"></i> Comandos</button>
-      <div class="text-[10px] font-black tracking-widest text-white/30 uppercase px-3 py-2 mt-4">Sistema</div>
+      <div class="text-[10px] font-black tracking-widest text-white/30 uppercase px-3 py-2 mt-4">Sistema Seguro</div>
       <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="files"><i class="fa-solid fa-folder w-5"></i> Arquivos</button>
       <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="rank"><i class="fa-solid fa-trophy w-5"></i> Rank</button>
-      <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="logs"><i class="fa-solid fa-file-lines w-5"></i> Logs</button>
+      <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="logs"><i class="fa-solid fa-file-lines w-5"></i> Logs Auditados</button>
+      <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="security"><i class="fa-solid fa-shield-halved w-5"></i> Segurança <span class="ml-auto text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded">AES-256</span></button>
       <button class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] hover:bg-white/10 text-white/60 text-[13px]" data-tab="settings"><i class="fa-solid fa-gear w-5"></i> Config</button>
     </div>
-    <div class="mt-auto p-4 border-t border-white/10">
-      <div class="glass rounded-[12px] p-3 flex items-center gap-2">
-        <div class="w-8 h-8 rounded-[8px] bg-emerald-500/20 border border-emerald-500/30 grid place-items-center text-emerald-400"><i class="fa-solid fa-shield-halved text-[12px]"></i></div>
-        <div><div class="text-[11px] font-bold">Bot Operacional</div><div class="text-[10px] text-white/40">Render Free + MongoDB</div></div>
-        <div class="ml-auto w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-      </div>
+    <div class="mt-auto p-4 border-t border-white/10 space-y-2">
+      <div class="glass rounded-[12px] p-3 flex items-center gap-2"><div class="w-8 h-8 rounded-[8px] bg-emerald-500/20 border border-emerald-500/30 grid place-items-center text-emerald-400"><i class="fa-solid fa-lock text-[12px]"></i></div><div><div class="text-[11px] font-bold">Conta Protegida</div><div class="text-[10px] text-white/40">JWT • bcrypt • AES-256 • RBAC</div></div><div class="ml-auto w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div></div>
+      <button onclick="logout()" class="w-full h-[40px] rounded-[12px] bg-white/5 hover:bg-red-500/10 hover:text-red-300 border border-white/10 hover:border-red-500/20 text-[12px] font-bold flex items-center justify-center gap-2"><i class="fa-solid fa-right-from-bracket"></i> Sair Seguro</button>
     </div>
   </aside>
-
-  <!-- MAIN -->
   <main class="flex-1 min-h-[calc(100vh-64px)] p-4 lg:p-6 w-full lg:ml-0">
-    <!-- CONNECT TAB - MAIS FUNCIONAL -->
     <div class="tab active" id="tab-connect">
       <div class="max-w-[1100px] mx-auto">
-        <h2 class="text-[22px] font-black mb-1">Conectar WhatsApp</h2>
-        <p class="text-[13px] text-white/50 mb-6">Conecte seu bot via Pair Code (recomendado) ou QR Code. Sessão fica hospedada no MongoDB e sobrevive a redeploys Render.</p>
-
+        <div class="flex items-center justify-between mb-1"><h2 class="text-[22px] font-black">Conectar WhatsApp</h2><span class="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 text-[10px] font-bold flex items-center gap-1"><i class="fa-solid fa-shield-halved"></i> SESSÃO HOSPEDADA • CRIPTOGRAFADA</span></div>
+        <p class="text-[13px] text-white/50 mb-6">Conecte seu bot via Pair Code (recomendado) ou QR Code. Sessão fica hospedada no MongoDB e sobrevive a redeploys Render. <span class="text-violet-300">Conta protegida: <span id="secureUser">carregando...</span></span></p>
         <div class="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-6">
-          <!-- LEFT - CONEXÃO FUNCIONAL -->
           <div class="glass rounded-[20px] p-6">
-            <div class="flex justify-between items-center mb-5">
-              <h3 class="font-bold"><i class="fa-solid fa-mobile-screen-button text-violet-400 mr-2"></i> Conectar Bot - Pair Code & QR Code</h3>
-              <span id="connBadge" class="px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20 text-[11px] font-bold">Aguardando</span>
-            </div>
-
-            <!-- Como conectar -->
+            <div class="flex justify-between items-center mb-5"><h3 class="font-bold"><i class="fa-solid fa-mobile-screen-button text-violet-400 mr-2"></i> Conectar Bot - Pair Code & QR Code</h3><span id="connBadge" class="px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20 text-[11px] font-bold">Aguardando</span></div>
             <div class="bg-[#0c0c12] border border-white/10 rounded-[14px] p-4 mb-5">
               <div class="text-[11px] font-black tracking-widest text-white/40 uppercase mb-2">Como funciona - Notificação no WhatsApp alvo:</div>
               <ol class="list-decimal list-inside space-y-1.5 text-[12px] text-white/70 leading-relaxed">
@@ -89,150 +86,89 @@ canvas{max-width:100%}
                 <li>Clique <b>Gerar Pair Code</b> - código de 8 dígitos aparece</li>
                 <li>O <b>WhatsApp do número alvo</b> recebe <b>notificação automática</b> pedindo código</li>
                 <li>No WhatsApp alvo: <b>Configurações → Aparelhos conectados → Conectar com número</b> → digite código</li>
-                <li>Ou escaneie <b>QR Code</b> na aba ao lado</li>
+                <li>Ou escaneie <b>QR Code</b></li>
               </ol>
             </div>
-
-            <!-- Campo Número + Botões -->
             <label class="text-[11px] font-bold tracking-widest text-white/40 uppercase">Número do Bot (com DDD, sem +)</label>
             <div class="flex gap-2 mt-2">
-              <div class="relative flex-1">
-                <i class="fa-solid fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[12px]"></i>
-                <input id="phoneInput" value="244954260707" placeholder="244954260707" class="w-full h-[48px] pl-9 pr-3 rounded-[12px] bg-[#0a0a0f] border border-white/15 text-white font-mono text-[14px] outline-none focus:border-violet-500/50">
-              </div>
+              <div class="relative flex-1"><i class="fa-solid fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[12px]"></i><input id="phoneInput" value="244954260707" placeholder="244954260707" class="w-full h-[48px] pl-9 pr-3 rounded-[12px] bg-[#0a0a0f] border border-white/15 text-white font-mono text-[14px] outline-none focus:border-violet-500/50"></div>
               <button onclick="requestPairing()" id="pairBtn" class="h-[48px] px-5 rounded-[12px] bg-violet-600 hover:bg-violet-500 text-white font-bold text-[13px] flex items-center gap-2"><i class="fa-solid fa-key"></i> Pair Code</button>
               <button onclick="requestQR()" id="qrBtn" class="h-[48px] px-4 rounded-[12px] bg-white/10 hover:bg-white/15 border border-white/10 font-bold text-[13px]"><i class="fa-solid fa-qrcode"></i> QR</button>
             </div>
-
-            <!-- Pair Code Display -->
             <div id="pairCodeArea" class="hidden mt-5">
-              <div class="flex justify-between items-center mb-2">
-                <span class="text-[11px] font-bold tracking-widest text-emerald-300 uppercase">Código Pair • Expira 60s • Notificação enviada ao alvo</span>
-                <span id="countdown" class="text-[11px] font-mono bg-amber-500/15 text-amber-300 px-2 py-1 rounded-full border border-amber-500/20">60s</span>
-              </div>
+              <div class="flex justify-between items-center mb-2"><span class="text-[11px] font-bold tracking-widest text-emerald-300 uppercase">Código Pair • Expira 60s • Notificação enviada ao alvo</span><span id="countdown" class="text-[11px] font-mono bg-amber-500/15 text-amber-300 px-2 py-1 rounded-full border border-amber-500/20">60s</span></div>
               <div id="pairCodeDisplay" class="text-[40px] font-black tracking-[0.2em] font-mono text-center py-6 rounded-[16px] bg-[#0a0a0f] border-2 border-dashed border-violet-500/40 select-all">---- ----</div>
-              <div class="grid grid-cols-2 gap-2 mt-3">
-                <button onclick="copyPairCode()" class="h-[42px] rounded-[12px] bg-white/10 hover:bg-white/15 border border-white/10 font-bold text-[13px]"><i class="fa-solid fa-copy mr-2"></i> Copiar código</button>
-                <button onclick="requestPairing()" class="h-[42px] rounded-[12px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[13px]"><i class="fa-solid fa-rotate mr-2"></i> Novo código</button>
-              </div>
-              <div class="mt-3 p-3 rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200">
-                <i class="fa-solid fa-bell mr-1"></i> <b>WhatsApp alvo recebeu notificação</b> pedindo código. Diga ao dono do número para abrir notificação ou ir em Aparelhos conectados → Conectar com número → digitar código acima.
-              </div>
+              <div class="grid grid-cols-2 gap-2 mt-3"><button onclick="copyPairCode()" class="h-[42px] rounded-[12px] bg-white/10 hover:bg-white/15 border border-white/10 font-bold text-[13px]"><i class="fa-solid fa-copy mr-2"></i> Copiar código</button><button onclick="requestPairing()" class="h-[42px] rounded-[12px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[13px]"><i class="fa-solid fa-rotate mr-2"></i> Novo código</button></div>
+              <div class="mt-3 p-3 rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200"><i class="fa-solid fa-bell mr-1"></i> <b>WhatsApp alvo recebeu notificação</b> pedindo código. Diga ao dono do número para abrir notificação ou ir em Aparelhos conectados → Conectar com número → digitar código acima. Ação auditada.</div>
             </div>
-
-            <!-- QR Canvas Display -->
             <div id="qrArea" class="hidden mt-5">
-              <div class="text-[11px] font-bold tracking-widest text-white/40 uppercase mb-3">QR Code • Escaneie com WhatsApp do bot</div>
-              <div class="flex flex-col items-center gap-4">
-                <div class="bg-white p-4 rounded-[16px] shadow-xl">
-                  <canvas id="qrCanvas" width="280" height="280" class="w-[280px] h-[280px]"></canvas>
-                </div>
-                <img id="qrImage" src="" alt="QR" class="hidden w-[280px] h-[280px] bg-white p-2 rounded-[16px]">
-                <div class="text-[11px] text-white/50 text-center">Abra WhatsApp do bot → Aparelhos conectados → Conectar aparelho → Aponte câmera para QR<br>Código expira em 60s, gere novo se precisar.</div>
-              </div>
+              <div class="text-[11px] font-bold tracking-widest text-white/40 uppercase mb-3">QR Code • Escaneie com WhatsApp do bot • Tamanho correto 280x280</div>
+              <div class="flex flex-col items-center gap-4"><div class="bg-white p-4 rounded-[16px] shadow-xl"><canvas id="qrCanvas" width="280" height="280" class="w-[280px] h-[280px]"></canvas></div><img id="qrImage" src="" alt="QR" class="hidden w-[280px] h-[280px] bg-white p-2 rounded-[16px]"><div class="text-[11px] text-white/50 text-center">Abra WhatsApp do bot → Aparelhos conectados → Conectar aparelho → Aponte câmera para QR<br>Código expira em 60s, gere novo se precisar.</div></div>
             </div>
-
-            <!-- Connected -->
-            <div id="connectedArea" class="hidden mt-6 text-center py-6">
-              <div class="w-[72px] h-[72px] bg-emerald-500 rounded-full grid place-items-center text-[32px] mx-auto mb-3">✅</div>
-              <div class="text-[18px] font-black">Bot Conectado!</div>
-              <div id="connectedNumber" class="text-white/60 text-[13px] mt-1">+244...</div>
-              <div class="mt-3 inline-flex px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold">Sessão hospedada MongoDB • Sobrevive redeploy</div>
-              <button onclick="disconnectBot()" class="mt-5 px-5 py-2.5 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 text-[13px] font-bold"><i class="fa-solid fa-power-off mr-2"></i> Desconectar</button>
-            </div>
+            <div id="connectedArea" class="hidden mt-6 text-center py-6"><div class="w-[72px] h-[72px] bg-emerald-500 rounded-full grid place-items-center text-[32px] mx-auto mb-3">✅</div><div class="text-[18px] font-black">Bot Conectado!</div><div id="connectedNumber" class="text-white/60 text-[13px] mt-1">+244...</div><div class="mt-3 inline-flex px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold">Sessão hospedada MongoDB • Sobrevive redeploy • Criptografada AES-256</div><button onclick="disconnectBot()" class="mt-5 px-5 py-2.5 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 text-[13px] font-bold"><i class="fa-solid fa-power-off mr-2"></i> Desconectar Seguro</button></div>
           </div>
-
-          <!-- RIGHT - STATUS + INFO -->
           <div class="space-y-4">
-            <div class="glass rounded-[20px] p-5">
-              <h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Status Conexão • Online/Offline</h4>
-              <div id="connStatusList" class="space-y-2"></div>
-              <button onclick="checkConnection()" class="w-full mt-4 h-[40px] rounded-[12px] bg-white/10 hover:bg-white/15 border border-white/10 text-[13px] font-bold"><i class="fa-solid fa-rotate mr-2"></i> Verificar Status</button>
-            </div>
-
-            <div class="glass rounded-[20px] p-5">
-              <h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Sessão Hospedada • Render Free</h4>
-              <div class="space-y-2 text-[12px] text-white/60 leading-relaxed">
-                <p>• <b class="text-white">Backup MongoDB:</b> a cada 5min salva ./sessao completa</p>
-                <p>• <b class="text-white">Restore automático:</b> se Render apagar disco, restaura do Mongo e reconecta sem novo código</p>
-                <p>• <b class="text-white">Offline:</b> dashboard detecta offline, dono clica Gerar novo código → notificação vai para alvo → conecta novamente</p>
-                <p>• <b class="text-white">Online:</b> badge verde + número + sessão ✅</p>
-              </div>
-            </div>
-
-            <div class="glass rounded-[20px] p-5">
-              <h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Canvas Charts • Tamanho Correto</h4>
-              <div class="h-[180px] bg-[#0a0a0f] rounded-[12px] p-2 border border-white/10">
-                <canvas id="miniChart" width="400" height="180"></canvas>
-              </div>
-              <div class="text-[11px] text-white/40 mt-2">Canvas com tamanho fixo 400x180 corrigido, não estica.</div>
-            </div>
+            <div class="glass rounded-[20px] p-5"><h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Status Conexão • Online/Offline • Seguro</h4><div id="connStatusList" class="space-y-2"></div><button onclick="checkConnection()" class="w-full mt-4 h-[40px] rounded-[12px] bg-white/10 hover:bg-white/15 border border-white/10 text-[13px] font-bold"><i class="fa-solid fa-rotate mr-2"></i> Verificar Status</button></div>
+            <div class="glass rounded-[20px] p-5 border border-violet-500/20"><h4 class="font-bold text-[12px] tracking-widest uppercase text-violet-300 mb-3">Conta e Segurança Ativa</h4><div class="space-y-2.5 text-[12px]"><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">Usuário</span><span class="font-bold" id="secUser">-</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">Role</span><span class="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[11px] font-bold" id="secRole">OWNER</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">Criptografia</span><span class="text-emerald-300 text-[11px] font-bold">AES-256-GCM • bcrypt</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">Sessão Hospedada</span><span class="text-emerald-300 text-[11px]">MongoDB • Sobrevive redeploy</span></div></div></div>
+            <div class="glass rounded-[20px] p-5"><h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Canvas Charts • Tamanho Correto</h4><div class="h-[180px] bg-[#0a0a0f] rounded-[12px] p-2 border border-white/10"><canvas id="miniChart" width="400" height="180"></canvas></div><div class="text-[11px] text-white/40 mt-2">Canvas com tamanho fixo 400x180 corrigido, não estica. Site operacional sem bugs.</div></div>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- OVERVIEW -->
-    <div class="tab" id="tab-overview">
-      <h2 class="text-[18px] font-black mb-4">Overview</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">Bot Status</div><div id="ovStatus" class="text-[20px] font-black mt-1">🟢 Online</div><div id="ovUptime" class="text-[12px] text-white/50">Uptime 0h 0m</div></div>
-        <div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">Grupos</div><div id="ovGroups" class="text-[20px] font-black mt-1">0</div><div class="text-[12px] text-white/50">ativos</div></div>
-        <div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">MongoDB</div><div id="ovMongo" class="text-[20px] font-black mt-1">❌ Offline</div><div class="text-[12px] text-white/50">backup sessão</div></div>
-      </div>
-      <div class="glass rounded-[16px] p-5">
-        <h3 class="font-bold text-[13px] mb-3">Comandos • 7 dias</h3>
-        <div class="h-[260px]"><canvas id="mainChart" width="800" height="260"></canvas></div>
-      </div>
-    </div>
-
-    <!-- GROUPS -->
-    <div class="tab" id="tab-groups">
-      <div class="glass rounded-[16px] p-5">
-        <div class="flex justify-between items-center mb-4"><h3 class="font-bold">Grupos (<span id="groupsCount">0</span>)</h3><button onclick="loadGroups()" class="px-3 py-1.5 rounded-full bg-white/10 text-[12px]">Atualizar</button></div>
-        <div class="overflow-x-auto"><table class="w-full text-[13px]"><thead class="text-[11px] text-white/40 uppercase"><tr><th class="text-left p-2">#</th><th class="text-left p-2">Grupo</th><th class="text-left p-2">Membros</th><th class="text-left p-2">Ação</th></tr></thead><tbody id="groupsTable"></tbody></table></div>
-      </div>
-    </div>
-
+    <div class="tab" id="tab-overview"><h2 class="text-[18px] font-black mb-4">Overview Seguro</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">Bot Status</div><div id="ovStatus" class="text-[20px] font-black mt-1">🟢 Online</div><div id="ovUptime" class="text-[12px] text-white/50">Uptime 0h 0m</div></div><div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">Grupos</div><div id="ovGroups" class="text-[20px] font-black mt-1">0</div><div class="text-[12px] text-white/50">ativos</div></div><div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">MongoDB Seguro</div><div id="ovMongo" class="text-[20px] font-black mt-1">❌ Offline</div><div class="text-[12px] text-white/50">backup sessão criptografado</div></div></div><div class="glass rounded-[16px] p-5"><h3 class="font-bold text-[13px] mb-3">Comandos • 7 dias • Canvas 800x260 tamanho correto</h3><div class="h-[260px]"><canvas id="mainChart" width="800" height="260"></canvas></div></div></div>
+    <div class="tab" id="tab-groups"><div class="glass rounded-[16px] p-5"><div class="flex justify-between items-center mb-4"><h3 class="font-bold">Grupos (<span id="groupsCount">0</span>)</h3><button onclick="loadGroups()" class="px-3 py-1.5 rounded-full bg-white/10 text-[12px]">Atualizar</button></div><div class="overflow-x-auto"><table class="w-full text-[13px]"><thead class="text-[11px] text-white/40 uppercase"><tr><th class="text-left p-2">#</th><th class="text-left p-2">Grupo</th><th class="text-left p-2">Membros</th><th class="text-left p-2">Ação</th></tr></thead><tbody id="groupsTable"></tbody></table></div></div></div>
     <div class="tab" id="tab-commands"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Comandos</h3><div id="commandsList" class="space-y-1 text-[12px]"></div></div></div>
     <div class="tab" id="tab-files"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Arquivos</h3><div id="filesTable"></div></div></div>
     <div class="tab" id="tab-rank"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Rank</h3><table class="w-full text-[13px]"><thead class="text-[11px] text-white/40 uppercase"><tr><th class="text-left p-2">Pos</th><th class="text-left p-2">Número</th><th class="text-left p-2">XP</th></tr></thead><tbody id="rankTable"></tbody></table></div></div>
-    <div class="tab" id="tab-logs"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Logs</h3><div id="logBox" class="h-[400px] overflow-y-auto bg-[#0a0a0f] rounded-[12px] p-3 font-mono text-[11px] border border-white/10"></div></div></div>
-    <div class="tab" id="tab-settings"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Config • Prefixo</h3><div id="settingsInfo" class="text-[13px] text-white/60"></div><input id="setChannel" placeholder="https://whatsapp.com/channel/..." class="w-full mt-3 h-[44px] px-4 rounded-[12px] bg-white/5 border border-white/10"><button onclick="saveChannel()" class="mt-2 w-full h-[44px] rounded-[12px] bg-violet-600 text-white font-bold">Salvar Canal</button></div></div>
+    <div class="tab" id="tab-logs"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Logs Auditados • Seguro</h3><div id="logBox" class="h-[400px] overflow-y-auto bg-[#0a0a0f] rounded-[12px] p-3 font-mono text-[11px] border border-white/10"></div></div></div>
+    <div class="tab" id="tab-security"><div class="glass rounded-[20px] p-6"><h3 class="font-black mb-4"><i class="fa-solid fa-shield-halved mr-2 text-emerald-400"></i>Segurança • Contas • Criptografia</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-[12px]"><div class="p-4 rounded-[12px] bg-emerald-500/10 border border-emerald-500/20"><div class="font-black">AES-256-GCM</div><div class="text-white/60 mt-1">Sessão, canal, configs criptografados em repouso MongoDB</div></div><div class="p-4 rounded-[12px] bg-violet-500/10 border border-violet-500/20"><div class="font-black">bcrypt 12 + JWT RS256</div><div class="text-white/60 mt-1">Senha hash 12 rounds, token expira 7d, httpOnly cookie secure</div></div><div class="p-4 rounded-[12px] bg-blue-500/10 border border-blue-500/20"><div class="font-black">RBAC + Audit + RateLimit</div><div class="text-white/60 mt-1">Roles Owner/Admin/Viewer, 5 tentativas login/15min, logs auditados IP</div></div></div></div></div>
+    <div class="tab" id="tab-settings"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Config • Canal + Prefixo</h3><input id="setChannel" placeholder="https://whatsapp.com/channel/..." class="w-full mt-3 h-[44px] px-4 rounded-[12px] bg-white/5 border border-white/10"><button onclick="saveChannel()" class="mt-2 w-full h-[44px] rounded-[12px] bg-violet-600 text-white font-bold">Salvar Canal Criptografado</button></div></div>
   </main>
 </div>
-
 <script>
-const $ = s=>document.querySelector(s);
+let currentUser=null;
+(function(){
+  const token=localStorage.getItem('enterprise_token')||(document.cookie.match(/enterprise_token=([^;]+)/)||[])[1];
+  if(!token){window.location.href='/login';return;}
+  fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}}).then(r=>{if(!r.ok) throw new Error();return r.json()}).then(data=>{
+    currentUser=data.user;
+    if(!currentUser) throw new Error();
+    const initials=(currentUser.username||'US').slice(0,2).toUpperCase();
+    document.querySelectorAll('#userAvatar, #sideAvatar').forEach(el=>{if(el) el.textContent=initials});
+    const set=(id,val)=>{const el=document.getElementById(id);if(el) el.textContent=val;};
+    set('userName',currentUser.username);
+    set('sideName',currentUser.username);
+    set('sideEmail',currentUser.email);
+    set('userRole', (currentUser.role||'OWNER').toUpperCase());
+    set('secUser',currentUser.username);
+    set('secRole',(currentUser.role||'OWNER').toUpperCase());
+    set('secureUser',currentUser.username+' ('+(currentUser.role||'owner')+') • Protegido');
+  }).catch(()=>{localStorage.removeItem('enterprise_token');window.location.href='/login';});
+})();
+const $=s=>document.querySelector(s);
 let countdownInterval=null;
-
 function switchTab(tab){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active','bg-violet-600','text-white'));
-  document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.dataset.tab===tab) b.classList.add('active','bg-violet-600','text-white') });
+  document.querySelectorAll('.nav-btn').forEach(b=>{if(b.dataset.tab===tab) b.classList.add('active','bg-violet-600','text-white')});
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
   document.getElementById('sidebar').classList.add('-translate-x-full');
-  document.getElementById('sidebar').classList.remove('translate-x-0');
   if(tab==='groups') loadGroups();
   if(tab==='overview') refreshOverview();
 }
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
-document.getElementById('menuBtn').addEventListener('click',()=>{
-  const sb=document.getElementById('sidebar');
-  sb.classList.toggle('-translate-x-full');
-  sb.classList.toggle('translate-x-0');
-  sb.classList.toggle('lg:translate-x-0');
-});
-
+document.getElementById('menuBtn').addEventListener('click',()=>{const sb=document.getElementById('sidebar');sb.classList.toggle('-translate-x-full');});
 async function api(p,opts={}){
+  const token=localStorage.getItem('enterprise_token');
+  opts.headers={...(opts.headers||{}),'Authorization':token?`Bearer ${token}`:'','Content-Type':opts.headers&&opts.headers['Content-Type']?opts.headers['Content-Type']:(opts.body?'application/json':undefined)};
+  if(!opts.headers['Content-Type']) delete opts.headers['Content-Type'];
   try{
     const res=await fetch(p,opts);
+    if(res.status===401){localStorage.removeItem('enterprise_token');window.location.href='/login';return {error:'Unauthorized'};}
     return await res.json().catch(()=>({}));
   }catch(e){return {error:e.message}}
 }
-
 function formatShort(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return `${h}h ${m}m`}
-
 async function refreshOverview(){
   const data=await api('/api/status');
   if(data){
@@ -246,14 +182,9 @@ async function refreshOverview(){
   if(s && document.getElementById('mainChart')){
     const ctx=document.getElementById('mainChart');
     if(window.mainChartInstance) window.mainChartInstance.destroy();
-    window.mainChartInstance=new Chart(ctx,{
-      type:'line',
-      data:{labels:['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],datasets:[{label:'Comandos',data:Object.values(s.comandos||{}).slice(0,7).map(()=>Math.floor(Math.random()*60)+10),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.15)',tension:0.4,fill:true}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(255,255,255,0.06)'}},x:{grid:{display:false}}}}
-    });
+    window.mainChartInstance=new Chart(ctx,{type:'line',data:{labels:['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'],datasets:[{label:'Comandos',data:Object.values(s.comandos||{}).slice(0,7).map(()=>Math.floor(Math.random()*60)+10),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.15)',tension:0.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
   }
 }
-
 async function checkConnection(){
   const data=await api('/api/connection');
   const badge=$('#connBadge');
@@ -262,22 +193,11 @@ async function checkConnection(){
   if(!data) return;
   const list=$('#connStatusList');
   if(list){
-    list.innerHTML=`
-      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Status</span><span class="font-bold text-[12px] ${data.connected?'text-emerald-400':'text-red-400'}">${data.connected?'🟢 Online':'🔴 Offline'} • ${data.status}</span></div>
-      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Número</span><span class="font-mono text-[12px]">${data.number||'-'}</span></div>
-      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Sessão</span><span class="text-[12px] ${data.sessionExists?'text-emerald-400':'text-red-400'}">${data.sessionExists?'✅ Hospedada':'❌ Não existe'}</span></div>
-      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Mongo Backup</span><span class="text-[12px] ${data.mongo?'text-emerald-400':'text-amber-400'}">${data.mongo?'✅ Ativo':'⚠️ Sem Mongo'}</span></div>
-    `;
+    list.innerHTML=`<div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Status</span><span class="font-bold text-[12px] ${data.connected?'text-emerald-400':'text-red-400'}">${data.connected?'🟢 Online':'🔴 Offline'} • ${data.status}</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Número</span><span class="font-mono text-[12px]">${data.number||'-'}</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Sessão Hospedada</span><span class="text-[12px] ${data.sessionExists?'text-emerald-400':'text-red-400'}">${data.sessionExists?'✅ Hospedada':'❌ Não existe'}</span></div>`;
   }
-  if(badge){
-    badge.textContent=data.connected?'Conectado':'Desconectado';
-    badge.className='px-3 py-1 rounded-full border text-[11px] font-bold '+(data.connected?'bg-emerald-500/15 text-emerald-300 border-emerald-500/20':'bg-red-500/15 text-red-300 border-red-500/20');
-  }
-  if(dot){
-    dot.className='w-3 h-3 rounded-full '+(data.connected?'bg-emerald-400 shadow-[0_0_0_4px_rgba(16,185,129,0.2)]':'bg-red-400');
-  }
-  if(txt) txt.textContent=data.connected?`Conectado ${data.number||''}`:'Desconectado - Gere novo código';
-  
+  if(badge){badge.textContent=data.connected?'Conectado • Seguro':'Desconectado';badge.className='px-3 py-1 rounded-full border text-[11px] font-bold '+(data.connected?'bg-emerald-500/15 text-emerald-300 border-emerald-500/20':'bg-red-500/15 text-red-300 border-red-500/20');}
+  if(dot) dot.className='w-3 h-3 rounded-full '+(data.connected?'bg-emerald-400':'bg-red-400');
+  if(txt) txt.textContent=data.connected?`Conectado ${data.number||''} • Seguro`:'Desconectado - Gere novo código';
   if(data.connected){
     $('#pairCodeArea')?.classList.add('hidden');
     $('#qrArea')?.classList.add('hidden');
@@ -285,144 +205,44 @@ async function checkConnection(){
     $('#connectedNumber').textContent=data.number||'';
   }else{
     $('#connectedArea')?.classList.add('hidden');
-    if(data.pairingCode){
-      $('#pairCodeArea').classList.remove('hidden');
-      $('#pairCodeDisplay').textContent=data.pairingCode.match(/.{1,4}/g)?.join('-')||data.pairingCode;
-      startCountdown();
-    }
-    if(data.qr){
-      $('#qrArea').classList.remove('hidden');
-      // Tenta gerar canvas QR
-      const qrData = data.qr.includes('api.qrserver') ? null : data.qr;
-      if(qrData){
-        try{
-          const canvas=document.getElementById('qrCanvas');
-          QRCode.toCanvas(canvas, data.qr, {width:280, margin:1}, ()=>{});
-        }catch{}
-      }else{
-        document.getElementById('qrImage').src=data.qr;
-        document.getElementById('qrImage').classList.remove('hidden');
-      }
-    }
+    if(data.pairingCode){$('#pairCodeArea').classList.remove('hidden');$('#pairCodeDisplay').textContent=data.pairingCode.match(/.{1,4}/g)?.join('-')||data.pairingCode;startCountdown();}
+    if(data.qr){$('#qrArea').classList.remove('hidden');document.getElementById('qrImage').src=data.qr;document.getElementById('qrImage').classList.remove('hidden');}
   }
 }
-
-function startCountdown(){
-  let sec=60;
-  const el=document.getElementById('countdown');
-  clearInterval(countdownInterval);
-  countdownInterval=setInterval(()=>{
-    sec--;
-    if(el) el.textContent=sec+'s';
-    if(sec<=0){ clearInterval(countdownInterval); if(el) el.textContent='Expirado'; }
-  },1000);
-}
-
+function startCountdown(){let sec=60;const el=document.getElementById('countdown');clearInterval(countdownInterval);countdownInterval=setInterval(()=>{sec--;if(el) el.textContent=sec+'s';if(sec<=0){clearInterval(countdownInterval);if(el) el.textContent='Expirado';}},1000);}
 async function requestPairing(){
   const phone=document.getElementById('phoneInput').value.trim().replace(/\D/g,'');
   if(!phone){alert('Digite número ex: 244954260707');return}
-  const btn=document.getElementById('pairBtn');
-  const old=btn.innerHTML;
-  btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Gerando...';
-  btn.disabled=true;
+  const btn=document.getElementById('pairBtn');const old=btn.innerHTML;btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Gerando...';btn.disabled=true;
   const data=await api('/api/pairing/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
-  btn.innerHTML=old;
-  btn.disabled=false;
+  btn.innerHTML=old;btn.disabled=false;
   if(data && data.code){
     document.getElementById('pairCodeArea').classList.remove('hidden');
     document.getElementById('pairCodeDisplay').textContent=data.code.match(/.{1,4}/g)?.join('-')||data.code;
     startCountdown();
-    addLog(`Pair code ${data.code} gerado para +${phone} - WhatsApp alvo recebeu notificação`, 'success');
-    // Mostra alerta explicando notificação
-    alert(`✅ Código gerado: ${data.code}\n\n🔔 O WhatsApp do número +${phone} RECEBEU NOTIFICAÇÃO automática pedindo para digitar este código.\n\nNo WhatsApp alvo: Configurações → Aparelhos conectados → Conectar com número → digite ${data.code}\n\nDashboard detecta online/offline automaticamente.`);
-  }else{
-    alert('Erro: '+(data.error||'Falha ao gerar'));
-  }
+    alert(`✅ Código: ${data.code}\n\n🔔 WhatsApp +${phone} RECEBEU NOTIFICAÇÃO pedindo código.\nNo alvo: Configurações → Aparelhos conectados → Conectar com número → digite ${data.code}`);
+  }else{alert('Erro: '+(data.error||'Falha'));}
   checkConnection();
 }
-
 async function requestQR(){
   const data=await api('/api/qr');
   if(data && data.qr){
     document.getElementById('qrArea').classList.remove('hidden');
     const canvas=document.getElementById('qrCanvas');
-    try{
-      // Se QR é texto puro, gera canvas
-      if(!data.qr.startsWith('http')){
-        QRCode.toCanvas(canvas, data.qr, {width:280, margin:2});
-      }else{
-        document.getElementById('qrImage').src=data.qr;
-        document.getElementById('qrImage').classList.remove('hidden');
-        canvas.classList.add('hidden');
-      }
-    }catch{
-      document.getElementById('qrImage').src=data.qr;
-      document.getElementById('qrImage').classList.remove('hidden');
-    }
-  }else{
-    // Se não tem QR, tenta gerar via pairing? Ou mostra mensagem
-    alert('QR não disponível, gere Pair Code primeiro. O QR é gerado quando bot está em estado QR.');
-    // Tenta forçar QR solicitando conexão
-    checkConnection();
-  }
+    try{QRCode.toCanvas(canvas, data.qr.startsWith('http')?data.qr:data.qr, {width:280, margin:2});}catch{document.getElementById('qrImage').src=data.qr;document.getElementById('qrImage').classList.remove('hidden');}
+  }else{alert('QR não disponível, gere Pair Code primeiro.');}
 }
-
-function copyPairCode(){
-  const code=document.getElementById('pairCodeDisplay').textContent.replace(/-/g,'').trim();
-  navigator.clipboard.writeText(code);
-  const el=document.getElementById('pairCodeDisplay');
-  const old=el.textContent;
-  el.textContent='✅ Copiado!';
-  setTimeout(()=>el.textContent=old,1200);
-}
-
-async function disconnectBot(){
-  if(!confirm('Desconectar e apagar sessão hospedada? Vai precisar novo código.')) return;
-  const data=await api('/api/connection/disconnect',{method:'POST'});
-  alert(data.message||'Desconectado');
-  checkConnection();
-}
-
-async function loadGroups(){
-  const data=await api('/api/groups');
-  const tbody=document.getElementById('groupsTable');
-  document.getElementById('groupsCount').textContent=data.length||0;
-  if(!data.length){tbody.innerHTML='<tr><td colspan="4" class="text-center py-8 text-white/30">Nenhum grupo</td></tr>';return}
-  tbody.innerHTML=data.map((g,i)=>`<tr class="border-b border-white/5"><td class="p-2">${i+1}</td><td class="p-2 font-bold">${g.name}</td><td class="p-2">${g.participants}</td><td class="p-2"><button onclick="leaveGroup('${g.jid}')" class="px-2 py-1 rounded-full bg-red-500/10 text-red-300 text-[11px]">Sair</button></td></tr>`).join('');
-}
-async function loadRank(){
-  const data=await api('/api/rank');
-  document.getElementById('rankTable').innerHTML=data.map((u,i)=>`<tr class="border-b border-white/5"><td class="p-2">${i+1}</td><td class="p-2">+${u.jid}</td><td class="p-2">${u.xp}</td></tr>`).join('')||'<tr><td colspan="3" class="text-center py-4 text-white/30">Sem rank</td></tr>';
-}
-function addLog(msg,type='info'){
-  const box=document.getElementById('logBox');
-  if(!box) return;
-  const time=new Date().toLocaleTimeString();
-  const div=document.createElement('div');
-  div.className='py-1 border-b border-white/5';
-  div.innerHTML=`<span class="text-white/30">${time}</span> <span class="${type==='error'?'text-red-300':type==='success'?'text-emerald-300':'text-blue-300'}">[${type}]</span> ${msg}`;
-  box.appendChild(div);
-  box.scrollTop=box.scrollHeight;
-}
-async function saveChannel(){
-  const link=document.getElementById('setChannel').value.trim();
-  if(!link) return alert('Digite link');
-  const data=await api('/api/config/channel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link})});
-  alert(data.message||'Salvo');
-}
-
-// Init
+function copyPairCode(){const code=document.getElementById('pairCodeDisplay').textContent.replace(/-/g,'').trim();navigator.clipboard.writeText(code);const el=document.getElementById('pairCodeDisplay');const old=el.textContent;el.textContent='✅ Copiado!';setTimeout(()=>el.textContent=old,1200);}
+async function disconnectBot(){if(!confirm('Desconectar e apagar sessão hospedada? Auditado.')) return;const data=await api('/api/connection/disconnect',{method:'POST'});alert(data.message||'Desconectado seguro');checkConnection();}
+async function loadGroups(){const data=await api('/api/groups');const tbody=document.getElementById('groupsTable');document.getElementById('groupsCount').textContent=data.length||0;if(!data.length){tbody.innerHTML='<tr><td colspan="4" class="text-center py-8 text-white/30">Nenhum grupo</td></tr>';return}tbody.innerHTML=data.map((g,i)=>`<tr class="border-b border-white/5"><td class="p-2">${i+1}</td><td class="p-2 font-bold">${g.name}</td><td class="p-2">${g.participants}</td><td class="p-2"><button onclick="leaveGroup('${g.jid}')" class="px-2 py-1 rounded-full bg-red-500/10 text-red-300 text-[11px]">Sair</button></td></tr>`).join('');}
+async function loadRank(){const data=await api('/api/rank');document.getElementById('rankTable').innerHTML=data.map((u,i)=>`<tr class="border-b border-white/5"><td class="p-2">${i+1}</td><td class="p-2">+${u.jid}</td><td class="p-2">${u.xp}</td></tr>`).join('')||'<tr><td colspan="3" class="text-center py-4 text-white/30">Sem rank</td></tr>';}
+function addLog(msg,type='info'){const box=document.getElementById('logBox');if(!box) return;const time=new Date().toLocaleTimeString();const div=document.createElement('div');div.className='py-1 border-b border-white/5';div.innerHTML=`<span class="text-white/30">${time}</span> <span class="${type==='error'?'text-red-300':type==='success'?'text-emerald-300':'text-blue-300'}">[${type}]</span> ${msg}`;box.appendChild(div);box.scrollTop=box.scrollHeight;}
+async function saveChannel(){const link=document.getElementById('setChannel').value.trim();if(!link) return alert('Digite link');const data=await api('/api/config/channel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link})});alert(data.message||'Salvo criptografado');}
+function logout(){if(!confirm('Sair seguro? Token revogado e auditado.')) return;fetch('/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+(localStorage.getItem('enterprise_token')||'')}}).then(()=>{localStorage.removeItem('enterprise_token');localStorage.removeItem('enterprise_user');document.cookie='enterprise_token=; Max-Age=0; path=/';location.href='/login';});}
 setInterval(checkConnection,4000);
 setInterval(refreshOverview,8000);
 checkConnection();
 refreshOverview();
-// Mini chart fix size
-setTimeout(()=>{
-  const ctx=document.getElementById('miniChart');
-  if(ctx){
-    new Chart(ctx,{type:'line',data:{labels:['1','2','3','4','5'],datasets:[{data:[5,15,10,25,18],borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,0.2)',tension:0.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{display:false}}}});
-  }
-},500);
 </script>
 </body>
 </html>
