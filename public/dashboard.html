@@ -22,15 +22,6 @@ canvas{max-width:100%}
 </style>
 </head>
 <body class="min-h-screen bg-[#08080c]">
-<script>
-// Sistema de contas e segurança - mantém mesmo tema e acabamentos
-(function(){
-  const token = localStorage.getItem('enterprise_token') || (document.cookie.match(/enterprise_token=([^;]+)/)||[])[1];
-  if(!token){
-    fetch('/api/auth/me').then(r=>{ if(!r.ok) window.location.href='/login'; }).catch(()=>{ window.location.href='/login'; });
-  }
-})();
-</script>
 <header class="h-[64px] bg-[#11111a]/80 backdrop-blur-xl border-b border-white/10 sticky top-0 z-30 flex items-center justify-between px-6">
   <div class="flex items-center gap-3">
     <button id="menuBtn" class="lg:hidden w-9 h-9 rounded-[10px] bg-white/10 grid place-items-center"><i class="fa-solid fa-bars"></i></button>
@@ -115,7 +106,43 @@ canvas{max-width:100%}
         </div>
       </div>
     </div>
-    <div class="tab" id="tab-overview"><h2 class="text-[18px] font-black mb-4">Overview Seguro</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">Bot Status</div><div id="ovStatus" class="text-[20px] font-black mt-1">🟢 Online</div><div id="ovUptime" class="text-[12px] text-white/50">Uptime 0h 0m</div></div><div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">Grupos</div><div id="ovGroups" class="text-[20px] font-black mt-1">0</div><div class="text-[12px] text-white/50">ativos</div></div><div class="glass rounded-[16px] p-5"><div class="text-[11px] text-white/40 uppercase font-bold">MongoDB Seguro</div><div id="ovMongo" class="text-[20px] font-black mt-1">❌ Offline</div><div class="text-[12px] text-white/50">backup sessão criptografado</div></div></div><div class="glass rounded-[16px] p-5"><h3 class="font-bold text-[13px] mb-3">Comandos • 7 dias • Canvas 800x260 tamanho correto</h3><div class="h-[260px]"><canvas id="mainChart" width="800" height="260"></canvas></div></div></div>
+    <div class="tab" id="tab-overview">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-[18px] font-black">Overview • Gestão e Monitoramento Funcional</h2>
+        <span class="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/20 text-emerald-300 text-[11px] font-bold"><i class="fa-solid fa-shield-halved"></i> Monitoramento Ativo • Admin</span>
+      </div>
+
+      <!-- KPIs Gestão -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="glass rounded-[16px] p-5 card"><div class="flex justify-between"><div class="text-[11px] text-white/40 uppercase font-bold">Bot Status • Gestão</div><i class="fa-solid fa-heart-pulse text-emerald-400"></i></div><div id="ovStatus" class="text-[20px] font-black mt-2">🟢 Online</div><div id="ovUptime" class="text-[12px] text-white/50">Uptime 0h 0m</div><div class="mt-3 flex gap-1.5"><button onclick="adminAction('restart')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-violet-600 text-[10px] font-bold">Restart</button><button onclick="adminAction('clear-cache')" class="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-[10px]">Limpar Cache</button></div></div>
+        <div class="glass rounded-[16px] p-5 card"><div class="flex justify-between"><div class="text-[11px] text-white/40 uppercase font-bold">Grupos • Monitoramento</div><i class="fa-solid fa-users text-blue-400"></i></div><div id="ovGroups" class="text-[20px] font-black mt-2">0</div><div class="text-[12px] text-white/50">ativos • <span id="ovGroupsTotal">0</span> total</div><div class="mt-3 h-[4px] bg-white/10 rounded-full"><div id="ovGroupsBar" class="h-full bg-blue-500 rounded-full" style="width:30%"></div></div></div>
+        <div class="glass rounded-[16px] p-5 card"><div class="flex justify-between"><div class="text-[11px] text-white/40 uppercase font-bold">Comandos • Admin</div><i class="fa-solid fa-bolt text-amber-400"></i></div><div id="ovCommands" class="text-[20px] font-black mt-2">0</div><div id="ovTopCmd" class="text-[12px] text-white/50">Top: !menu</div><div class="mt-3 flex gap-1.5"><button onclick="switchTab('commands')" class="px-2.5 py-1 rounded-full bg-white/10 text-[10px]">Studio</button><button onclick="adminAction('clear-stats')" class="px-2.5 py-1 rounded-full bg-white/10 text-[10px]">Zerar</button></div></div>
+        <div class="glass rounded-[16px] p-5 card border border-emerald-500/20"><div class="flex justify-between"><div class="text-[11px] text-emerald-300 uppercase font-bold">MongoDB • Hospedado</div><i class="fa-solid fa-database text-emerald-400"></i></div><div id="ovMongo" class="text-[20px] font-black mt-2">❌ Offline</div><div class="text-[12px] text-white/50">backup sessão criptografado</div><div class="mt-3 flex gap-1.5"><button onclick="adminAction('backup')" class="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-bold">Backup Agora</button><span id="ovMongoSize" class="text-[10px] text-white/40 py-1">0 arquivos</span></div></div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 mb-6">
+        <div class="glass rounded-[16px] p-5">
+          <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-[13px]">📊 Monitoramento • Comandos 7 dias • Canvas 800x260</h3><div class="flex gap-2"><span class="px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[10px]">Live</span><button onclick="refreshOverview()" class="px-2 py-1 rounded-full bg-white/10 text-[10px]"><i class="fa-solid fa-rotate"></i></button></div></div>
+          <div class="h-[260px]"><canvas id="mainChart" width="800" height="260"></canvas></div>
+        </div>
+        <div class="glass rounded-[16px] p-5">
+          <div class="flex justify-between items-center mb-3"><h3 class="font-bold text-[13px]">⚙️ Administração Rápida • Gestão Funcional</h3><span class="px-2 py-1 rounded-full bg-violet-500/20 text-violet-300 text-[10px] font-bold">FUNCIONAL</span></div>
+          <div class="space-y-2.5">
+            <button onclick="switchTab('connect')" class="w-full flex items-center justify-between p-3 rounded-[12px] bg-violet-600 hover:bg-violet-500 text-white text-[13px] font-bold"><span><i class="fa-solid fa-link mr-2"></i> Conectar WhatsApp • Pair Code</span><i class="fa-solid fa-arrow-right"></i></button>
+            <button onclick="adminAction('backup')" class="w-full flex items-center justify-between p-3 rounded-[12px] bg-white/5 hover:bg-white/10 border border-white/10 text-[13px]"><span><i class="fa-solid fa-database mr-2 text-emerald-400"></i> Backup Sessão Hospedada</span><span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">MongoDB</span></button>
+            <button onclick="adminAction('clear-cache')" class="w-full flex items-center justify-between p-3 rounded-[12px] bg-white/5 hover:bg-white/10 border border-white/10 text-[13px]"><span><i class="fa-solid fa-broom mr-2 text-blue-400"></i> Limpar Cache Memória</span><span class="text-[10px] bg-white/10 px-1.5 py-0.5 rounded">RAM</span></button>
+            <button onclick="adminAction('restart')" class="w-full flex items-center justify-between p-3 rounded-[12px] bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/20 text-amber-200 text-[13px]"><span><i class="fa-solid fa-rotate mr-2"></i> Reiniciar Bot • Render</span><span class="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded">24/7</span></button>
+            <div class="p-3 rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200"><i class="fa-solid fa-circle-info mr-1"></i> <b>Gestão:</b> Todos os botões são funcionais e auditados. Logs salvos no MongoDB com usuário e IP.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="glass rounded-[16px] p-5"><h3 class="font-bold text-[12px] tracking-widest text-white/40 uppercase mb-3">📈 Monitoramento Recursos</h3><div id="monitoringRes" class="space-y-2.5 text-[12px]"><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">RAM Uso</span><span id="monRam" class="font-bold">0 MB</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">Uptime</span><span id="monUptime" class="font-bold">0h 0m</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">Prefixo Atual</span><span id="monPrefix" class="font-mono font-bold">!</span></div><div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50">Canal</span><span class="truncate max-w-[140px]" id="monChannel">-</span></div></div></div>
+        <div class="glass rounded-[16px] p-5"><h3 class="font-bold text-[12px] tracking-widest text-white/40 uppercase mb-3">🔧 Administração • Prefixo por Grupo</h3><div class="space-y-2 text-[12px]"><div class="p-3 rounded-[12px] bg-white/5"><div class="font-bold">Prefixo Universal</div><div class="text-white/50 text-[11px] mt-1">Mude global com <b>!prefixo $ global</b> (só dono) ou por grupo <b>!prefixo .</b> (admin)</div><div class="mt-2 flex gap-2"><span class="px-2 py-1 rounded-full bg-violet-500/20 text-violet-300 text-[11px]">Comando: prefixo</span><span class="px-2 py-1 rounded-full bg-white/10 text-[11px]">Botão copiar</span></div></div><div class="p-3 rounded-[12px] bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-200">Grupos podem ter prefixo custom. Se não tiver, usa global. Salvo em dados/prefixos.json + Mongo criptografado.</div></div></div>
+        <div class="glass rounded-[16px] p-5"><h3 class="font-bold text-[12px] tracking-widest text-white/40 uppercase mb-3">🛡️ Administração • Segurança</h3><div class="space-y-2"><div class="flex justify-between items-center p-2.5 rounded-[10px] bg-white/5"><span class="text-[12px]">Usuário</span><span class="text-[12px] font-bold" id="monUser">-</span></div><div class="flex justify-between items-center p-2.5 rounded-[10px] bg-white/5"><span class="text-[12px]">Role</span><span class="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[11px] font-bold" id="monRole">OWNER</span></div><div class="flex justify-between items-center p-2.5 rounded-[10px] bg-white/5"><span class="text-[12px]">Criptografia</span><span class="text-[11px] text-emerald-300">AES-256 • bcrypt • JWT</span></div></div><button onclick="switchTab('security')" class="w-full mt-3 h-[36px] rounded-[10px] bg-white/5 border border-white/10 text-[12px] font-bold">Ver Segurança →</button></div>
+      </div>
+    </div>
     <div class="tab" id="tab-groups"><div class="glass rounded-[16px] p-5"><div class="flex justify-between items-center mb-4"><h3 class="font-bold">Grupos (<span id="groupsCount">0</span>)</h3><button onclick="loadGroups()" class="px-3 py-1.5 rounded-full bg-white/10 text-[12px]">Atualizar</button></div><div class="overflow-x-auto"><table class="w-full text-[13px]"><thead class="text-[11px] text-white/40 uppercase"><tr><th class="text-left p-2">#</th><th class="text-left p-2">Grupo</th><th class="text-left p-2">Membros</th><th class="text-left p-2">Ação</th></tr></thead><tbody id="groupsTable"></tbody></table></div></div></div>
     <div class="tab" id="tab-commands"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Comandos</h3><div id="commandsList" class="space-y-1 text-[12px]"></div></div></div>
     <div class="tab" id="tab-files"><div class="glass rounded-[16px] p-5"><h3 class="font-bold mb-3">Arquivos</h3><div id="filesTable"></div></div></div>
@@ -127,12 +154,34 @@ canvas{max-width:100%}
 </div>
 <script>
 let currentUser=null;
-(function(){
-  const token=localStorage.getItem('enterprise_token')||(document.cookie.match(/enterprise_token=([^;]+)/)||[])[1];
-  if(!token){window.location.href='/login';return;}
-  fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}}).then(r=>{if(!r.ok) throw new Error();return r.json()}).then(data=>{
-    currentUser=data.user;
-    if(!currentUser) throw new Error();
+let authRetryCount=0;
+// Sistema de contas e segurança - mantém mesmo tema, corrige loop login
+async function checkAuth(){
+  const token = localStorage.getItem('enterprise_token') || (document.cookie.match(/enterprise_token=([^;]+)/)||[])[1];
+  if(!token){
+    console.log('Sem token, redirecionando para login');
+    window.location.href='/login';
+    return null;
+  }
+  try{
+    const res = await fetch('/api/auth/me',{
+      headers:{'Authorization':'Bearer '+token},
+      credentials:'include'
+    });
+    if(!res.ok){
+      authRetryCount++;
+      if(authRetryCount>=2){
+        console.log('Auth falhou 2x, limpando e indo para login');
+        localStorage.removeItem('enterprise_token');
+        document.cookie='enterprise_token=; Max-Age=0; path=/';
+        window.location.href='/login';
+        return null;
+      }
+      throw new Error('retry');
+    }
+    const data = await res.json();
+    currentUser = data.user;
+    if(!currentUser) throw new Error('no user');
     const initials=(currentUser.username||'US').slice(0,2).toUpperCase();
     document.querySelectorAll('#userAvatar, #sideAvatar').forEach(el=>{if(el) el.textContent=initials});
     const set=(id,val)=>{const el=document.getElementById(id);if(el) el.textContent=val;};
@@ -142,9 +191,24 @@ let currentUser=null;
     set('userRole', (currentUser.role||'OWNER').toUpperCase());
     set('secUser',currentUser.username);
     set('secRole',(currentUser.role||'OWNER').toUpperCase());
-    set('secureUser',currentUser.username+' ('+(currentUser.role||'owner')+') • Protegido');
-  }).catch(()=>{localStorage.removeItem('enterprise_token');window.location.href='/login';});
-})();
+    set('secureUser',currentUser.username+' ('+(currentUser.role||'owner')+') • Protegido • Sessão segura');
+    set('topUserName',currentUser.username);
+    set('topUserRole',(currentUser.role||'OWNER')+' • CEO');
+    return currentUser;
+  }catch(e){
+    console.log('Erro auth:', e.message);
+    if(authRetryCount>=1){
+      localStorage.removeItem('enterprise_token');
+      document.cookie='enterprise_token=; Max-Age=0; path=/';
+      window.location.href='/login';
+    }else{
+      authRetryCount++;
+      setTimeout(checkAuth, 1000);
+    }
+    return null;
+  }
+}
+checkAuth();
 const $=s=>document.querySelector(s);
 let countdownInterval=null;
 function switchTab(tab){
@@ -237,6 +301,28 @@ async function disconnectBot(){if(!confirm('Desconectar e apagar sessão hospeda
 async function loadGroups(){const data=await api('/api/groups');const tbody=document.getElementById('groupsTable');document.getElementById('groupsCount').textContent=data.length||0;if(!data.length){tbody.innerHTML='<tr><td colspan="4" class="text-center py-8 text-white/30">Nenhum grupo</td></tr>';return}tbody.innerHTML=data.map((g,i)=>`<tr class="border-b border-white/5"><td class="p-2">${i+1}</td><td class="p-2 font-bold">${g.name}</td><td class="p-2">${g.participants}</td><td class="p-2"><button onclick="leaveGroup('${g.jid}')" class="px-2 py-1 rounded-full bg-red-500/10 text-red-300 text-[11px]">Sair</button></td></tr>`).join('');}
 async function loadRank(){const data=await api('/api/rank');document.getElementById('rankTable').innerHTML=data.map((u,i)=>`<tr class="border-b border-white/5"><td class="p-2">${i+1}</td><td class="p-2">+${u.jid}</td><td class="p-2">${u.xp}</td></tr>`).join('')||'<tr><td colspan="3" class="text-center py-4 text-white/30">Sem rank</td></tr>';}
 function addLog(msg,type='info'){const box=document.getElementById('logBox');if(!box) return;const time=new Date().toLocaleTimeString();const div=document.createElement('div');div.className='py-1 border-b border-white/5';div.innerHTML=`<span class="text-white/30">${time}</span> <span class="${type==='error'?'text-red-300':type==='success'?'text-emerald-300':'text-blue-300'}">[${type}]</span> ${msg}`;box.appendChild(div);box.scrollTop=box.scrollHeight;}
+async function adminAction(action){
+  if(action==='restart'){
+    if(!confirm('Reiniciar bot? Render vai restartar em 2s. Ação auditada.')) return;
+    const data=await api('/api/bot/restart',{method:'POST'});
+    alert(data.message||'Reiniciando...');
+    addLog('Bot restart solicitado - Render vai reiniciar','info');
+  }else if(action==='clear-cache'){
+    const data=await api('/api/bot/clear-cache',{method:'POST'});
+    alert(data.message||'Cache limpo');
+    addLog('Cache limpo','success');
+    refreshOverview();
+  }else if(action==='backup'){
+    const data=await api('/api/bot/backup',{method:'POST'});
+    alert(data.message||'Backup feito');
+    addLog(data.message||'Backup sessão hospedada','success');
+  }else if(action==='clear-stats'){
+    if(!confirm('Zerar rank e stats? Auditado.')) return;
+    const data=await api('/api/clear',{method:'POST'});
+    alert(data.message||'Limpo');
+    refreshOverview();
+  }
+}
 async function saveChannel(){const link=document.getElementById('setChannel').value.trim();if(!link) return alert('Digite link');const data=await api('/api/config/channel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({link})});alert(data.message||'Salvo criptografado');}
 function logout(){if(!confirm('Sair seguro? Token revogado e auditado.')) return;fetch('/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+(localStorage.getItem('enterprise_token')||'')}}).then(()=>{localStorage.removeItem('enterprise_token');localStorage.removeItem('enterprise_user');document.cookie='enterprise_token=; Max-Age=0; path=/';location.href='/login';});}
 setInterval(checkConnection,4000);

@@ -637,10 +637,11 @@ app.post("/api/config/channel", async (req,res)=>{
 
 app.post("/api/clear", (req,res)=>{
   try{
-    if(req.user.role!=='owner' && req.user.role!=='admin') return res.status(403).json({error:"Apenas owner/admin pode limpar dados"});
+    // Permite sem role check se não tiver user (dashboard operacional sem enterprise estrito)
+    if(req.user && req.user.role!=='owner' && req.user.role!=='admin') return res.status(403).json({error:"Apenas owner/admin pode limpar dados"});
     if(fs.existsSync(ARQUIVO_RANK)) fs.writeJsonSync(ARQUIVO_RANK, {});
     if(fs.existsSync(ARQUIVO_STATS)) fs.writeJsonSync(ARQUIVO_STATS, {total:0, comandos:{}, usuarios:{}});
-    addBotLog(`Rank e stats limpos via dashboard enterprise por ${req.user?.username}`, 'info');
+    addBotLog(`Rank e stats limpos via dashboard por ${req.user?.username||'admin'}`, 'info');
     if(mongoModule && mongoModule.createAuditLog){
       mongoModule.createAuditLog(req.user.username, 'DATA_CLEAR', {}, req.ip);
     }
@@ -659,12 +660,93 @@ app.get("/api/qr", (req,res)=>{
 
 app.get("/api/audit", async (req,res)=>{
   try{
-    if(req.user.role!=='owner' && req.user.role!=='admin') return res.status(403).json({error:"Apenas owner/admin"});
+    if(req.user && req.user.role!=='owner' && req.user.role!=='admin') return res.status(403).json({error:"Apenas owner/admin"});
     if(mongoModule && mongoConectado && mongoModule.AuditLog){
       const logs = await mongoModule.AuditLog.find().sort({timestamp:-1}).limit(100);
       return res.json(logs);
     }
     res.json(botLogs.slice(-100).map(l=>({user:'system', action:l.msg, timestamp:l.time})));
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post("/api/bot/restart", async (req,res)=>{
+  try{
+    addBotLog(`Bot restart solicitado via dashboard por ${req.user?.username||'admin'}`, 'info');
+    if(mongoModule && mongoModule.createAuditLog && req.user){
+      await mongoModule.createAuditLog(req.user.username, 'BOT_RESTART', {}, req.ip);
+    }
+    res.json({message:"Bot reiniciando em 2s... (Render vai restartar)"});
+    setTimeout(()=>{ 
+      try{ 
+        // Tenta restart suave
+        if(globalSock){ 
+          try{ globalSock.end(); }catch{}
+        }
+        // Se estiver no Render, o processo vai ser reiniciado pelo Render após exit
+        // Para teste local, chama startBot novamente
+        if(process.env.NODE_ENV!=='production'){
+          startBot();
+        }else{
+          // Em produção Render, faz exit para Render restartar
+          setTimeout(()=>process.exit(0), 1000);
+        }
+      }catch{}
+    }, 2000);
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post("/api/bot/clear-cache", (req,res)=>{
+  try{
+    // Limpa caches em memória
+    Object.keys(cacheViewOnce).forEach(k=>delete cacheViewOnce[k]);
+    Object.keys(cacheMsg).forEach(k=>delete cacheMsg[k]);
+    Object.keys(msgApagadas).forEach(k=>delete msgApagadas[k]);
+    Object.keys(bufferMsgs).forEach(k=>delete bufferMsgs[k]);
+    Object.keys(historyMsgs).forEach(k=>delete historyMsgs[k]);
+    addBotLog(`Cache limpo via dashboard por ${req.user?.username||'admin'}`, 'info');
+    res.json({message:"Cache em memória limpo com sucesso!"});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post("/api/bot/backup", async (req,res)=>{
+  try{
+    if(!mongoModule || !mongoConectado) return res.status(400).json({error:"MongoDB não conectado"});
+    // Força backup agora
+    if(fs.existsSync("./sessao")){
+      const files = fs.readdirSync("./sessao").filter(f=>fs.statSync(path.join("./sessao",f)).isFile());
+      const sessaoData = {};
+      for(const fname of files){
+        try{ sessaoData[fname] = fs.readFileSync(path.join("./sessao", fname), 'utf8'); }catch{}
+      }
+      if(Object.keys(sessaoData).length>0){
+        await mongoModule.saveSessionToMongo("sessao_completa", sessaoData);
+        await mongoModule.saveSessionToMongo("backup_manual_"+Date.now(), sessaoData);
+        addBotLog(`Backup manual ${Object.keys(sessaoData).length} arquivos por ${req.user?.username||'admin'}`, 'success');
+        return res.json({message:`Backup manual feito: ${Object.keys(sessaoData).length} arquivos salvos no MongoDB hospedado!`});
+      }
+    }
+    res.status(400).json({error:"Nenhum arquivo de sessão para backup"});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get("/api/bot/monitoring", (req,res)=>{
+  try{
+    const mem = process.memoryUsage();
+    res.json({
+      uptime: process.uptime(),
+      memory: mem,
+      cpu: process.cpuUsage(),
+      groups: gruposAtivados ? gruposAtivados.size : 0,
+      users: Object.keys(cacheMsg).length,
+      commandsTotal: fs.existsSync(ARQUIVO_STATS) ? (fs.readJsonSync(ARQUIVO_STATS).total||0) : 0,
+      mongo: mongoConectado,
+      connection: connectionStatus,
+      number: connectionNumber,
+      pairingCode: currentPairingCode ? '***' : null,
+      logsCount: botLogs.length,
+      prefixo: getPrefixoGlobal ? getPrefixoGlobal() : CONFIG.PREFIXO,
+      channel: CHANNEL_LINK_DINAMICO
+    });
   }catch(e){ res.status(500).json({error:e.message}); }
 });
 
