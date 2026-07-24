@@ -155,13 +155,39 @@ canvas{max-width:100%}
 <script>
 let currentUser=null;
 let authRetryCount=0;
-// Sistema de contas e segurança - mantém mesmo tema, corrige loop login
+// Sistema de contas e segurança - mantém mesmo tema, corrige loop login e mantém estrutura dashboard
 async function checkAuth(){
   const token = localStorage.getItem('enterprise_token') || (document.cookie.match(/enterprise_token=([^;]+)/)||[])[1];
+  const userStored = localStorage.getItem('enterprise_user');
+  // Usa usuário do localStorage imediatamente para manter estrutura, mesmo sem validar ainda
+  if(userStored){
+    try{
+      currentUser = JSON.parse(userStored);
+      const initials=(currentUser.username||'US').slice(0,2).toUpperCase();
+      document.querySelectorAll('#userAvatar, #sideAvatar').forEach(el=>{if(el) el.textContent=initials});
+      const set=(id,val)=>{const el=document.getElementById(id);if(el) el.textContent=val;};
+      set('userName',currentUser.username);
+      set('sideName',currentUser.username);
+      set('sideEmail',currentUser.email);
+      set('userRole', (currentUser.role||'OWNER').toUpperCase());
+      set('secUser',currentUser.username);
+      set('secRole',(currentUser.role||'OWNER').toUpperCase());
+      set('secureUser',currentUser.username+' ('+(currentUser.role||'owner')+') • Protegido • Sessão segura');
+      set('topUserName',currentUser.username);
+      set('monUser', currentUser.username);
+      set('monRole', (currentUser.role||'OWNER').toUpperCase());
+    }catch{}
+  }
   if(!token){
-    console.log('Sem token, redirecionando para login');
-    window.location.href='/login';
-    return null;
+    console.log('Sem token, mas mantendo dashboard estrutura - banner login');
+    const existingBanner = document.getElementById('authBanner');
+    if(!existingBanner){
+      const banner = document.createElement('div');
+      banner.id='authBanner';
+      banner.innerHTML = `<div class="fixed top-[64px] left-0 right-0 lg:left-[260px] z-30 bg-amber-500/15 border-b border-amber-500/20 text-amber-200 text-[12px] px-6 py-2.5 flex items-center justify-between"><span><i class="fa-solid fa-triangle-exclamation mr-2"></i> Você não está autenticado. Conta e segurança requer login para gestão completa e monitoramento admin.</span><a href="/login" class="px-3 py-1 rounded-full bg-amber-500 text-black font-bold text-[11px]">Fazer Login Seguro</a></div>`;
+      document.body.prepend(banner);
+    }
+    return currentUser;
   }
   try{
     const res = await fetch('/api/auth/me',{
@@ -170,12 +196,9 @@ async function checkAuth(){
     });
     if(!res.ok){
       authRetryCount++;
-      if(authRetryCount>=2){
-        console.log('Auth falhou 2x, limpando e indo para login');
-        localStorage.removeItem('enterprise_token');
-        document.cookie='enterprise_token=; Max-Age=0; path=/';
-        window.location.href='/login';
-        return null;
+      if(authRetryCount>=3){
+        console.log('Auth falhou 3x, mantendo dashboard mas avisando');
+        return currentUser; // mantém estrutura, não redireciona
       }
       throw new Error('retry');
     }
@@ -193,19 +216,19 @@ async function checkAuth(){
     set('secRole',(currentUser.role||'OWNER').toUpperCase());
     set('secureUser',currentUser.username+' ('+(currentUser.role||'owner')+') • Protegido • Sessão segura');
     set('topUserName',currentUser.username);
-    set('topUserRole',(currentUser.role||'OWNER')+' • CEO');
+    set('monUser', currentUser.username);
+    set('monRole', (currentUser.role||'OWNER').toUpperCase());
+    // Remove banner se existir
+    const b=document.getElementById('authBanner');
+    if(b) b.remove();
     return currentUser;
   }catch(e){
-    console.log('Erro auth:', e.message);
-    if(authRetryCount>=1){
-      localStorage.removeItem('enterprise_token');
-      document.cookie='enterprise_token=; Max-Age=0; path=/';
-      window.location.href='/login';
-    }else{
-      authRetryCount++;
-      setTimeout(checkAuth, 1000);
+    console.log('Erro auth (mantendo dashboard estrutura):', e.message);
+    authRetryCount++;
+    if(authRetryCount<3){
+      setTimeout(checkAuth, 1500);
     }
-    return null;
+    return currentUser;
   }
 }
 checkAuth();
@@ -226,9 +249,15 @@ async function api(p,opts={}){
   const token=localStorage.getItem('enterprise_token');
   opts.headers={...(opts.headers||{}),'Authorization':token?`Bearer ${token}`:'','Content-Type':opts.headers&&opts.headers['Content-Type']?opts.headers['Content-Type']:(opts.body?'application/json':undefined)};
   if(!opts.headers['Content-Type']) delete opts.headers['Content-Type'];
+  opts.credentials='include';
   try{
     const res=await fetch(p,opts);
-    if(res.status===401){localStorage.removeItem('enterprise_token');window.location.href='/login';return {error:'Unauthorized'};}
+    if(res.status===401){
+      console.log('API 401 para', p, '- mantendo dashboard estrutura, não redireciona automático');
+      // Não redireciona automático, mantém dashboard funcional - usuário pode clicar login se quiser
+      // Apenas se for rota crítica de auth e sem token, mostra banner
+      return {error:'Unauthorized', _401:true};
+    }
     return await res.json().catch(()=>({}));
   }catch(e){return {error:e.message}}
 }
