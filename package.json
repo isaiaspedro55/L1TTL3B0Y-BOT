@@ -1,19 +1,28 @@
 {
   "name": "l1ttl3b0y",
-  "version": "1.0.0",
-  "description": "",
+  "version": "3.5.0-render",
+  "description": "L1TTL3B0Y Bot - Render Free + MongoDB + Uptime + Menu Carousel",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["whatsapp", "bot", "baileys", "l1ttl3b0y", "render"],
   "type": "commonjs",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
-    "@whiskeysockets/baileys": "^7.0.0-rc13",
+    "@systemzero/baileys": "latest",
     "axios": "^1.18.1",
-    "chalk": "^5.6.2",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.6.0",
+    "express": "^4.21.1",
+    "form-data": "^4.0.2",
     "fs-extra": "^11.3.6",
     "moment": "^2.30.1",
+    "mongoose": "^8.9.5",
     "node-cache": "^5.1.2",
     "pino": "^10.3.1",
     "qrcode-terminal": "^0.12.0"

@@ -1,20 +1,19 @@
-# Dependências
 node_modules/
-
-# Sessão do WhatsApp
-auth/
 sessao/
-
-# Variáveis de ambiente
+downloads/*
+!downloads/.gitkeep
+vpn/*
+!vpn/.gitkeep
+dados/*.jpg
 .env
-
-# Logs
 *.log
-logs/
-
-# Arquivos temporários
-tmp/
-temp/
-
-# Cache
-.cache/
+.sessao
+.DS_Store
+*.mp4
+!configs/LOGOS/*.mp4
+configs/LOGOS/fotomenu.mp4
+configs/LOGOS/fotomenu.png
+temp*
+ogg_*
+mus_*
+vid_*

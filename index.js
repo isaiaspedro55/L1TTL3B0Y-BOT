@@ -1,3 +1,4 @@
+require('dotenv').config();
 // ✅ LINHA 1 ABSOLUTA — antes de qualquer require
 process.env.TMPDIR = require("path").join(process.cwd(), "downloads");
 
@@ -7,6 +8,8 @@ const {
   DisconnectReason,
   downloadMediaMessage,
   fetchLatestBaileysVersion,
+  prepareWAMessageMedia,
+  generateWAMessageFromContent
 } = require("@systemzero/baileys");
 
 const fs       = require("fs-extra");
@@ -15,28 +18,123 @@ const path     = require("path");
 const axios    = require("axios");
 const https    = require("https");
 const FormData = require("form-data");
+const express  = require("express");
 
 fs.ensureDirSync(process.env.TMPDIR);
 fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./vpn");
 fs.ensureDirSync("./dados");
+fs.ensureDirSync("./configs");
+fs.ensureDirSync("./configs/LOGOS");
+fs.ensureDirSync("./sessao");
+
+// ===== MONGODB + CONFIG DINAMICO =====
+let mongoModule = null;
+let CHANNEL_LINK_DINAMICO = process.env.CHANNEL_LINK || "https://whatsapp.com/channel/0029VbC8voN4Y9lszc9VuT2D";
+let mongoConectado = false;
+try {
+  mongoModule = require("./database/mongo");
+} catch(e) {
+  console.log("⚠️ Mongo module não encontrado:", e.message);
+}
 
 let ButtonV2 = null;
 try { ButtonV2 = require("@systemzero/baileys/lib/MB.cjs").ButtonV2; }
 catch(e) { console.log("⚠️ ButtonV2:", e.message); }
 
 const CONFIG = {
-  PREFIXO: "!",
-  NUMERO_BOT: "244954260707",
-  NUMEROS_ADM: ["926612801","244926612801","169853876965546"],
-  GROQ_KEY: "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",
-  DONO_JID: "169853876965546@lid",
-  DONO_NOME: "ISAÍAS PEDRO",
-  DONO_NUM: "926 612 801",
-  VOZ_TTS: "pt-PT-DuarteNeural",
-  SENHA_BOT: "lordinho2025",
-  SYSTEMZONE_KEY: "SUA_APIKEY_AQUI",
+  PREFIXO: process.env.PREFIX || "!",
+  NUMERO_BOT: (process.env.BOT_NUMBER || "244954260707").replace(/\D/g,""),
+  NUMEROS_ADM: (process.env.OWNER_NUMBERS || "926612801,244926612801,169853876965546").split(",").map(s=>s.trim()),
+  GROQ_KEY: process.env.GROQ_API_KEY || "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",
+  DONO_JID: process.env.DONO_JID || "169853876965546@lid",
+  DONO_NOME: process.env.OWNER_NAME || "ISAÍAS PEDRO",
+  DONO_NUM: process.env.OWNER_NUMBER || "926 612 801",
+  VOZ_TTS: process.env.VOZ_TTS || "pt-PT-DuarteNeural",
+  SENHA_BOT: process.env.SENHA_BOT || "lordinho2025",
+  SYSTEMZONE_KEY: process.env.SYSTEMZONE_KEY || "SUA_APIKEY_AQUI",
+  CHANNEL_LINK: process.env.CHANNEL_LINK || "https://whatsapp.com/channel/0029VbC8voN4Y9lszc9VuT2D",
+  MONGODB_URI: process.env.MONGODB_URI || "",
+  RENDER_URL: process.env.RENDER_EXTERNAL_URL || "",
+  PORT: parseInt(process.env.PORT || "10000"),
 };
+
+if (mongoModule && CONFIG.MONGODB_URI) {
+  (async () => {
+    try {
+      mongoConectado = await mongoModule.connectMongo(CONFIG.MONGODB_URI);
+      if (mongoConectado) {
+        const canalSalvo = await mongoModule.getConfig("CHANNEL_LINK");
+        if (canalSalvo) {
+          CHANNEL_LINK_DINAMICO = canalSalvo;
+          console.log("📢 Canal Link do MongoDB:", CHANNEL_LINK_DINAMICO);
+        } else {
+          console.log("📢 Canal Link atual:", CHANNEL_LINK_DINAMICO);
+        }
+      }
+    } catch(e) { console.log("⚠️ Erro inicial Mongo:", e.message); }
+  })();
+}
+
+async function obterChannelLink() {
+  try {
+    if (mongoModule && mongoConectado) {
+      const doMongo = await mongoModule.getConfig("CHANNEL_LINK");
+      if (doMongo) {
+        CHANNEL_LINK_DINAMICO = doMongo;
+        return doMongo;
+      }
+    }
+  } catch {}
+  return CHANNEL_LINK_DINAMICO || CONFIG.CHANNEL_LINK;
+}
+
+// ===== EXPRESS SERVER PARA RENDER FREE =====
+const app = express();
+app.use(express.json());
+app.get("/", (req,res)=>{
+  res.json({
+    status:"online",
+    bot:"L1TTL3B0Y ULTRA PRO V3.5 RENDER",
+    dono:CONFIG.DONO_NOME,
+    uptime:process.uptime(),
+    timestamp:new Date().toISOString(),
+    mongo: mongoConectado ? "conectado" : "desconectado",
+    channel: CHANNEL_LINK_DINAMICO,
+    prefixo: CONFIG.PREFIXO
+  });
+});
+app.get("/health", (req,res)=>res.status(200).send("OK"));
+app.get("/ping", (req,res)=>res.json({pong:true,time:Date.now(),uptime:Math.floor(process.uptime())}));
+app.get("/status", (req,res)=>{
+  res.json({
+    bot:"L1TTL3B0Y",
+    status:"rodando",
+    prefixo:CONFIG.PREFIXO,
+    gruposAtivos: typeof gruposAtivados !== 'undefined' ? gruposAtivados.size : 0,
+    mongo:mongoConectado,
+    mem:process.memoryUsage(),
+    uptime:Math.floor(process.uptime())
+  });
+});
+app.listen(CONFIG.PORT, ()=>{
+  console.log(`🌐 Servidor HTTP rodando na porta ${CONFIG.PORT}`);
+  console.log(`🔗 Health check: http://localhost:${CONFIG.PORT}/health`);
+});
+// AUTO PING a cada 14min para Render Free
+if (process.env.KEEP_ALIVE !== "false") {
+  const RENDER_URL = CONFIG.RENDER_URL || process.env.RENDER_EXTERNAL_URL;
+  setInterval(async ()=>{
+    try{
+      await axios.get(`http://localhost:${CONFIG.PORT}/ping`, {timeout:5000}).catch(()=>{});
+      if (RENDER_URL && RENDER_URL.startsWith("http")) {
+        await axios.get(`${RENDER_URL}/ping`, {timeout:10000}).catch(()=>{});
+        console.log("🔄 Auto-ping enviado para manter vivo");
+      }
+    }catch{}
+  }, 1000*60*14);
+  console.log("⏰ Auto-ping ativado (14 min) para Render Free");
+}
 
 const httpsAgent = new https.Agent({rejectUnauthorized:false,keepAlive:true,timeout:60000});
 const silentLogger = {level:"silent",child:()=>silentLogger,info:()=>{},warn:()=>{},error:()=>{},debug:()=>{},trace:()=>{},fatal:()=>{}};
@@ -114,20 +212,31 @@ function salvarNoBuffer(jid,d){if(!bufferMsgs[jid]) bufferMsgs[jid]=[]; bufferMs
 
 const TODOS_COMANDOS = new Set([
   "menu","ajuda","sobre","setfoto","alugar","addai",
+  // NOVO MENU PRINCIPAL
+  "menup","down","menufigurinhas","brincadeiras","menucoins","alteradores","menulogos","menu18","menuadm","menudono","criador","perfil","donos",
+  // DOWNLOADS
   "play","mp3","mp4","mp4hd","foto","doc","sticker","mostre",
   "sf","qr","vz","ver","id",
   "tiktok","instagram","twitter","spotify","soundcloud","pinterest","mediafire","apk",
+  // IA AUDIO FOTO
   "transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","busca","shazam",
   "fotocopia","fotoparaia","resumirfoto","traduzirfoto",
+  // ARQUIVOS
   "apagadas","arquivo","arqadd","arqdelete","decrypt",
+  // IA TEXTO
   "ia","resumir","traduzir","piada","conselho","poema","historia",
+  // UTIL
   "calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono",
+  // JOGOS
   "quiz","completar","vof","caca","guerra","rank","toprank","perfil","stop",
+  // ADM
   "all","att","link","sorteio","verifica","banir","silenciar","dessilenciar","silenciados",
   "addadmin","removeadmin","fechar","abrir","bot","anti-link","vozbot",
   "bloq","desbloq","aviso","apagar","denunciar","out","add","prefixo","prefixos",
   "ergue-se","set","nomegrupo","descgrupo","fotogrupo",
   "chaton","sms","gsms","scanlink","editar","placar","tourl",
+  // NOVOS RENDER + CANAL
+  "setcanal","setchannel","canal","channel","render","uptime","mongodb"
 ]);
 
 const VOF_BANCO=[{p:"O sol é uma estrela.",r:"verdadeiro"},{p:"A baleia é um peixe.",r:"falso"},{p:"O coração tem 4 câmaras.",r:"verdadeiro"},{p:"Angola tem 18 províncias.",r:"verdadeiro"},{p:"A água ferve a 50°C.",r:"falso"},{p:"O elefante é o maior animal terrestre.",r:"verdadeiro"},{p:"A Lua tem atmosfera.",r:"falso"},{p:"O tubarão é um mamífero.",r:"falso"},{p:"Luanda é capital de Angola.",r:"verdadeiro"},{p:"O diamante é o mineral mais duro.",r:"verdadeiro"}];
@@ -169,30 +278,215 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
   const P=CONFIG.PREFIXO;
   const agora=new Date();
   const hora=agora.toLocaleTimeString("pt-AO",{timeZone:"Africa/Luanda",hour:"2-digit",minute:"2-digit",second:"2-digit"});
-  const nomeUser=sender.split("@")[0].split(":")[0];
+  const pushname = msg.pushName || sender.split("@")[0].split(":")[0];
+  const nomeUser = sender.split("@")[0].split(":")[0];
   const cargo=isDono?"Criador.":(isAdmin?"Administrador.":"Utilizador.");
+  const isChVip = isDono ? "Sᴜᴘᴇʀ Vɪᴘ 👑" : "Usuário Comum";
+  const isCargo = cargo;
   const bt=chatsDesativados.has(jid)?"🔴":"🟢";
   const al=antiLinkDesativado.has(jid)?"⚠️":"🔒";
   const vz=vozBotDesativado.has(jid)?"🔇":"🎙️";
+  const prefix = P;
+  const from = jid;
 
-  const corpo=
-`┌─☆·˖✶˖·✦·˖✶˖·☆─┐
+  try { await reagir(sock,msg,"🧧"); } catch {}
+
+  // ===== NOVO MENU CAROUSEL ESTILO HITADORI ADAPTADO PARA L1TTL3B0Y =====
+  try {
+    const caminhoVideo = "./configs/LOGOS/fotomenu.mp4";
+    const caminhoImagem = "./configs/LOGOS/fotomenu.png";
+    let mediaMenu;
+    let hasMedia = false;
+
+    try {
+      if (fs.existsSync(caminhoVideo)) {
+        mediaMenu = await prepareWAMessageMedia({
+          video: { url: caminhoVideo },
+          mimetype: "video/mp4",
+          gifPlayback: true,
+          seconds: 8
+        }, { upload: sock.waUploadToServer });
+        hasMedia = true;
+      } else if (fs.existsSync(caminhoImagem)) {
+        mediaMenu = await prepareWAMessageMedia(
+          { image: { url: caminhoImagem } },
+          { upload: sock.waUploadToServer }
+        );
+        hasMedia = true;
+      } else if (botFotoBuffer) {
+        // usa foto personalizada do bot como fallback
+        const tempPath = "./configs/LOGOS/temp_menu.jpg";
+        fs.writeFileSync(tempPath, botFotoBuffer);
+        mediaMenu = await prepareWAMessageMedia(
+          { image: { url: tempPath } },
+          { upload: sock.waUploadToServer }
+        );
+        hasMedia = true;
+        try { fs.removeSync(tempPath); } catch {}
+      } else if (ppBotUrl) {
+        mediaMenu = await prepareWAMessageMedia(
+          { image: { url: ppBotUrl } },
+          { upload: sock.waUploadToServer }
+        );
+        hasMedia = true;
+      }
+    } catch (e) {
+      console.log("⚠️ Erro media menu:", e.message);
+      hasMedia = false;
+    }
+
+    const canalLink = await obterChannelLink();
+
+    const listaMenus = {
+      title: "🌀 ᴍᴇɴᴜ L1TTL3B0Y",
+      sections: [
+        {
+          title: "ᴍᴇɴᴜs ᴅɪᴠᴇʀsᴏs ",
+          highlight_label: "L1TTL3B0Y|ᴅᴇᴠ",
+          rows: [
+            { header: "🌀⃞ ᴍᴇɴᴜ-ᴘʀɪɴᴄɪᴘᴀʟ ", title: "_comandos principais e básicos._", id: prefix + "menup" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ᴅᴏᴡɴʟᴏᴀᴅs ", title: "_comandos de download e upload._", id: prefix + "down" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ғɪɢᴜʀɪɴʜᴀs", title: "_comandos de figurinhas._", id: prefix + "menufigurinhas" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ʙʀɪɴᴄᴀᴅᴇɪʀᴀs", title: "_diversão e jogos para grupo._", id: prefix + "brincadeiras" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ᴄᴏɪɴs", title: "_coins, aventura e diversão._", id: prefix + "menucoins" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ᴀʟᴛᴇʀᴀᴅᴏʀᴇs ", title: "_edição de música e áudio._", id: prefix + "alteradores" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ʟᴏɢᴏs ", title: "_criação de logos._", id: prefix + "menulogos" },
+            { header: "🌀⃞ ᴍᴇɴᴜ+18 ", title: "_comandos adultos, só vips._", id: prefix + "menu18" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ᴀᴅᴍ", title: "_comandos para adm de grupo._", id: prefix + "menuadm" },
+            { header: "🌀⃞ ᴍᴇɴᴜ-ᴅᴏɴᴏ", title: "_apenas dono_", id: prefix + "menudono" }
+          ]
+        },
+        {
+          title: "ғᴜɴᴄ̧ᴏᴇs ᴇxᴛʀᴀs ",
+          highlight_label: "L1TTL3B0Y|ᴅᴇᴠ",
+          rows: [
+            { header: "🌀 ᴄʀɪᴀᴅᴏʀ", title: "_informações do criador_", id: prefix + "criador" },
+            { header: "🌀 ᴘᴇʀғɪʟ", title: "_dados do usuário_", id: prefix + "perfil" },
+            { header: "🌀 ᴘɪɴɢ", title: "_info do bot_", id: prefix + "ping" },
+            { header: "🌀 ᴅᴏɴᴏs", title: "_lista de donos_", id: prefix + "donos" },
+            { header: "🌀 ᴀʟᴜɢᴀʀ ʙᴏᴛ", title: "_planos de aluguel_", id: prefix + "alugar" }
+          ]
+        }
+      ]
+    };
+
+    const botoes = [{
+      name: "single_select",
+      buttonParamsJson: JSON.stringify(listaMenus)
+    }, {
+      name: "cta_url",
+      buttonParamsJson: JSON.stringify({
+        display_text: "📢 ᴄᴀɴᴀʟ",
+        url: canalLink,
+        merchant_url: canalLink
+      })
+    }];
+
+    const corpoNovo = `╭─☆·˖✶˖·✦·˖✶˖·☆─╮
+│  🌀 *L1TTL3B0Y • LORDE LÁ DJUM* 🌀
+╰─☆·˖✶˖·✦·˖✶˖·☆─╯
+
+║𝚄𝚂𝚄Á𝚁𝙸𝙾: ${pushname}
+║𝙲𝙰𝚁𝙶𝙾: ${isCargo}
+║𝚅𝙸𝙿: ${isChVip}
+║⌨️ ᴘʀᴇғɪxᴏ: ${P}
+║${bt} ʙᴏᴛ | ${al} ʟɪɴᴋ | ${vz} ᴠᴏᴢ
+║🕐 ʜᴏʀᴀ: ${hora}
+
+*Eu quero que cada usuário tenha uma experiência digna.*
+*Mais de 100 comandos disponíveis!*
+
+👑 *Criador:* ${CONFIG.DONO_NOME}
+📞 *Contato:* ${CONFIG.DONO_NUM}`;
+
+    let headerObj = {};
+    let headerType = "IMAGE";
+    if (hasMedia && mediaMenu) {
+      if (mediaMenu.videoMessage) {
+        headerObj = { videoMessage: mediaMenu.videoMessage };
+        headerType = "VIDEO";
+      } else if (mediaMenu.imageMessage) {
+        headerObj = { imageMessage: mediaMenu.imageMessage };
+        headerType = "IMAGE";
+      }
+    }
+
+    const carouselMessage = {
+      cards: [{
+        header: hasMedia ? {
+          hasMediaAttachment: true,
+          ...headerObj
+        } : undefined,
+        headerType: hasMedia ? headerType : undefined,
+        body: { text: corpoNovo },
+        footer: { text: "🌀 L1TTL3B0Y-BOT • v3.5 RENDER" },
+        nativeFlowMessage: { buttons: botoes }
+      }]
+    };
+
+    const msgContent = {
+      interactiveMessage: {
+        contextInfo: {
+          participant: sender,
+          quotedMessage: { conversation: "░⃟⃛🌀 ᴍᴇɴᴜ L1TTL3B0Y 🌀" }
+        },
+        body: { text: "*ᴍᴇɴᴜ ᴘʀɪɴᴄɪᴘᴀʟ*" },
+        carouselMessage: hasMedia ? carouselMessage : undefined,
+        ...(hasMedia ? {} : {
+          body: { text: corpoNovo },
+          footer: { text: "🌀 L1TTL3B0Y" },
+          nativeFlowMessage: { buttons: botoes }
+        })
+      }
+    };
+
+    // Se tem mídia, usa carousel completo
+    if (hasMedia) {
+      const msgW = generateWAMessageFromContent(from, msgContent, {});
+      await sock.relayMessage(from, msgW.message, { messageId: msgW.key.id });
+      return;
+    } else {
+      // Sem mídia, tenta enviar mesmo assim com botões
+      const msgW = generateWAMessageFromContent(from, {
+        interactiveMessage: {
+          contextInfo: {
+            participant: sender,
+            quotedMessage: { conversation: "🌀 ᴍᴇɴᴜ" }
+          },
+          body: { text: corpoNovo },
+          footer: { text: "🌀 L1TTL3B0Y • RENDER" },
+          nativeFlowMessage: { buttons: botoes }
+        }
+      }, {});
+      await sock.relayMessage(from, msgW.message, { messageId: msgW.key.id });
+      return;
+    }
+
+  } catch (error) {
+    console.error("❌ Erro menu carousel:", error.message);
+    // Fallback para método antigo
+  }
+
+  // ===== FALLBACK: ButtonV2 + Categorias Numeradas (original) =====
+  const corpoFallback = `┌─☆·˖✶˖·✦·˖✶˖·☆─┐
 ｜  🌀 *LORDE LÁ DJUM* 🌀
 └─☆·˖✶˖·✦·˖✶˖·☆─┘
 
-｜✦ 🌀 BOT: *LORDE-DJUM v3.5*
+｜✦ 🌀 BOT: *LORDE-DJUM v3.5 RENDER*
 ｜✦ 👤 USUÁRIO: *${nomeUser}*
-｜✦ 🎖️ CARGO: *${cargo}*
+｜✦ 🎖️ CARGO: *${isDono?"Criador.":(isAdmin?"Administrador.":"Utilizador.")}*
 ｜✦ ⌨️ PREFIXO: *${P}*
 ｜✦ ${bt} BOT | ${al} LINK | ${vz} VOZ
-｜✦ 🕐 HORA: *${hora}*`;
+｜✦ 🕐 HORA: *${hora}*
+｜✦ 🍃 MONGO: *${mongoConectado?"✅":"❌"}*
+｜✦ 📢 CANAL: _configurável via ${P}setcanal_`;
 
   if(ButtonV2){
     try{
       const bv2=new ButtonV2(sock);
-      bv2.setTitle("🌀 LORDE LÁ DJUM v3.5");
-      bv2.setBody(corpo);
-      bv2.setFooter("© LORDE LÁ DJUM v3.5");
+      bv2.setTitle("🌀 L1TTL3B0Y RENDER v3.5");
+      bv2.setBody(corpoFallback);
+      bv2.setFooter("© LORDE LÁ DJUM • RENDER FREE 24/7");
       if(ppBotUrl) bv2.setThumbnail(ppBotUrl);
       bv2.addButton("💎 MENU 💎","btn_abrir_menu");
       bv2.addButton(`👑 ${CONFIG.DONO_NOME}`,"btn_dono_info");
@@ -200,16 +494,15 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
         bv2.send(jid,{quoted:msg}),
         new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000))
       ]);
-      return; // ✅ SEM fallback se ButtonV2 funcionou
-    }catch(e){console.log("⚠️ ButtonV2 menu:",e.message);}
+      return;
+    }catch(e){console.log("⚠️ ButtonV2 menu fallback:",e.message);}
   }
 
-  // Fallback único
   try{
-    if(botFotoBuffer) await sock.sendMessage(jid,{image:botFotoBuffer,caption:corpo},{quoted:msg});
-    else if(ppBotUrl) await sock.sendMessage(jid,{image:{url:ppBotUrl},caption:corpo},{quoted:msg});
-    else await sock.sendMessage(jid,{text:corpo},{quoted:msg});
-  }catch{ try{await sock.sendMessage(jid,{text:corpo},{quoted:msg});}catch{} }
+    if(botFotoBuffer) await sock.sendMessage(jid,{image:botFotoBuffer,caption:corpoFallback},{quoted:msg});
+    else if(ppBotUrl) await sock.sendMessage(jid,{image:{url:ppBotUrl},caption:corpoFallback},{quoted:msg});
+    else await sock.sendMessage(jid,{text:corpoFallback},{quoted:msg});
+  }catch{ try{await sock.sendMessage(jid,{text:corpoFallback},{quoted:msg});}catch{} }
   await new Promise(r=>setTimeout(r,600));
   await enviarMenuNumerado(sock,jid,sender,isDono);
 }
@@ -1102,15 +1395,105 @@ async function startBot(){
           }
         }
 
-        // ✅ HANDLER: listResponseMessage
+        // ✅ HANDLER: listResponseMessage (single_select do menu carousel)
         const listResp=msg.message?.listResponseMessage;
         if(listResp){
-          const catId=listResp.singleSelectReply?.selectedRowId;
-          if(catId&&catId.startsWith("cat_")){
+          const selectedId=listResp.singleSelectReply?.selectedRowId;
+          if(selectedId){
             if(isGrupo&&!isDono&&!gruposAtivados.has(jid)) return;
             if(chatsDesativados.has(jid)&&!isDono) return;
-            await enviarSubmenu(sock,jid,msg,catId); return;
+
+            if(selectedId.startsWith("cat_")){
+              await enviarSubmenu(sock,jid,msg,selectedId); return;
+            }
+
+            // Novo menu: ids como !menup, !down, etc
+            let cmd = selectedId.trim();
+            // remove prefixo se tiver
+            if(cmd.startsWith(CONFIG.PREFIXO)) cmd = cmd.slice(CONFIG.PREFIXO.length);
+            cmd = cmd.toLowerCase();
+            console.log(`📋 Menu selecionado: ${selectedId} -> ${cmd}`);
+
+            // Redireciona para handler de comandos via mensagem fake
+            // Simula chamada direta
+            if(TODOS_COMANDOS.has(cmd)){
+              // cria um loop local simples para executar
+              const fakeArgs = [];
+              // injetar no fluxo de comandos
+              // Usar mesmo lógica de comando manual
+              if(cmd==="menup"){
+                await enviarSubmenu(sock,jid,msg,"cat_musica");
+                await new Promise(r=>setTimeout(r,400));
+                await enviarSubmenu(sock,jid,msg,"cat_util");
+                return;
+              }
+              if(cmd==="down"){
+                await enviarSubmenu(sock,jid,msg,"cat_musica");
+                await new Promise(r=>setTimeout(r,300));
+                await enviarSubmenu(sock,jid,msg,"cat_social");
+                return;
+              }
+              if(cmd==="menufigurinhas"){
+                const txt = `┌─⊱ 『 🌀 FIGURINHAS 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}sticker* ↩️ img/vid → sticker\n◎ ─ *${CONFIG.PREFIXO}sf* ↩️ sticker → foto/vídeo\n│\n└──────────────────────────────⊰`;
+                await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
+                return;
+              }
+              if(["brincadeiras","menucoins","alteradores","menulogos","menu18","menuadm","menudono","criador","perfil","donos","alugar"].includes(cmd)){
+                // permite que o fluxo principal de comandos trate, mas aqui fazemos shortcut
+                if(cmd==="brincadeiras") await enviarSubmenu(sock,jid,msg,"cat_jogos");
+                else if(cmd==="menucoins"){
+                  await enviarSubmenu(sock,jid,msg,"cat_jogos");
+                  await new Promise(r=>setTimeout(r,300));
+                  await enviarComFoto(sock,jid,`┌─⊱ 『 🪙 COINS 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}rank* / *${CONFIG.PREFIXO}toprank*\n│\n└──────────────────────────────⊰`,ppBotUrl);
+                }
+                else if(cmd==="alteradores") await enviarComFoto(sock,jid,`┌─⊱ 『 🎧 ALTERADORES 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}vz* / *${CONFIG.PREFIXO}transcrever*\n│\n└──────────────────────────────⊰`,ppBotUrl);
+                else if(cmd==="menulogos") await enviarComFoto(sock,jid,`┌─⊱ 『 🎨 LOGOS 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}editar* / *${CONFIG.PREFIXO}qr*\n│\n└──────────────────────────────⊰`,ppBotUrl);
+                else if(cmd==="menuadm") await enviarSubmenu(sock,jid,msg,"cat_adm");
+                else if(cmd==="menudono"){
+                  if(!isDono){ await enviarSemFoto(sock,jid,`🔒 Apenas dono!`); return; }
+                  await enviarSubmenu(sock,jid,msg,"cat_dono");
+                }
+                else if(cmd==="criador"){
+                  let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}
+                  const canal = await obterChannelLink();
+                  const tD=`┌─⊱ 『 👑 CRIADOR 』 ⊰─┐\n│\n◎ ─ 🏷️ *${CONFIG.DONO_NOME}*\n◎ ─ 📞 *${CONFIG.DONO_NUM}*\n◎ ─ 📢 ${canal}\n│\n└──────────────────────────────⊰`;
+                  if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg});
+                  else await enviarComFoto(sock,jid,tD,ppBotUrl,msg);
+                }
+                else if(cmd==="donos"){
+                  const lista = CONFIG.NUMEROS_ADM.map((n,i)=>`◎ ─ ${i===0?"👑":"👮"} +${n}`).join("\n");
+                  await enviarComFoto(sock,jid,`┌─⊱ 『 👑 DONOS 』 ⊰─┐\n│\n${lista}\n│\n└──────────────────────────────⊰`,ppBotUrl);
+                }
+                else if(cmd==="alugar"){
+                  await enviarComFoto(sock,jid,`┌─⊱ 『 💰 ALUGAR 』 ⊰─┐\n│\n◎ ─ Contacto: *${CONFIG.DONO_NUM}*\n◎ ─ *${CONFIG.PREFIXO}alugar* para ver dados\n│\n└──────────────────────────────⊰`,ppBotUrl);
+                }
+                return;
+              }
+            }
           }
+        }
+
+        // ✅ HANDLER: interactiveResponseMessage para single_select (novo formato Baileys)
+        const interResp2 = msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage;
+        if(interResp2){
+          try{
+            const params = JSON.parse(interResp2.paramsJson || "{}");
+            const selId = params.id || params.selectedId || "";
+            if(selId){
+              console.log(`🔘 interactiveResponse: ${selId}`);
+              if(selId.startsWith("cat_")){
+                await enviarSubmenu(sock,jid,msg,selId); return;
+              }
+              let cmd2 = selId.trim();
+              if(cmd2.startsWith(CONFIG.PREFIXO)) cmd2 = cmd2.slice(CONFIG.PREFIXO.length);
+              cmd2 = cmd2.toLowerCase();
+              if(TODOS_COMANDOS.has(cmd2)){
+                // shortcut igual ao listResponse
+                if(cmd2==="menup"){ await enviarSubmenu(sock,jid,msg,"cat_musica"); return; }
+                if(cmd2==="down"){ await enviarSubmenu(sock,jid,msg,"cat_musica"); return; }
+              }
+            }
+          }catch(e){ console.log("⚠️ interResp parse:", e.message); }
         }
 
         // !ergue-se
@@ -1211,7 +1594,7 @@ async function startBot(){
 
         const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","bot","link","sorteio","verifica","silenciar","dessilenciar","silenciados","decrypt","arqadd","arqdelete","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai"];
         if(CMDS_ADMIN.includes(comando)&&!isAdmin){await enviarSemFoto(sock,jid,`🔒 *Apenas administradores.*`); await reagir(sock,msg,"🚫"); return;}
-        const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto"];
+        const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto","setcanal","setchannel"];
         if(CMDS_DONO.includes(comando)&&!isDono){await enviarSemFoto(sock,jid,`🔒 *Apenas o dono do bot.*`); await reagir(sock,msg,"🚫"); return;}
 
         // ══════════════════════════════════════════
@@ -1299,6 +1682,142 @@ _Após pagamento, envia comprovativo!_ 🧾`;
           const catMap={musica:"cat_musica",social:"cat_social",ia:"cat_ia",jogos:"cat_jogos",util:"cat_util",extra:"cat_extra",arq:"cat_arq",adm:"cat_adm",admin:"cat_adm",grup:"cat_grup",dono:"cat_dono"};
           if(sub&&catMap[sub]){await enviarSubmenu(sock,jid,msg,catMap[sub]);}
           else{await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin);}
+          return;
+        }
+
+        // ===== NOVOS COMANDOS DO MENU CARROSSEL L1TTL3B0Y =====
+        if(comando==="menup"){
+          await enviarSubmenu(sock,jid,msg,"cat_musica");
+          await new Promise(r=>setTimeout(r,400));
+          await enviarSubmenu(sock,jid,msg,"cat_util");
+          await new Promise(r=>setTimeout(r,400));
+          await enviarSubmenu(sock,jid,msg,"cat_ia");
+          return;
+        }
+        if(comando==="down"){
+          await enviarSubmenu(sock,jid,msg,"cat_musica");
+          await new Promise(r=>setTimeout(r,300));
+          await enviarSubmenu(sock,jid,msg,"cat_social");
+          return;
+        }
+        if(comando==="menufigurinhas"){
+          const txt = `┌─⊱ 『 🌀 FIGURINHAS 』 ⊰─┐
+│
+◎ ─ *${CONFIG.PREFIXO}sticker* ↩️ img/vid → sticker
+◎ ─ *${CONFIG.PREFIXO}sf* ↩️ sticker → foto/vídeo
+◎ ─ *${CONFIG.PREFIXO}tourl* ↩️ mídia → link
+│
+└──────────────────────────────⊰`;
+          await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
+          return;
+        }
+        if(comando==="brincadeiras"){
+          await enviarSubmenu(sock,jid,msg,"cat_jogos");
+          return;
+        }
+        if(comando==="menucoins"){
+          await enviarSubmenu(sock,jid,msg,"cat_jogos");
+          await new Promise(r=>setTimeout(r,300));
+          await enviarComFoto(sock,jid,`┌─⊱ 『 🪙 COINS & RANK 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}rank* → seu nível\n◎ ─ *${CONFIG.PREFIXO}toprank* → top 10\n◎ ─ *${CONFIG.PREFIXO}perfil* @user → perfil zoeira/elogio\n│\n└──────────────────────────────⊰`,ppBotUrl);
+          return;
+        }
+        if(comando==="alteradores"){
+          const txt=`┌─⊱ 『 🎧 ALTERADORES 』 ⊰─┐
+│
+◎ ─ *${CONFIG.PREFIXO}vz* [texto] → voz TTS
+◎ ─ *${CONFIG.PREFIXO}transcrever* ↩️ áudio → texto
+◎ ─ *${CONFIG.PREFIXO}resumiraudio* / *traduziraudio*
+◎ ─ *${CONFIG.PREFIXO}audioparaia* ↩️ áudio → resposta IA
+│
+└──────────────────────────────⊰`;
+          await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
+          return;
+        }
+        if(comando==="menulogos"){
+          const txt=`┌─⊱ 『 🎨 LOGOS 』 ⊰─┐
+│
+◎ ─ *${CONFIG.PREFIXO}editar* [instrução] ↩️ img → editada IA
+◎ ─ *${CONFIG.PREFIXO}qr* [texto] → gera QR
+◎ ─ *${CONFIG.PREFIXO}mostre* [nome] → busca imagem
+│
+└──────────────────────────────⊰`;
+          await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
+          return;
+        }
+        if(comando==="menu18"){
+          if(!isDono){
+            await enviarSemFoto(sock,jid,`🔞 Apenas VIPs! Fale com *${CONFIG.DONO_NOME}* para liberar.\n💰 *${CONFIG.PREFIXO}alugar*`);
+            return;
+          }
+          await enviarComFoto(sock,jid,`┌─⊱ 『 🔞 MENU 18+ VIP 』 ⊰─┐\n│\n◎ ─ _Em construção para VIPs_\n│\n└──────────────────────────────⊰`,ppBotUrl);
+          return;
+        }
+        if(comando==="menuadm"){
+          await enviarSubmenu(sock,jid,msg,"cat_adm");
+          return;
+        }
+        if(comando==="menudono"){
+          if(!isDono){ await enviarSemFoto(sock,jid,`🔒 Apenas dono!`); return; }
+          await enviarSubmenu(sock,jid,msg,"cat_dono");
+          await new Promise(r=>setTimeout(r,400));
+          await enviarSubmenu(sock,jid,msg,"cat_grup");
+          return;
+        }
+        if(comando==="criador"){
+          let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}
+          const canal = await obterChannelLink();
+          const tD=`┌─⊱ 『 👑 CRIADOR 』 ⊰─┐
+│
+◎ ─ 🏷️ *${CONFIG.DONO_NOME}*
+◎ ─ 📞 *${CONFIG.DONO_NUM}*
+◎ ─ 🤖 *LORDE LÁ DJUM v3.5 RENDER*
+│
+◎ ─ 📢 Canal: ${canal}
+◎ ─ 💰 *${CONFIG.PREFIXO}alugar* para alugar bot
+◎ ─ 🍃 MongoDB: *${mongoConectado?"✅ Conectado":"❌ Desconectado"}*
+◎ ─ 🌐 Render Free + Uptime
+│
+└──────────────────────────────⊰`;
+          if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg});
+          else await enviarComFoto(sock,jid,tD,ppBotUrl,msg);
+          return;
+        }
+        if(comando==="donos"){
+          const lista = CONFIG.NUMEROS_ADM.map((n,i)=>`◎ ─ ${i===0?"👑":"👮"} +${n}`).join("\n");
+          await enviarComFoto(sock,jid,`┌─⊱ 『 👑 DONOS 』 ⊰─┐\n│\n${lista}\n│\n└──────────────────────────────⊰`,ppBotUrl);
+          return;
+        }
+
+        // ===== COMANDOS DE CANAL CONFIGURÁVEL PELO DONO =====
+        if(comando==="setcanal"||comando==="setchannel"){
+          if(!isDono){ await enviarSemFoto(sock,jid,`🔒 Apenas dono pode configurar canal!`); return; }
+          const novoLink = args[0]?.trim();
+          if(!novoLink || !novoLink.includes("whatsapp.com/channel")){
+            await enviarComFoto(sock,jid,`┌─⊱ 『 📢 SETAR CANAL 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}setcanal* [link]\n│\n◎ ─ Exemplo:\n   ${CONFIG.PREFIXO}setcanal https://whatsapp.com/channel/XXXX\n│\n◎ ─ Atual: ${CHANNEL_LINK_DINAMICO}\n│\n└──────────────────────────────⊰`,ppBotUrl);
+            return;
+          }
+          CHANNEL_LINK_DINAMICO = novoLink;
+          if (mongoModule && mongoConectado) {
+            await mongoModule.setConfig("CHANNEL_LINK", novoLink);
+          }
+          await enviarComFoto(sock,jid,`✅ *Canal atualizado!*\n📢 ${novoLink}\n\n_O menu agora usará esse link._`,ppBotUrl);
+          await reagir(sock,msg,"✅");
+          return;
+        }
+        if(comando==="canal"||comando==="channel"){
+          const canal = await obterChannelLink();
+          await enviarComFoto(sock,jid,`┌─⊱ 『 📢 CANAL OFICIAL 』 ⊰─┐\n│\n◎ ─ ${canal}\n│\n└──────────────────────────────⊰\n\n_Siga nosso canal!_`,ppBotUrl,msg);
+          return;
+        }
+        if(comando==="render"||comando==="uptime"){
+          const up = Math.floor(process.uptime());
+          const h = Math.floor(up/3600);
+          const m = Math.floor((up%3600)/60);
+          await enviarComFoto(sock,jid,`┌─⊱ 『 🌐 RENDER FREE STATUS 』 ⊰─┐\n│\n◎ ─ ⏱️ Uptime: *${h}h ${m}m*\n◎ ─ 🍃 MongoDB: *${mongoConectado?"✅ Conectado":"❌ Offline (JSON)"}*\n◎ ─ 📢 Canal: ${CHANNEL_LINK_DINAMICO}\n◎ ─ 🔗 Health: *${CONFIG.RENDER_URL || "localhost"}/health*\n◎ ─ 💾 RAM: *${(process.memoryUsage().heapUsed/1024/1024).toFixed(1)}MB*\n│\n◎ ─ _Render Free dorme 15min sem tráfego, mas nosso auto-ping a cada 14min mantém vivo! Use UptimeRobot pingando /health_\n│\n└──────────────────────────────⊰`,ppBotUrl);
+          return;
+        }
+        if(comando==="mongodb"){
+          await enviarComFoto(sock,jid,`┌─⊱ 『 🍃 MONGODB 』 ⊰─┐\n│\n◎ ─ Status: *${mongoConectado?"✅ Conectado":"❌ Desconectado"}*\n◎ ─ URI: *${CONFIG.MONGODB_URI ? "✅ Configurado" : "❌ Não configurado"}*\n│\n◎ ─ _Para configurar: Vá no Render Dashboard > Environment > MONGODB_URI_\n│\n└──────────────────────────────⊰`,ppBotUrl);
           return;
         }
 
