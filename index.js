@@ -502,7 +502,7 @@ app.post("/api/pairing/request", async (req,res)=>{
       // Notificação via console e log para dashboard
       console.log(`\n╔══════════════════════════════════════════╗\n║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║\n║           ➤  ${code.match(/.{1,4}/g)?.join('-')||code}  ◄             ║\n║  📞 Número: +${phone}             ║\n╚══════════════════════════════════════════╝\n`);
 
-      return res.json({code, phone, message:"Código gerado! No WhatsApp: Dispositivos conectados > Conectar com número • Notificação enterprise enviada • Código criptografado AES-256 temporário"});
+      return res.json({code, phone, message:`Código ${code} gerado com sucesso! 🔔 O WhatsApp do número +${phone} (alvo) RECEBERÁ NOTIFICAÇÃO pedindo o código para conectar - é automático do WhatsApp. Peça ao dono do número alvo para abrir a notificação e digitar o código, ou manualmente: WhatsApp do alvo → Configurações → Aparelhos conectados → Conectar com número de telefone → digite ${code}. Dashboard sabe status on/offline em tempo real. Se offline, o bot automaticamente permite gerar novo código quando dono pedir. Sessão fica hospedada no MongoDB e sobrevive a redeploys Render.`});
     }catch(e){
       addBotLog(`Erro ao gerar pairing code: ${e.message}`, 'error');
       return res.status(500).json({error:e.message});
@@ -1816,6 +1816,56 @@ let tentativasReconexao=0;
 async function startBot(){
   try{
     addBotLog("Iniciando bot L1TTL3B0Y...", 'info');
+
+    // ===== RESTAURA SESSÃO COMPLETA DO MONGODB ANTES DE CRIAR AUTH STATE (Render Free) =====
+    // Isso garante sessão hospedada sobrevive a redeploys
+    if(mongoModule && CONFIG.MONGODB_URI){
+      try{
+        // Primeiro tenta restaurar sessão completa (vários arquivos)
+        const sessaoCompleta = await mongoModule.loadSessionFromMongo?.("sessao_completa");
+        if(sessaoCompleta && typeof sessaoCompleta === 'object'){
+          const precisaRestaurar = !fs.existsSync("./sessao/creds.json");
+          if(precisaRestaurar){
+            fs.ensureDirSync("./sessao");
+            let count=0;
+            for(const [fname, content] of Object.entries(sessaoCompleta)){
+              try{
+                const fpath = path.join("./sessao", fname);
+                // content pode ser string JSON ou objeto
+                if(typeof content === 'string'){
+                  // Tenta detectar se é JSON
+                  try{
+                    const parsed = JSON.parse(content);
+                    fs.writeJsonSync(fpath, parsed);
+                  }catch{
+                    fs.writeFileSync(fpath, content, 'utf8');
+                  }
+                }else{
+                  fs.writeJsonSync(fpath, content);
+                }
+                count++;
+              }catch(e){ console.log(`⚠️ Erro restaurar ${fname}:`, e.message); }
+            }
+            if(count>0){
+              console.log(`♻️ Sessão completa restaurada do MongoDB: ${count} arquivos - sessão hospedada!`);
+              addBotLog(`Sessão hospedada restaurada: ${count} arquivos do MongoDB`, 'success');
+            }
+          }
+        } else {
+          // Fallback: tenta restaurar só creds.json (compatibilidade antiga)
+          if(!fs.existsSync("./sessao/creds.json")){
+            const savedCreds = await mongoModule.loadSessionFromMongo?.("creds");
+            if(savedCreds){
+              fs.ensureDirSync("./sessao");
+              fs.writeJsonSync("./sessao/creds.json", savedCreds);
+              console.log("♻️ Sessão creds.json restaurada do MongoDB!");
+              addBotLog("Sessão creds restaurada do MongoDB", 'success');
+            }
+          }
+        }
+      }catch(e){ console.log("⚠️ Restore Mongo sessão:", e.message); }
+    }
+
     const{version}=await fetchLatestBaileysVersion();
     const{state,saveCreds}=await useMultiFileAuthState("./sessao");
     const sock=makeWASocket({
@@ -1834,36 +1884,53 @@ async function startBot(){
     });
     globalSock = sock;
     connectionStatus = "connecting";
-    addBotLog("Socket Baileys criado, aguardando conexão...", 'info');
+    addBotLog("Socket Baileys criado, aguardando conexão... Conecte via dashboard /dashboard → Aba Conexão → Código será notificado no WhatsApp alvo", 'info');
     sock.ev.on("creds.update",async ()=>{
       await saveCreds();
-      // Backup extra para MongoDB para sobreviver redeploy no Render
+      // Backup completo da sessão para MongoDB - sessão hospedada sobrevive redeploy Render
       try {
         if (mongoModule && mongoConectado && mongoModule.saveSessionToMongo) {
-          // Salva creds.json inteiro no Mongo como backup
-          const credsPath = "./sessao/creds.json";
-          if (fs.existsSync(credsPath)) {
-            const credsData = fs.readJsonSync(credsPath);
-            await mongoModule.saveSessionToMongo("creds", credsData);
+          // Salva pasta ./sessao inteira
+          if(fs.existsSync("./sessao")){
+            const files = fs.readdirSync("./sessao").filter(f=>!f.startsWith('.') && fs.statSync(path.join("./sessao",f)).isFile());
+            const sessaoData = {};
+            for(const fname of files){
+              try{
+                const fpath = path.join("./sessao", fname);
+                const content = fs.readFileSync(fpath, 'utf8');
+                sessaoData[fname] = content;
+              }catch{}
+            }
+            if(Object.keys(sessaoData).length>0){
+              await mongoModule.saveSessionToMongo("sessao_completa", sessaoData);
+              // Também salva creds separado para compatibilidade
+              const credsPath = "./sessao/creds.json";
+              if(fs.existsSync(credsPath)){
+                const credsData = fs.readJsonSync(credsPath);
+                await mongoModule.saveSessionToMongo("creds", credsData);
+              }
+              addBotLog(`Backup sessão hospedada: ${Object.keys(sessaoData).length} arquivos salvos no MongoDB`, 'info');
+            }
           }
         }
-      } catch(e) { console.log("⚠️ Backup Mongo creds:", e.message); }
+      } catch(e) { console.log("⚠️ Backup Mongo sessão hospedada:", e.message); }
     });
     setInterval(()=>verificarInativos(sock),24*60*60*1000);
-
-    // Restaura sessão do Mongo se arquivo local não existe (Render Free perde arquivos em redeploy)
-    if (mongoModule && CONFIG.MONGODB_URI) {
-      try {
-        if (!fs.existsSync("./sessao/creds.json")) {
-          const savedCreds = await mongoModule.loadSessionFromMongo?.("creds");
-          if (savedCreds) {
-            fs.ensureDirSync("./sessao");
-            fs.writeJsonSync("./sessao/creds.json", savedCreds);
-            console.log("♻️ Sessão restaurada do MongoDB!");
+    // Backup periódico a cada 5 minutos da sessão completa - sessão hospedada
+    setInterval(async()=>{
+      try{
+        if(mongoModule && mongoConectado && fs.existsSync("./sessao/creds.json")){
+          const files = fs.readdirSync("./sessao").filter(f=>fs.statSync(path.join("./sessao",f)).isFile());
+          const sessaoData = {};
+          for(const fname of files){
+            try{ sessaoData[fname] = fs.readFileSync(path.join("./sessao", fname), 'utf8'); }catch{}
+          }
+          if(Object.keys(sessaoData).length>0){
+            await mongoModule.saveSessionToMongo("sessao_completa", sessaoData);
           }
         }
-      } catch(e) { console.log("⚠️ Restore Mongo:", e.message); }
-    }
+      }catch{}
+    }, 5*60*1000);
 
     if(!sock.authState.creds.registered){
       const phoneNumber=CONFIG.NUMERO_BOT.replace(/\D/g,"");
