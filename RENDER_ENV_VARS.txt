@@ -1,0 +1,58 @@
+🌀 L1TTL3B0Y ENTERPRISE v4.0 - VARIÁVEIS PARA COLAR NO RENDER
+
+Vá em: https://dashboard.render.com → seu serviço l1ttl3b0y → Environment → Add Environment Variable
+Cole UMA POR UMA (Key = lado esquerdo, Value = lado direito)
+
+---
+
+NODE_ENV = production
+PORT = 10000
+PREFIX = !
+BOT_NUMBER = 244954260707
+OWNER_NUMBERS = 926612801,244926612801,169853876965546
+OWNER_NAME = ISAÍAS PEDRO
+OWNER_NUMBER = 926 612 801
+DONO_JID = 169853876965546@lid
+DONO_NOME = ISAÍAS PEDRO
+DONO_NUM = 926 612 801
+SENHA_BOT = lordinho2025
+
+# SEGURANÇA ENTERPRISE - GERE SEGREDOS NOVOS COM:
+# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+JWT_SECRET = L1TTL3B0Y_ENTERPRISE_JWT_SECRET_2026_REPLACE_ME_64_CHARS_RANDOM
+ENCRYPTION_KEY = 7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8
+
+# MONGODB - SUBSTITUA SUA_SENHA_AQUI PELA SENHA REAL DO USUÁRIO pedroisaias222_db_user
+# Se sua senha tiver @, troque @ por %40
+# Ex: senha M1nha@123 vira M1nha%40123
+MONGODB_URI = mongodb+srv://pedroisaias222_db_user:SUA_SENHA_AQUI@cluster0.mkvc2ye.mongodb.net/l1ttl3b0y?retryWrites=true&w=majority&appName=Cluster0
+
+GROQ_API_KEY = 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
+SYSTEMZONE_KEY = SUA_APIKEY_AQUI
+
+RENDER_EXTERNAL_URL = https://l1ttl3b0y.onrender.com
+KEEP_ALIVE = true
+CHANNEL_LINK = https://whatsapp.com/channel/0029VbC8voN4Y9lszc9VuT2D
+VOZ_TTS = pt-PT-DuarteNeural
+
+---
+
+APÓS COLAR TODAS:
+1. Clique Save Changes → Render vai fazer Redeploy automático
+2. Vá em Logs e aguarde: "✅ MongoDB conectado com sucesso!"
+3. Se der erro Mongo, verifique:
+   - Network Access no Atlas está 0.0.0.0/0 Allow All
+   - Senha correta (sem < > , com encode @ -> %40)
+   - Usuário pedroisaias222_db_user tem permissão Read and write
+
+4. Acesse:
+   https://l1ttl3b0y.onrender.com/login → criar conta (primeira vira Owner)
+   https://l1ttl3b0y.onrender.com/dashboard → painel $1M
+   https://l1ttl3b0y.onrender.com/health → health check para UptimeRobot
+
+---
+
+.example.env local (para teste npm start):
+Copie o arquivo .env que gerei (bot/.env) e coloque sua senha real no MONGODB_URI, depois:
+npm install
+npm start
