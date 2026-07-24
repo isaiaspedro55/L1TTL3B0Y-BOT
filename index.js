@@ -1208,8 +1208,35 @@ async function startBot(){
       // ✅ Aumenta timeout para media upload
       defaultQueryTimeoutMs:60000*3,
     });
-    sock.ev.on("creds.update",saveCreds);
+    sock.ev.on("creds.update",async ()=>{
+      await saveCreds();
+      // Backup extra para MongoDB para sobreviver redeploy no Render
+      try {
+        if (mongoModule && mongoConectado && mongoModule.saveSessionToMongo) {
+          // Salva creds.json inteiro no Mongo como backup
+          const credsPath = "./sessao/creds.json";
+          if (fs.existsSync(credsPath)) {
+            const credsData = fs.readJsonSync(credsPath);
+            await mongoModule.saveSessionToMongo("creds", credsData);
+          }
+        }
+      } catch(e) { console.log("⚠️ Backup Mongo creds:", e.message); }
+    });
     setInterval(()=>verificarInativos(sock),24*60*60*1000);
+
+    // Restaura sessão do Mongo se arquivo local não existe (Render Free perde arquivos em redeploy)
+    if (mongoModule && CONFIG.MONGODB_URI) {
+      try {
+        if (!fs.existsSync("./sessao/creds.json")) {
+          const savedCreds = await mongoModule.loadSessionFromMongo?.("creds");
+          if (savedCreds) {
+            fs.ensureDirSync("./sessao");
+            fs.writeJsonSync("./sessao/creds.json", savedCreds);
+            console.log("♻️ Sessão restaurada do MongoDB!");
+          }
+        }
+      } catch(e) { console.log("⚠️ Restore Mongo:", e.message); }
+    }
 
     if(!sock.authState.creds.registered){
       const phoneNumber=CONFIG.NUMERO_BOT.replace(/\D/g,"");
