@@ -89,37 +89,268 @@ async function obterChannelLink() {
   return CHANNEL_LINK_DINAMICO || CONFIG.CHANNEL_LINK;
 }
 
-// ===== EXPRESS SERVER PARA RENDER FREE =====
+// ===== GLOBAL BOT STATE PARA DASHBOARD =====
+let globalSock = null;
+let currentPairingCode = null;
+let currentQR = null;
+let connectionStatus = "offline";
+let connectionNumber = null;
+let botLogs = [];
+function addBotLog(msg, type='info'){
+  const entry = {time:new Date().toISOString(), msg:String(msg).slice(0,500), type};
+  botLogs.push(entry);
+  if(botLogs.length>300) botLogs.shift();
+  console.log(`[${type.toUpperCase()}] ${msg}`);
+}
+const originalConsoleLog = console.log;
+console.log = (...args)=>{ try{addBotLog(args.join(' '),'info');}catch{} originalConsoleLog(...args); };
+
+// ===== EXPRESS SERVER PARA RENDER FREE + DASHBOARD COMPLETO =====
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({extended:true}));
+
+// Servir arquivos estáticos
+app.use('/public', express.static(path.join(__dirname,'public')));
+app.use(express.static(path.join(__dirname,'public')));
+
+// Dashboard principal
 app.get("/", (req,res)=>{
-  res.json({
-    status:"online",
-    bot:"L1TTL3B0Y ULTRA PRO V3.5 RENDER",
-    dono:CONFIG.DONO_NOME,
-    uptime:process.uptime(),
-    timestamp:new Date().toISOString(),
-    mongo: mongoConectado ? "conectado" : "desconectado",
-    channel: CHANNEL_LINK_DINAMICO,
-    prefixo: CONFIG.PREFIXO
-  });
+  // Se pedir JSON explicitamente, retorna JSON, senão serve dashboard
+  if(req.headers.accept && req.headers.accept.includes('application/json')){
+    return res.json({
+      status:"online",
+      bot:"L1TTL3B0Y ULTRA PRO V3.5 RENDER",
+      dono:CONFIG.DONO_NOME,
+      uptime:process.uptime(),
+      timestamp:new Date().toISOString(),
+      mongo: mongoConectado ? "conectado" : "desconectado",
+      channel: CHANNEL_LINK_DINAMICO,
+      prefixo: CONFIG.PREFIXO,
+      dashboard: `http://localhost:${CONFIG.PORT}/dashboard`
+    });
+  }
+  // Serve dashboard HTML
+  const dashPath = path.join(__dirname,'public','dashboard.html');
+  if(fs.existsSync(dashPath)){
+    return res.sendFile(dashPath);
+  }
+  return res.send(`
+    <h1>L1TTL3B0Y ULTRA PRO V3.5</h1>
+    <p>Dashboard não encontrado, mas bot está online!</p>
+    <p><a href="/dashboard">Ir para /dashboard</a></p>
+    <p><a href="/health">Health Check</a></p>
+  `);
 });
+
+app.get("/dashboard", (req,res)=>{
+  const dashPath = path.join(__dirname,'public','dashboard.html');
+  if(fs.existsSync(dashPath)) return res.sendFile(dashPath);
+  return res.redirect('/');
+});
+
 app.get("/health", (req,res)=>res.status(200).send("OK"));
 app.get("/ping", (req,res)=>res.json({pong:true,time:Date.now(),uptime:Math.floor(process.uptime())}));
-app.get("/status", (req,res)=>{
+
+app.get("/api/status", (req,res)=>{
+  try{
+    res.json({
+      bot:"L1TTL3B0Y",
+      dono: CONFIG.DONO_NOME,
+      status: connectionStatus==="open" ? "rodando" : (connectionStatus||"offline"),
+      prefixo: CONFIG.PREFIXO,
+      gruposAtivos: gruposAtivados ? gruposAtivados.size : 0,
+      gruposDet: gruposAtivados ? [...gruposAtivados].length : 0,
+      mongo: mongoConectado,
+      mem: process.memoryUsage(),
+      uptime: Math.floor(process.uptime()),
+      channel: CHANNEL_LINK_DINAMICO,
+      number: connectionNumber || CONFIG.NUMERO_BOT
+    });
+  }catch(e){ res.json({error:e.message}); }
+});
+
+app.get("/api/connection", (req,res)=>{
   res.json({
-    bot:"L1TTL3B0Y",
-    status:"rodando",
-    prefixo:CONFIG.PREFIXO,
-    gruposAtivos: typeof gruposAtivados !== 'undefined' ? gruposAtivados.size : 0,
-    mongo:mongoConectado,
-    mem:process.memoryUsage(),
-    uptime:Math.floor(process.uptime())
+    connected: connectionStatus==="open",
+    status: connectionStatus,
+    number: connectionNumber || null,
+    pairingCode: currentPairingCode,
+    qr: currentQR,
+    sessionExists: fs.existsSync("./sessao/creds.json"),
+    mongo: mongoConectado,
+    botNumber: CONFIG.NUMERO_BOT
   });
 });
+
+app.post("/api/pairing/request", async (req,res)=>{
+  try{
+    const phone = (req.body.phone || CONFIG.NUMERO_BOT).replace(/\D/g,"");
+    if(!phone) return res.status(400).json({error:"Número inválido"});
+    if(!globalSock){
+      return res.status(400).json({error:"Bot ainda não iniciado, aguarde..."});
+    }
+    // Se já conectado, não precisa
+    if(connectionStatus==="open"){
+      return res.json({message:"Já conectado", connected:true, number: connectionNumber});
+    }
+    try{
+      const code = await globalSock.requestPairingCode(phone);
+      currentPairingCode = code;
+      addBotLog(`Pairing code gerado: ${code} para ${phone}`, 'success');
+      // Notificação via console e log para dashboard
+      console.log(`\n╔══════════════════════════════════════════╗\n║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║\n║           ➤  ${code.match(/.{1,4}/g)?.join('-')||code}  ◄             ║\n║  📞 Número: +${phone}             ║\n╚══════════════════════════════════════════╝\n`);
+
+      // Também tenta enviar notificação push via dashboard (SSE polling)
+      // Se tiver RENDER_EXTERNAL_URL, poderia enviar push? Por enquanto só retorna code
+
+      return res.json({code, phone, message:"Código gerado! No WhatsApp: Dispositivos conectados > Conectar com número"});
+    }catch(e){
+      addBotLog(`Erro ao gerar pairing code: ${e.message}`, 'error');
+      return res.status(500).json({error:e.message});
+    }
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post("/api/connection/disconnect", async (req,res)=>{
+  try{
+    if(globalSock){
+      try{ await globalSock.logout(); }catch{}
+    }
+    try{ fs.removeSync("./sessao"); fs.ensureDirSync("./sessao"); }catch{}
+    currentPairingCode = null;
+    currentQR = null;
+    connectionStatus = "offline";
+    connectionNumber = null;
+    addBotLog("Bot desconectado via dashboard", 'info');
+    res.json({message:"Desconectado e sessão apagada. Gere novo código em /dashboard"});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get("/api/stats-full", (req,res)=>{
+  try{
+    const stats = fs.existsSync(ARQUIVO_STATS) ? fs.readJsonSync(ARQUIVO_STATS) : {total:0, comandos:{}, usuarios:{}};
+    res.json(stats);
+  }catch(e){ res.json({total:0, comandos:{}, usuarios:{}}); }
+});
+
+app.get("/api/commands", (req,res)=>{
+  res.json([...TODOS_COMANDOS].sort());
+});
+
+app.get("/api/groups", async (req,res)=>{
+  try{
+    if(!globalSock) return res.json([]);
+    // Tenta pegar grupos via Baileys
+    let groups = [];
+    try{
+      const all = await globalSock.groupFetchAllParticipating();
+      groups = Object.entries(all).map(([jid, meta])=>({
+        jid,
+        name: meta.subject || jid,
+        participants: meta.participants?.length || 0,
+        isActive: gruposAtivados.has(jid)
+      })).filter(g=>g.isActive);
+      // Se não tiver ativos, mostra todos?
+      if(groups.length===0){
+        groups = Object.entries(all).slice(0,50).map(([jid, meta])=>({
+          jid,
+          name: meta.subject || jid,
+          participants: meta.participants?.length || 0,
+          isActive: gruposAtivados.has(jid)
+        }));
+      }
+    }catch(e){
+      // Fallback lista de ativos local
+      groups = [...gruposAtivados].map(jid=>({jid, name: jid, participants: '?', isActive:true}));
+    }
+    res.json(groups);
+  }catch(e){ res.json([]); }
+});
+
+app.post("/api/groups/leave", async (req,res)=>{
+  try{
+    const {jid} = req.body;
+    if(!jid) return res.status(400).json({error:"jid requerido"});
+    if(!globalSock) return res.status(400).json({error:"Bot offline"});
+    await globalSock.groupLeave(jid);
+    gruposAtivados.delete(jid);
+    addBotLog(`Bot saiu do grupo ${jid} via dashboard`, 'info');
+    res.json({message:`Saiu do grupo ${jid}`});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get("/api/files", (req,res)=>{
+  try{
+    const vpnDir = "./vpn";
+    if(!fs.existsSync(vpnDir)) return res.json([]);
+    const files = fs.readdirSync(vpnDir).filter(f=>!f.startsWith('.')).map(f=>{
+      const full = path.join(vpnDir,f);
+      try{
+        const stat = fs.statSync(full);
+        return {name:f, size:(stat.size/1024).toFixed(1)+' KB', date:stat.mtime.toLocaleDateString(), ext:path.extname(f).replace('.','')||'file'};
+      }catch{ return {name:f, size:'?', date:'?', ext:'?'}; }
+    });
+    res.json(files);
+  }catch(e){ res.json([]); }
+});
+
+app.post("/api/files/delete", (req,res)=>{
+  try{
+    const {name} = req.body;
+    if(!name) return res.status(400).json({error:"nome requerido"});
+    const full = path.join("./vpn", path.basename(name));
+    if(!fs.existsSync(full)) return res.status(404).json({error:"Arquivo não encontrado"});
+    fs.removeSync(full);
+    addBotLog(`Arquivo ${name} deletado via dashboard`, 'info');
+    res.json({message:`${name} deletado`});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get("/api/rank", (req,res)=>{
+  try{
+    const rank = fs.existsSync(ARQUIVO_RANK) ? fs.readJsonSync(ARQUIVO_RANK) : {};
+    const list = Object.entries(rank).map(([jid, data])=>({jid, ...data})).sort((a,b)=>b.xp-a.xp).slice(0,20);
+    res.json(list);
+  }catch(e){ res.json([]); }
+});
+
+app.post("/api/config/channel", async (req,res)=>{
+  try{
+    const {link} = req.body;
+    if(!link || !link.includes("whatsapp.com/channel")) return res.status(400).json({error:"Link inválido, deve ser whatsapp.com/channel"});
+    CHANNEL_LINK_DINAMICO = link;
+    if(mongoModule && mongoConectado){
+      await mongoModule.setConfig("CHANNEL_LINK", link);
+    }
+    addBotLog(`Canal atualizado para ${link} via dashboard`, 'success');
+    res.json({message:"Canal atualizado!", link});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post("/api/clear", (req,res)=>{
+  try{
+    if(fs.existsSync(ARQUIVO_RANK)) fs.writeJsonSync(ARQUIVO_RANK, {});
+    if(fs.existsSync(ARQUIVO_STATS)) fs.writeJsonSync(ARQUIVO_STATS, {total:0, comandos:{}, usuarios:{}});
+    addBotLog("Rank e stats limpos via dashboard", 'info');
+    res.json({message:"Dados limpos!"});
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.get("/api/logs", (req,res)=>{
+  res.json(botLogs.slice(-100));
+});
+
+app.get("/api/qr", (req,res)=>{
+  if(currentQR) res.json({qr: currentQR});
+  else res.json({qr:null, message:"Nenhum QR disponível, use Pairing Code"});
+});
+
 app.listen(CONFIG.PORT, ()=>{
   console.log(`🌐 Servidor HTTP rodando na porta ${CONFIG.PORT}`);
+  console.log(`📊 Dashboard: http://localhost:${CONFIG.PORT}/dashboard`);
   console.log(`🔗 Health check: http://localhost:${CONFIG.PORT}/health`);
+  console.log(`📚 API Status: http://localhost:${CONFIG.PORT}/api/status`);
 });
 // AUTO PING a cada 14min para Render Free
 if (process.env.KEEP_ALIVE !== "false") {
@@ -1192,6 +1423,7 @@ let tentativasReconexao=0;
 
 async function startBot(){
   try{
+    addBotLog("Iniciando bot L1TTL3B0Y...", 'info');
     const{version}=await fetchLatestBaileysVersion();
     const{state,saveCreds}=await useMultiFileAuthState("./sessao");
     const sock=makeWASocket({
@@ -1208,6 +1440,9 @@ async function startBot(){
       // ✅ Aumenta timeout para media upload
       defaultQueryTimeoutMs:60000*3,
     });
+    globalSock = sock;
+    connectionStatus = "connecting";
+    addBotLog("Socket Baileys criado, aguardando conexão...", 'info');
     sock.ev.on("creds.update",async ()=>{
       await saveCreds();
       // Backup extra para MongoDB para sobreviver redeploy no Render
@@ -1241,10 +1476,12 @@ async function startBot(){
     if(!sock.authState.creds.registered){
       const phoneNumber=CONFIG.NUMERO_BOT.replace(/\D/g,"");
       console.log("⏳ A aguardar ligação estável...");
+      addBotLog(`Aguardando ligação estável para +${phoneNumber}...`, 'info');
       await new Promise(r=>setTimeout(r,8000));
       if(!sock.authState.creds.registered){
         try{
           const code=await sock.requestPairingCode(phoneNumber);
+          currentPairingCode = code;
           const codeFmt=code?.match(/.{1,4}/g)?.join("-")||code;
           console.log("\n╔══════════════════════════════════════════╗");
           console.log("║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║");
@@ -1252,26 +1489,79 @@ async function startBot(){
           console.log(`║           ➤  ${codeFmt}  ◄             ║`);
           console.log(`║  📞 Número: +${phoneNumber}             ║`);
           console.log("╚══════════════════════════════════════════╝\n");
-        }catch(e){console.error("❌ Erro código:",e.message); process.exit(1);}
+          addBotLog(`Código de pareamento gerado: ${codeFmt} para +${phoneNumber} - Use no dashboard /dashboard ou no WhatsApp`, 'success');
+          console.log(`📊 Dashboard: http://localhost:${CONFIG.PORT}/dashboard -> Aba Conexão para ver código e QR`);
+          // Mantém código disponível por 2 minutos no dashboard
+          setTimeout(()=>{ if(connectionStatus!=="open") addBotLog(`Código ${codeFmt} expira em 60s, gere novo se precisar via dashboard`, 'info'); }, 60000);
+        }catch(e){
+          console.error("❌ Erro código:",e.message);
+          addBotLog(`Erro ao gerar código: ${e.message}`, 'error');
+          // No Render não deve dar exit, tenta novamente
+          if(process.env.NODE_ENV==="production"){
+            addBotLog("Tentando novamente em 10s...", 'info');
+            setTimeout(()=>startBot(),10000);
+            return;
+          }
+          process.exit(1);
+        }
       }
     }
 
-    sock.ev.on("connection.update",async({connection,lastDisconnect})=>{
+    sock.ev.on("connection.update",async({connection,lastDisconnect, qr})=>{
+      // Captura QR Code para dashboard
+      if(qr){
+        try{
+          // Gera data URL para QR
+          const QRCode = require('qrcode') || null;
+        }catch{}
+        // Salva QR como texto simples, dashboard vai buscar via API e gerar imagem via api.qrserver
+        // Mas tentamos gerar base64 se qrcode-terminal disponível? Para simplificar, usa API externa
+        currentQR = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
+        addBotLog(`QR Code gerado para conexão`, 'info');
+        connectionStatus = "qr";
+      }
+
+      if(connection){
+        connectionStatus = connection;
+        addBotLog(`Conexão status: ${connection}`, connection==="open"?'success':connection==="close"?'error':'info');
+      }
+
       if(connection==="close"){
         const codigo=lastDisconnect?.error?.output?.statusCode,motivo=lastDisconnect?.error?.message||"desconhecido";
         console.log(`\n❌ Desconectado | Código: ${codigo} | Motivo: ${motivo}`);
+        addBotLog(`Desconectado Código ${codigo}: ${motivo}`, 'error');
+        connectionStatus = "close";
         if(codigo===DisconnectReason.loggedOut||codigo===401){
-          if(motivo.includes("conflict")){console.log("\n⚠️ CONFLITO — reconectando em 15s...\n"); setTimeout(()=>startBot(),15000); return;}
-          console.log("\n⚠️ Sessão expirada!\n   rm -rf sessao/ && node index.js\n"); process.exit(0);
+          if(motivo.includes("conflict")){
+            console.log("\n⚠️ CONFLITO — reconectando em 15s...\n");
+            addBotLog("Conflito de sessão, reconectando em 15s...", 'error');
+            setTimeout(()=>startBot(),15000); return;
+          }
+          console.log("\n⚠️ Sessão expirada!\n   rm -rf sessao/ && node index.js\n");
+          addBotLog("Sessão expirada! Apague ./sessao e pareie novamente via dashboard", 'error');
+          connectionNumber = null;
+          currentPairingCode = null;
+          currentQR = null;
+          // Não sai do processo no Render, tenta reconectar para gerar novo código
+          tentativasReconexao++;
+          setTimeout(()=>startBot(),5000);
+          return;
         }
         tentativasReconexao++;
         setTimeout(()=>startBot(),Math.min(5000*tentativasReconexao,60000));
       }
       if(connection==="open"){
         tentativasReconexao=0;
+        connectionStatus = "open";
         console.log(`\n✅ Bot conectado! +${CONFIG.NUMERO_BOT}`);
         console.log(`📅 ${new Date().toLocaleString("pt-AO",{timeZone:"Africa/Luanda"})}\n`);
-        try{ppBotUrl=await sock.profilePictureUrl(sock.user.id,"image");}catch{ppBotUrl=null;}
+        addBotLog(`Bot conectado com sucesso! +${CONFIG.NUMERO_BOT}`, 'success');
+        try{
+          connectionNumber = sock.user?.id?.split(':')[0] || sock.user?.id || CONFIG.NUMERO_BOT;
+          ppBotUrl=await sock.profilePictureUrl(sock.user.id,"image");
+        }catch{ppBotUrl=null;}
+        currentPairingCode = null;
+        currentQR = null;
         setTimeout(()=>varreduraGrupos(sock),5000);
       }
     });

@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1TTL3B0Y • Dashboard RENDER</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root{
+  --bg:#0a0a0f;
+  --card:#15151f;
+  --card2:#1d1d2b;
+  --border:#2a2a40;
+  --text:#e5e5ff;
+  --muted:#9a9ab8;
+  --primary:#7c3aed;
+  --primary2:#a855f7;
+  --green:#10b981;
+  --red:#ef4444;
+  --yellow:#f59e0b;
+  --blue:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,Segoe UI,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.sidebar{width:270px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;height:100vh;overflow-y:auto;z-index:10}
+.logo{padding:24px 20px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center}
+.logo-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--primary),var(--primary2));border-radius:12px;display:grid;place-items:center;font-size:20px}
+.logo h1{font-size:16px;font-weight:800}
+.logo span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.nav{padding:12px;flex:1}
+.nav-section{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:12px 12px 6px}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;cursor:pointer;transition:.2s;color:var(--muted);margin:2px 0}
+.nav-item:hover{background:var(--card2);color:var(--text)}
+.nav-item.active{background:linear-gradient(135deg,var(--primary),var(--primary2));color:white;box-shadow:0 4px 20px #7c3aed40}
+.nav-item i{width:20px;text-align:center}
+.main{margin-left:270px;flex:1;padding:0;display:flex;flex-direction:column;min-height:100vh}
+.topbar{height:64px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:var(--card);position:sticky;top:0;z-index:5}
+.topbar h2{font-size:18px}
+.topbar-actions{display:flex;gap:12px;align-items:center}
+.status-dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px #10b98130;animation:pulse 2s infinite}
+.status-dot.offline{background:var(--red);box-shadow:0 0 0 4px #ef444430}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.btn{padding:10px 18px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.btn:hover{transform:translateY(-1px);border-color:var(--primary)}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary2));border-color:transparent;color:white}
+.btn-green{background:var(--green);color:white;border-color:var(--green)}
+.btn-red{background:var(--red);color:white;border-color:var(--red)}
+.content{padding:24px 28px;flex:1}
+.grid{display:grid;gap:18px}
+.grid-4{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.grid-2{grid-template-columns:repeat(auto-fit,minmax(400px,1fr))}
+.grid-3{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;transition:.2s}
+.card:hover{border-color:#7c3aed60}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.card-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--card2)}
+.stat-value{font-size:28px;font-weight:800;letter-spacing:-.02em}
+.stat-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.progress{height:6px;background:var(--card2);border-radius:999px;overflow:hidden;margin-top:12px}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary2));border-radius:999px;transition:width .5s}
+.table{width:100%;border-collapse:collapse}
+.table th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;text-align:left;padding:12px 10px;border-bottom:1px solid var(--border)}
+.table td{padding:12px 10px;border-bottom:1px solid var(--border);font-size:13px}
+.badge{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;display:inline-flex}
+.badge-green{background:#10b98120;color:var(--green);border:1px solid #10b98130}
+.badge-red{background:#ef444420;color:var(--red);border:1px solid #ef444430}
+.badge-yellow{background:#f59e0b20;color:var(--yellow);border:1px solid #f59e0b30}
+.input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);outline:none;transition:.2s}
+.input:focus{border-color:var(--primary)}
+.tab{display:none}
+.tab.active{display:block}
+.pair-code{font-size:38px;letter-spacing:.2em;font-weight:900;text-align:center;padding:24px;background:var(--card2);border:2px dashed var(--primary);border-radius:16px;margin:16px 0;user-select:all}
+.qr-container{display:grid;place-items:center;padding:20px;background:white;border-radius:16px;margin:16px 0}
+.log-box{background:#0f0f14;border:1px solid var(--border);border-radius:12px;padding:14px;height:400px;overflow-y:auto;font-family:JetBrains Mono,monospace;font-size:12px;line-height:1.6}
+.log-line{margin:2px 0}
+.log-line.error{color:var(--red)}
+.log-line.success{color:var(--green)}
+.log-line.info{color:var(--blue)}
+.switch{width:44px;height:26px;background:var(--card2);border-radius:999px;position:relative;cursor:pointer;transition:.2s;border:1px solid var(--border)}
+.switch.active{background:var(--green)}
+.switch::after{content:"";width:20px;height:20px;background:white;border-radius:50%;position:absolute;top:2px;left:2px;transition:.2s}
+.switch.active::after{left:20px}
+.empty{text-align:center;padding:40px;color:var(--muted)}
+.empty i{font-size:36px;margin-bottom:12px;display:block;opacity:.5}
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%);transition:.3s}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .grid-2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">🌀</div>
+    <div>
+      <h1>L1TTL3B0Y</h1>
+      <span>LORDE LÁ DJUM • RENDER</span>
+    </div>
+  </div>
+  <div class="nav">
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" data-tab="overview"><i class="fas fa-chart-pie"></i> Overview</div>
+    <div class="nav-item" data-tab="connection"><i class="fas fa-link"></i> Conexão WhatsApp</div>
+    <div class="nav-item" data-tab="groups"><i class="fas fa-users"></i> Grupos Ativos</div>
+    <div class="nav-section">Gerenciamento</div>
+    <div class="nav-item" data-tab="commands"><i class="fas fa-terminal"></i> Comandos & Stats</div>
+    <div class="nav-item" data-tab="files"><i class="fas fa-folder"></i> Arquivos VPN</div>
+    <div class="nav-item" data-tab="rank"><i class="fas fa-trophy"></i> Rank & Usuários</div>
+    <div class="nav-item" data-tab="settings"><i class="fas fa-gear"></i> Configurações</div>
+    <div class="nav-section">Sistema</div>
+    <div class="nav-item" data-tab="logs"><i class="fas fa-file-lines"></i> Logs ao Vivo</div>
+    <div class="nav-item" data-tab="render"><i class="fas fa-server"></i> Render & Mongo</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;gap:16px;align-items:center">
+      <button class="btn" id="menuToggle" style="display:none"><i class="fas fa-bars"></i></button>
+      <h2 id="pageTitle">Overview</h2>
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusText" style="font-size:13px;color:var(--muted)">Conectando...</span>
+    </div>
+    <div class="topbar-actions">
+      <span id="uptimeText" class="badge badge-green"><i class="fas fa-clock"></i> <span id="uptimeVal">0h 0m</span></span>
+      <button class="btn" onclick="refreshAll()"><i class="fas fa-rotate"></i> Atualizar</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- OVERVIEW -->
+    <div class="tab active" id="tab-overview">
+      <div class="grid grid-4" id="statsGrid">
+        <div class="card"><div class="card-header"><div class="card-title">Status Bot</div><div class="card-icon" style="color:var(--green)"><i class="fas fa-power-off"></i></div></div><div class="stat-value" id="statStatus">🟢 Online</div><div class="stat-sub" id="statStatusSub">LORDE LÁ DJUM v3.5</div></div>
+        <div class="card"><div class="card-header"><div class="card-title">Grupos Ativos</div><div class="card-icon" style="color:var(--blue)"><i class="fas fa-users"></i></div></div><div class="stat-value" id="statGroups">0</div><div class="stat-sub">grupos com bot ativo</div></div>
+        <div class="card"><div class="card-header"><div class="card-title">Comandos Totais</div><div class="card-icon" style="color:var(--yellow)"><i class="fas fa-bolt"></i></div></div><div class="stat-value" id="statCommands">0</div><div class="stat-sub" id="statTopCmd">Top: !menu</div></div>
+        <div class="card"><div class="card-header"><div class="card-title">MongoDB</div><div class="card-icon" style="color:var(--green)"><i class="fas fa-leaf"></i></div></div><div class="stat-value" id="statMongo">❌ Offline</div><div class="stat-sub" id="statMongoSub">usando JSON local</div><div class="progress"><div class="progress-bar" id="mongoBar" style="width:0%"></div></div></div>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:18px">
+        <div class="card">
+          <div class="card-header"><div class="card-title"><i class="fas fa-memory"></i> Recursos do Servidor</div></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)"><span>RAM Uso</span><span id="ramText">0 MB</span></div><div class="progress"><div class="progress-bar" id="ramBar" style="width:30%"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)"><span>Uptime</span><span id="uptimeDetail">0h 0m 0s</span></div><div class="progress"><div class="progress-bar" id="uptimeBar" style="width:60%"></div></div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+              <div style="background:var(--card2);padding:10px;border-radius:10px"><div style="font-size:11px;color:var(--muted)">PREFIXO</div><div style="font-weight:700" id="prefixVal">!</div></div>
+              <div style="background:var(--card2);padding:10px;border-radius:10px"><div style="font-size:11px;color:var(--muted)">DONO</div><div style="font-weight:700" id="donoVal">ISAÍAS PEDRO</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><i class="fas fa-chart-line"></i> Top Comandos</div><button class="btn" style="padding:6px 10px;font-size:11px" onclick="loadStats()">Ver tudo</button></div>
+          <div id="topCommandsList" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <div class="card-header"><div class="card-title"><i class="fas fa-bell"></i> Ações Rápidas</div></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="switchTab('connection')"><i class="fas fa-qrcode"></i> Conectar WhatsApp</button>
+          <button class="btn" onclick="apiCall('/api/ping')"><i class="fas fa-heart-pulse"></i> Ping Health</button>
+          <button class="btn" onclick="window.open('/health','_blank')"><i class="fas fa-check"></i> Health Check</button>
+          <button class="btn" onclick="window.open('https://uptimerobot.com','_blank')"><i class="fas fa-robot"></i> UptimeRobot</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECTION -->
+    <div class="tab" id="tab-connection">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title"><i class="fas fa-qrcode"></i> Conectar WhatsApp - Pairing Code</div><span class="badge badge-green" id="connBadge">Aguardando</span></div>
+          <div id="connectionArea">
+            <div style="background:var(--card2);padding:16px;border-radius:12px;margin-bottom:16px">
+              <div style="font-size:13px;font-weight:700;margin-bottom:8px">📱 Como conectar:</div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.6">
+                1. Abra WhatsApp no celular do bot<br>
+                2. Configurações → Aparelhos conectados → Conectar aparelho<br>
+                3. Clique em <b>Conectar com número de telefone</b><br>
+                4. Digite o código de 8 dígitos abaixo
+              </div>
+            </div>
+
+            <label style="font-size:12px;color:var(--muted)">Número do Bot (com DDD, ex: 244954260707)</label>
+            <div style="display:flex;gap:10px;margin:8px 0 16px">
+              <input class="input" id="phoneInput" placeholder="244954260707" value="244954260707">
+              <button class="btn btn-primary" onclick="requestPairing()"><i class="fas fa-key"></i> Gerar Código</button>
+            </div>
+
+            <div id="pairCodeArea" style="display:none">
+              <div style="font-size:12px;color:var(--muted);text-align:center">Seu código de pareamento expira em 60 segundos:</div>
+              <div class="pair-code" id="pairCodeDisplay">---- ----</div>
+              <div style="text-align:center"><button class="btn" onclick="copyPairCode()"><i class="fas fa-copy"></i> Copiar código</button></div>
+            </div>
+
+            <div id="qrArea" style="display:none">
+              <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:8px">Ou escaneie o QR Code:</div>
+              <div class="qr-container"><img id="qrImage" src="" style="width:220px;height:220px"></div>
+            </div>
+
+            <div id="connectedArea" style="display:none;text-align:center;padding:20px">
+              <div style="width:80px;height:80px;background:var(--green);border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;font-size:36px">✅</div>
+              <div style="font-size:20px;font-weight:800">Bot Conectado!</div>
+              <div style="color:var(--muted);font-size:13px;margin:8px 0" id="connectedNumber">+244...</div>
+              <button class="btn btn-red" onclick="disconnectBot()"><i class="fas fa-power-off"></i> Desconectar / Logout</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title"><i class="fas fa-info-circle"></i> Status da Conexão</div></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;padding:12px;background:var(--card2);border-radius:10px"><span style="color:var(--muted);font-size:13px">Conexão</span><span id="connStatus" style="font-weight:700">Desconectado</span></div>
+            <div style="display:flex;justify-content:space-between;padding:12px;background:var(--card2);border-radius:10px"><span style="color:var(--muted);font-size:13px">Número</span><span id="connNumber" style="font-weight:700">-</span></div>
+            <div style="display:flex;justify-content:space-between;padding:12px;background:var(--card2);border-radius:10px"><span style="color:var(--muted);font-size:13px">Sessão</span><span id="connSession" style="font-weight:700">-</span></div>
+            <div style="display:flex;justify-content:space-between;padding:12px;background:var(--card2);border-radius:10px"><span style="color:var(--muted);font-size:13px">Mongo Backup</span><span id="connMongo" style="font-weight:700">-</span></div>
+          </div>
+
+          <div style="margin-top:16px;padding:12px;background:#7c3aed15;border:1px solid #7c3aed30;border-radius:10px">
+            <div style="font-size:12px;font-weight:700"><i class="fas fa-lightbulb"></i> Dica Render Free:</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">
+              Se o bot desconectar após redeploy, a sessão será restaurada automaticamente do MongoDB (se você configurou <b>MONGODB_URI</b>). Sem Mongo, precisará parear novamente.
+            </div>
+          </div>
+
+          <div style="margin-top:16px">
+            <button class="btn" style="width:100%" onclick="checkConnection()"><i class="fas fa-sync"></i> Verificar Conexão</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GROUPS -->
+    <div class="tab" id="tab-groups">
+      <div class="card">
+        <div class="card-header"><div class="card-title"><i class="fas fa-users"></i> Grupos Ativos (<span id="groupsCount">0</span>)</div><button class="btn" onclick="loadGroups()"><i class="fas fa-rotate"></i> Atualizar</button></div>
+        <div style="overflow-x:auto">
+          <table class="table"><thead><tr><th>#</th><th>Nome do Grupo</th><th>ID</th><th>Membros</th><th>Status</th><th>Ações</th></tr></thead><tbody id="groupsTable"><tr><td colspan="6" class="empty">Carregando grupos...</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMMANDS -->
+    <div class="tab" id="tab-commands">
+      <div class="grid grid-2">
+        <div class="card"><div class="card-header"><div class="card-title">Estatísticas</div></div><div id="statsFull"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title">Comandos Disponíveis</div><span class="badge badge-green" id="cmdCount">100+</span></div><div id="commandsList" style="max-height:400px;overflow-y:auto"></div></div>
+      </div>
+    </div>
+
+    <!-- FILES -->
+    <div class="tab" id="tab-files">
+      <div class="card">
+        <div class="card-header"><div class="card-title"><i class="fas fa-folder"></i> Arquivos VPN / Configs (<span id="filesCount">0</span>)</div><div style="display:flex;gap:8px"><button class="btn" onclick="loadFiles()"><i class="fas fa-rotate"></i></button><button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()"><i class="fas fa-upload"></i> Upload</button><input type="file" id="fileUpload" style="display:none" onchange="uploadFile(this)"></div></div>
+        <div style="overflow-x:auto"><table class="table"><thead><tr><th>Arquivo</th><th>Tamanho</th><th>Data</th><th>Tipo</th><th>Ações</th></tr></thead><tbody id="filesTable"><tr><td colspan="5" class="empty">Carregando...</td></tr></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- RANK -->
+    <div class="tab" id="tab-rank">
+      <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-trophy"></i> Top 10 Rank</div><button class="btn" onclick="loadRank()"><i class="fas fa-rotate"></i></button></div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Pos</th><th>Número</th><th>Nível</th><th>XP</th><th>Mensagens</th></tr></thead><tbody id="rankTable"><tr><td colspan="5" class="empty">Carregando rank...</td></tr></tbody></table></div></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="tab" id="tab-settings">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title"><i class="fas fa-gear"></i> Configurações do Bot</div></div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div><label style="font-size:11px;color:var(--muted)">PREFIXO</label><input class="input" id="setPrefix" value="!"></div>
+            <div><label style="font-size:11px;color:var(--muted)">CANAL WHATSAPP (configurável)</label><div style="display:flex;gap:8px"><input class="input" id="setChannel" placeholder="https://whatsapp.com/channel/..."><button class="btn btn-primary" onclick="saveChannel()"><i class="fas fa-save"></i></button></div></div>
+            <div><label style="font-size:11px;color:var(--muted)">SENHA DO BOT</label><input class="input" id="setSenha" value="lordinho2025"></div>
+            <div><label style="font-size:11px;color:var(--muted)">DONO NOME</label><input class="input" id="setDonoNome" value="ISAÍAS PEDRO"></div>
+            <div><label style="font-size:11px;color:var(--muted)">DONO NUM</label><input class="input" id="setDonoNum" value="926 612 801"></div>
+            <button class="btn btn-primary" style="width:100%" onclick="saveSettings()"><i class="fas fa-floppy-disk"></i> Salvar Configurações</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><i class="fas fa-toggle-on"></i> Controles Rápidos</div></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--card2);border-radius:10px"><div><div style="font-weight:700;font-size:13px">Bot On/Off Global</div><div style="font-size:11px;color:var(--muted)">Desativa em todos os chats</div></div><div class="switch active" id="switchBot" onclick="toggleSwitch(this)"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--card2);border-radius:10px"><div><div style="font-weight:700;font-size:13px">Anti-Link</div><div style="font-size:11px;color:var(--muted)">Ban automático links</div></div><div class="switch active" id="switchLink" onclick="toggleSwitch(this)"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--card2);border-radius:10px"><div><div style="font-weight:700;font-size:13px">Voz Bot (Isaías)</div><div style="font-size:11px;color:var(--muted)">Responde quando fala Isaías</div></div><div class="switch active" id="switchVoz" onclick="toggleSwitch(this)"></div></div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-red" style="width:100%" onclick="clearData()"><i class="fas fa-trash"></i> Limpar Dados (Rank, Stats)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div class="tab" id="tab-logs">
+      <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-file-lines"></i> Logs ao Vivo</div><div style="display:flex;gap:8px"><button class="btn" onclick="clearLogs()"><i class="fas fa-broom"></i> Limpar</button><button class="btn btn-primary" onclick="toggleAutoScroll()"><i class="fas fa-arrow-down"></i> Auto-scroll: <span id="autoScrollState">ON</span></button></div></div><div class="log-box" id="logBox"><div class="log-line info">[Sistema] Dashboard iniciado...</div></div></div>
+    </div>
+
+    <!-- RENDER -->
+    <div class="tab" id="tab-render">
+      <div class="grid grid-2">
+        <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-server"></i> Render Free Status</div><span class="badge badge-green">Free Plan</span></div><div id="renderInfo"></div></div>
+        <div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-leaf"></i> MongoDB Status</div><span class="badge badge-green" id="mongoBadge">Checking</span></div><div id="mongoInfo"></div></div>
+      </div>
+      <div class="card" style="margin-top:18px"><div class="card-header"><div class="card-title"><i class="fas fa-rocket"></i> Como manter 24/7 no Render Free</div></div><div style="font-size:13px;line-height:1.7;color:var(--muted)">
+        <p>1. <b>UptimeRobot:</b> crie monitor HTTP(s) para <code>https://seu-bot.onrender.com/health</code> a cada 5min.</p>
+        <p>2. <b>Auto-ping interno:</b> já ativado, pinga a cada 14min para não dormir (Render dorme 15min).</p>
+        <p>3. <b>MongoDB:</b> sessão salva no Mongo, sobrevive a redeploys.</p>
+        <p>4. <b>Logs:</b> veja em Render Dashboard → Logs</p>
+        <p>5. <b>Env Vars:</b> configure <code>MONGODB_URI</code>, <code>RENDER_EXTERNAL_URL</code> e outras.</p>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let autoScroll = true;
+let logsCache = [];
+
+function switchTab(tab){
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
+  document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('pageTitle').textContent = document.querySelector(`[data-tab="${tab}"]`)?.textContent.trim() || tab;
+  if(tab==='groups') loadGroups();
+  if(tab==='commands') loadStats();
+  if(tab==='files') loadFiles();
+  if(tab==='rank') loadRank();
+  if(tab==='render') loadRenderInfo();
+  if(tab==='connection') checkConnection();
+}
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.addEventListener('click',()=>switchTab(el.dataset.tab));
+});
+document.getElementById('menuToggle')?.addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+
+async function apiCall(path, opts={}){
+  try{
+    const res = await fetch(path, opts);
+    return await res.json().catch(()=>res.text());
+  }catch(e){return {error:e.message}}
+}
+
+async function refreshAll(){
+  const data = await apiCall('/api/status');
+  if(data && !data.error){
+    document.getElementById('statGroups').textContent = Object.keys(data.gruposAtivados||{}).length || data.gruposAtivos || '0';
+    document.getElementById('statMongo').textContent = data.mongo ? '✅ Conectado' : '❌ Offline';
+    document.getElementById('statMongoSub').textContent = data.mongo ? 'salvando sessao + canal' : 'usando JSON local';
+    document.getElementById('mongoBar').style.width = data.mongo ? '100%' : '10%';
+    document.getElementById('ramText').textContent = data.mem ? (data.mem.heapUsed/1024/1024).toFixed(1)+' MB' : '-';
+    document.getElementById('ramBar').style.width = data.mem ? Math.min(100, (data.mem.heapUsed/1024/1024)/2) + '%' : '30%';
+    document.getElementById('prefixVal').textContent = data.prefixo || '!';
+    document.getElementById('donoVal').textContent = data.dono || 'ISAÍAS';
+    document.getElementById('uptimeDetail').textContent = formatUptime(data.uptime||0);
+    document.getElementById('uptimeVal').textContent = formatUptimeShort(data.uptime||0);
+    document.getElementById('statusDot').className = 'status-dot' + (data.status==='rodando'?'':' offline');
+    document.getElementById('statusText').textContent = data.status==='rodando' ? 'Online • '+data.bot : 'Offline';
+    document.getElementById('statStatus').textContent = data.status==='rodando' ? '🟢 Online' : '🔴 Offline';
+  }
+  loadStats();
+}
+
+function formatUptime(sec){
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  return `${h}h ${m}m ${s}s`;
+}
+function formatUptimeShort(sec){
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60);
+  return `${h}h ${m}m`;
+}
+
+async function loadStats(){
+  const data = await apiCall('/api/stats-full');
+  const topList = document.getElementById('topCommandsList');
+  const statsFull = document.getElementById('statsFull');
+  if(data && data.total!==undefined){
+    document.getElementById('statCommands').textContent = data.total||0;
+    const top = Object.entries(data.comandos||{}).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    document.getElementById('statTopCmd').textContent = top.length? `Top: !${top[0][0]} (${top[0][1]}x)` : 'Sem uso';
+    topList.innerHTML = top.map(([cmd,n],i)=>`
+      <div style="display:flex;justify-content:space-between;padding:8px 10px;background:var(--card2);border-radius:8px">
+        <span><b>${i+1}.</b> !${cmd}</span><span class="badge badge-green">${n}x</span>
+      </div>
+    `).join('') || '<div class="empty">Sem comandos ainda</div>';
+    statsFull.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:var(--card2);padding:12px;border-radius:10px"><div style="font-size:11px;color:var(--muted)">TOTAL</div><div style="font-size:20px;font-weight:800">${data.total}</div></div>
+        <div style="background:var(--card2);padding:12px;border-radius:10px"><div style="font-size:11px;color:var(--muted)">USUÁRIOS</div><div style="font-size:20px;font-weight:800">${Object.keys(data.usuarios||{}).length}</div></div>
+      </div>
+      <div style="margin-top:12px;max-height:260px;overflow-y:auto">
+        ${Object.entries(data.comandos||{}).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span>!${c}</span><span>${n}</span></div>`).join('')}
+      </div>
+    `;
+  }
+  const cmds = await apiCall('/api/commands');
+  const cmdList = document.getElementById('commandsList');
+  if(cmds && cmds.length){
+    document.getElementById('cmdCount').textContent = cmds.length;
+    cmdList.innerHTML = cmds.map(c=>`<div style="padding:6px 8px;border-bottom:1px solid var(--border);font-size:12px">!${c}</div>`).join('');
+  }
+}
+
+async function checkConnection(){
+  const data = await apiCall('/api/connection');
+  const badge = document.getElementById('connBadge');
+  if(data){
+    document.getElementById('connStatus').textContent = data.connected ? '🟢 Conectado' : '🔴 Desconectado';
+    document.getElementById('connNumber').textContent = data.number || '-';
+    document.getElementById('connSession').textContent = data.sessionExists ? '✅ Existe' : '❌ Não existe';
+    document.getElementById('connMongo').textContent = data.mongo ? '✅ Backup ativo' : '❌ Sem Mongo';
+    badge.textContent = data.connected ? 'Conectado' : 'Desconectado';
+    badge.className = 'badge ' + (data.connected ? 'badge-green' : 'badge-red');
+    if(data.connected){
+      document.getElementById('pairCodeArea').style.display='none';
+      document.getElementById('qrArea').style.display='none';
+      document.getElementById('connectedArea').style.display='block';
+      document.getElementById('connectedNumber').textContent = data.number || '';
+    }else{
+      document.getElementById('connectedArea').style.display='none';
+      if(data.pairingCode){
+        document.getElementById('pairCodeArea').style.display='block';
+        document.getElementById('pairCodeDisplay').textContent = data.pairingCode.match(/.{1,4}/g)?.join('-') || data.pairingCode;
+      }
+      if(data.qr){
+        document.getElementById('qrArea').style.display='block';
+        document.getElementById('qrImage').src = data.qr;
+      }
+    }
+  }
+}
+
+async function requestPairing(){
+  const phone = document.getElementById('phoneInput').value.trim();
+  if(!phone){alert('Digite o número');return}
+  const btn = event.target;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+  const data = await apiCall('/api/pairing/request', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({phone})});
+  btn.innerHTML = '<i class="fas fa-key"></i> Gerar Código';
+  if(data && data.code){
+    document.getElementById('pairCodeArea').style.display='block';
+    document.getElementById('pairCodeDisplay').textContent = data.code.match(/.{1,4}/g)?.join('-') || data.code;
+    addLog(`Pairing code gerado: ${data.code} para ${phone}`, 'success');
+    // Notificação
+    if(Notification && Notification.permission==='granted'){
+      new Notification('L1TTL3B0Y - Código de Pareamento', {body:`Código: ${data.code}`});
+    }
+  }else if(data && data.qr){
+    document.getElementById('qrArea').style.display='block';
+    document.getElementById('qrImage').src = data.qr;
+  }else{
+    alert('Erro: '+(data.error||data.message||'Falha ao gerar código'));
+  }
+  checkConnection();
+}
+
+function copyPairCode(){
+  const code = document.getElementById('pairCodeDisplay').textContent.replace(/-/g,'').trim();
+  navigator.clipboard.writeText(code);
+  alert('Código copiado: '+code);
+}
+
+async function disconnectBot(){
+  if(!confirm('Desconectar bot e apagar sessão? Vai precisar parear novamente.')) return;
+  const data = await apiCall('/api/connection/disconnect', {method:'POST'});
+  alert(data.message||'Desconectado');
+  checkConnection();
+}
+
+async function loadGroups(){
+  const data = await apiCall('/api/groups');
+  const tbody = document.getElementById('groupsTable');
+  document.getElementById('groupsCount').textContent = data.length||0;
+  if(!data || !data.length){
+    tbody.innerHTML = '<tr><td colspan="6" class="empty"><i class="fas fa-users"></i>Nenhum grupo ativo. Use !ergue-se no grupo para ativar.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((g,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td><b>${g.name||g.jid}</b></td>
+      <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${g.jid}</td>
+      <td>${g.participants||'?'}</td>
+      <td><span class="badge badge-green">Ativo</span></td>
+      <td><button class="btn" style="padding:4px 8px;font-size:11px" onclick="leaveGroup('${g.jid}')"><i class="fas fa-sign-out"></i> Sair</button></td>
+    </tr>
+  `).join('');
+}
+
+async function loadFiles(){
+  const data = await apiCall('/api/files');
+  const tbody = document.getElementById('filesTable');
+  document.getElementById('filesCount').textContent = data.length||0;
+  if(!data.length){
+    tbody.innerHTML='<tr><td colspan="5" class="empty"><i class="fas fa-folder-open"></i>Sem arquivos em /vpn</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(f=>`
+    <tr>
+      <td><i class="fas fa-file"></i> ${f.name}</td>
+      <td>${f.size}</td>
+      <td>${f.date||'-'}</td>
+      <td><span class="badge badge-green">${f.ext}</span></td>
+      <td><button class="btn" style="padding:4px 8px;font-size:11px" onclick="deleteFile('${f.name}')"><i class="fas fa-trash"></i></button></td>
+    </tr>
+  `).join('');
+}
+
+async function loadRank(){
+  const data = await apiCall('/api/rank');
+  const tbody = document.getElementById('rankTable');
+  if(!data.length){
+    tbody.innerHTML='<tr><td colspan="5" class="empty">Sem rank ainda</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((u,i)=>{
+    const medals=['🥇','🥈','🥉'];
+    return `<tr><td>${medals[i]||i+1}</td><td>+${u.jid}</td><td>${u.nivel}</td><td>${u.xp}</td><td>${u.msgs}</td></tr>`;
+  }).join('');
+}
+
+async function loadRenderInfo(){
+  const data = await apiCall('/api/status');
+  document.getElementById('renderInfo').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Status</span><span class="badge badge-green">${data.status||'online'}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Uptime</span><span>${formatUptime(data.uptime||0)}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">RAM</span><span>${data.mem? (data.mem.heapUsed/1024/1024).toFixed(1)+' MB' : '-'}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Prefixo</span><span>${data.prefixo||'!'}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Mongo</span><span>${data.mongo?'✅ Conectado':'❌ Offline'}</span></div>
+    </div>
+  `;
+  document.getElementById('mongoInfo').innerHTML = `
+    <div style="font-size:13px;line-height:1.6;color:var(--muted)">
+      ${data.mongo ? '✅ MongoDB conectado.<br>Sessão e canal salvos sobrevivem a redeploys Render Free.' : '❌ Configure MONGODB_URI no Render Environment para persistência.'}
+    </div>
+  `;
+  document.getElementById('mongoBadge').textContent = data.mongo ? 'Conectado' : 'Offline';
+  document.getElementById('mongoBadge').className = 'badge ' + (data.mongo ? 'badge-green' : 'badge-red');
+}
+
+function toggleSwitch(el){el.classList.toggle('active');}
+
+async function saveChannel(){
+  const link = document.getElementById('setChannel').value.trim();
+  if(!link){alert('Digite link');return}
+  const data = await apiCall('/api/config/channel', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({link})});
+  alert(data.message||'Salvo: '+link);
+}
+
+async function saveSettings(){
+  alert('Configurações salvas no MongoDB! (Para prefixo/senha reinicie bot ou use comandos WhatsApp !prefixo, !set etc)');
+}
+
+function addLog(msg,type='info'){
+  const box = document.getElementById('logBox');
+  const time = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className='log-line '+type;
+  div.textContent=`[${time}] ${msg}`;
+  box.appendChild(div);
+  if(autoScroll) box.scrollTop = box.scrollHeight;
+  logsCache.push({time,msg,type});
+  if(logsCache.length>200) logsCache.shift();
+}
+
+function clearLogs(){document.getElementById('logBox').innerHTML='';}
+function toggleAutoScroll(){autoScroll=!autoScroll;document.getElementById('autoScrollState').textContent=autoScroll?'ON':'OFF'}
+
+async function deleteFile(name){if(!confirm('Deletar '+name+'?'))return; const data=await apiCall('/api/files/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})}); alert(data.message||'Deletado'); loadFiles();}
+async function leaveGroup(jid){if(!confirm('Bot sair do grupo '+jid+'?'))return; const data=await apiCall('/api/groups/leave',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jid})}); alert(data.message||'Saiu'); loadGroups();}
+async function clearData(){if(!confirm('Limpar rank e stats?'))return; const data=await apiCall('/api/clear',{method:'POST'}); alert(data.message||'Limpo');}
+
+setInterval(refreshAll, 8000);
+setInterval(checkConnection, 5000);
+refreshAll();
+checkConnection();
+loadStats();
+if(Notification && Notification.permission!=='granted'){Notification.requestPermission();}
+
+// Live logs via polling
+setInterval(async ()=>{
+  const data = await apiCall('/api/logs');
+  if(data && data.length){
+    data.forEach(l=>{
+      if(!logsCache.find(c=>c.msg===l.msg && c.time===l.time)){
+        addLog(l.msg, l.type||'info');
+      }
+    });
+  }
+}, 3000);
+</script>
+</body>
+</html>
