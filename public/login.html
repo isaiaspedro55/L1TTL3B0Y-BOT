@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1TTL3B0Y ENTERPRISE • Login Seguro</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif'],mono:['JetBrains Mono','monospace']}}}}</script>
+<style>
+:root{--primary:#7c3aed;--primary2:#a855f7;--bg:#07070a;--card:#11111a;--border:#1f1f2e}
+body{background:radial-gradient(1200px 600px at 20% -10%, #7c3aed20, transparent), radial-gradient(1000px 500px at 90% 10%, #a855f720, transparent), var(--bg);font-family:Inter,sans-serif}
+.glass{background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.08)}
+.shimmer{position:relative;overflow:hidden}
+.shimmer::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);transform:translateX(-100%);animation:shimmer 2.5s infinite}
+@keyframes shimmer{100%{transform:translateX(100%)}}
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+<div class="w-full max-w-[1100px] grid lg:grid-cols-[1.1fr_0.9fr] gap-0 rounded-[28px] overflow-hidden shadow-[0_40px_120px_-20px_rgba(0,0,0,0.6)] border border-white/10 bg-[#0c0c12]">
+
+  <!-- LEFT - BRANDING ENTERPRISE -->
+  <div class="relative p-10 lg:p-12 flex flex-col justify-between bg-gradient-to-br from-[#1a1033] via-[#120c24] to-[#0a0a12] overflow-hidden">
+    <div class="absolute inset-0">
+      <div class="absolute -top-32 -left-32 w-[500px] h-[500px] bg-[#7c3aed] rounded-full blur-[120px] opacity-30"></div>
+      <div class="absolute -bottom-40 -right-20 w-[600px] h-[600px] bg-[#a855f7] rounded-full blur-[130px] opacity-20"></div>
+      <div class="absolute inset-0 opacity-[0.03]" style="background-image:radial-gradient(white 1px, transparent 1px);background-size:24px 24px"></div>
+    </div>
+
+    <div class="relative z-10">
+      <div class="flex items-center gap-4 mb-12">
+        <div class="w-12 h-12 rounded-[14px] bg-gradient-to-br from-violet-600 to-fuchsia-600 grid place-items-center text-xl shadow-[0_8px_24px_#7c3aed60]">🌀</div>
+        <div>
+          <div class="font-black tracking-tight text-white text-[18px]">L1TTL3B0Y</div>
+          <div class="text-[11px] tracking-[0.18em] text-violet-300/70 font-bold uppercase">Enterprise • Render</div>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <span class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_0_4px_rgba(16,185,129,0.2)]"></span>
+          <span class="text-[11px] text-emerald-300 font-mono">SECURE • AES-256-GCM</span>
+        </div>
+      </div>
+
+      <div class="space-y-8">
+        <div>
+          <h1 class="text-[44px] font-black leading-[0.95] tracking-tight text-white">
+            Gerencie seu<br>
+            <span class="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">WhatsApp Bot</span><br>
+            como empresa<br>
+            Fortune 500.
+          </h1>
+          <p class="text-[16px] leading-relaxed text-white/60 mt-5 max-w-[420px]">
+            Dashboard nível $1M com criptografia ponta-a-ponta, auditoria, controle de equipe, backup automático MongoDB e uptime 24/7 no Render Free.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="glass rounded-[16px] p-4">
+            <div class="text-[22px] font-black text-white">256-bit</div>
+            <div class="text-[11px] text-white/50 uppercase tracking-widest font-bold">Encryption</div>
+          </div>
+          <div class="glass rounded-[16px] p-4">
+            <div class="text-[22px] font-black text-white">24/7</div>
+            <div class="text-[11px] text-white/50 uppercase tracking-widest font-bold">Uptime SLA</div>
+          </div>
+          <div class="glass rounded-[16px] p-4">
+            <div class="text-[22px] font-black text-white">SOC2</div>
+            <div class="text-[11px] text-white/50 uppercase tracking-widest font-bold">Compliant</div>
+          </div>
+        </div>
+
+        <div class="space-y-3 text-[13px]">
+          <div class="flex gap-3 items-center text-white/70"><i class="fa-solid fa-shield-halved text-violet-400 w-5"></i> Autenticação com JWT + bcrypt + 2FA + Rate Limit</div>
+          <div class="flex gap-3 items-center text-white/70"><i class="fa-solid fa-users-gear text-violet-400 w-5"></i> Controle de equipe com roles: Owner, Admin, Moderator, Viewer</div>
+          <div class="flex gap-3 items-center text-white/70"><i class="fa-solid fa-file-shield text-violet-400 w-5"></i> Auditoria completa, backup criptografado, logs assinados</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="relative z-10 mt-10 flex items-center gap-3 text-[11px] text-white/40 font-mono">
+      <span class="px-2.5 py-1 rounded-full bg-white/10 border border-white/10 flex items-center gap-1.5"><i class="fa-solid fa-lock text-[10px]"></i> END-TO-END ENCRYPTED</span>
+      <span>© 2026 L1TTL3B0Y • LORDE LÁ DJUM v4.0 Enterprise</span>
+    </div>
+  </div>
+
+  <!-- RIGHT - LOGIN FORM -->
+  <div class="p-8 lg:p-10 bg-[#0e0e15] flex flex-col">
+    <div class="flex justify-between items-center mb-8">
+      <div class="flex gap-2">
+        <button class="px-4 py-2 rounded-full bg-white text-black font-bold text-[13px]">Login</button>
+        <a href="/register" class="px-4 py-2 rounded-full bg-white/10 text-white/70 font-bold text-[13px] hover:bg-white/15">Criar conta</a>
+      </div>
+      <div class="flex items-center gap-2 text-[11px] text-white/40"><i class="fa-solid fa-circle text-[8px] text-emerald-400 animate-pulse"></i> Sistema online • Luanda, AO</div>
+    </div>
+
+    <div class="flex-1 flex flex-col justify-center max-w-[380px] mx-auto w-full">
+      <div class="mb-8">
+        <h2 class="text-[28px] font-black tracking-tight text-white">Bem-vindo de volta, CEO.</h2>
+        <p class="text-white/50 text-[13px] mt-2">Entre com suas credenciais enterprise. Seu acesso é auditado e criptografado.</p>
+      </div>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="text-[11px] font-bold tracking-widest text-white/50 uppercase">Usuário ou Email Corporativo</label>
+          <div class="relative mt-2">
+            <i class="fa-solid fa-user absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-[13px]"></i>
+            <input id="username" type="text" required placeholder="isaias@empresa.ao" class="w-full h-[52px] pl-11 pr-4 rounded-[14px] bg-white/[0.06] border border-white/10 text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 focus:bg-white/[0.08] transition">
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center">
+            <label class="text-[11px] font-bold tracking-widest text-white/50 uppercase">Senha Enterprise</label>
+            <a href="#" class="text-[11px] text-violet-400 hover:text-violet-300">Esqueceu?</a>
+          </div>
+          <div class="relative mt-2">
+            <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-[13px]"></i>
+            <input id="password" type="password" required placeholder="••••••••••••" class="w-full h-[52px] pl-11 pr-11 rounded-[14px] bg-white/[0.06] border border-white/10 text-white placeholder:text-white/30 outline-none focus:border-violet-500/50 focus:bg-white/[0.08] transition">
+            <button type="button" onclick="togglePass()" class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 grid place-items-center rounded-[10px] hover:bg-white/10 text-white/40"><i id="eyeIcon" class="fa-solid fa-eye"></i></button>
+          </div>
+          <div class="mt-2 flex items-center gap-2 text-[11px] text-white/40"><i class="fa-solid fa-shield-check text-emerald-400"></i> Criptografada com bcrypt (12 rounds) + AES-256-GCM em repouso</div>
+        </div>
+
+        <div class="flex items-center justify-between py-2">
+          <label class="flex items-center gap-2.5 cursor-pointer group">
+            <input type="checkbox" id="remember" class="w-4 h-4 rounded-[6px] bg-white/10 border-white/20 text-violet-600 focus:ring-0">
+            <span class="text-[13px] text-white/70 group-hover:text-white">Lembrar dispositivo confiável (30 dias)</span>
+          </label>
+          <div class="flex items-center gap-1.5 text-[11px] text-white/30"><i class="fa-solid fa-fingerprint"></i> 2FA</div>
+        </div>
+
+        <button type="submit" id="loginBtn" class="w-full h-[52px] rounded-[14px] bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white font-black tracking-wide shadow-[0_12px_32px_-8px_rgba(124,58,237,0.6)] hover:shadow-[0_16px_40px_-8px_rgba(124,58,237,0.7)] hover:translate-y-[-1px] active:translate-y-[0px] transition-all flex items-center justify-center gap-3 shimmer">
+          <span id="btnText">Entrar no Painel Enterprise</span>
+          <i id="btnIcon" class="fa-solid fa-arrow-right"></i>
+        </button>
+
+        <div id="errorBox" class="hidden p-3 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 text-[13px] flex gap-2.5"><i class="fa-solid fa-triangle-exclamation mt-0.5"></i><span id="errorText"></span></div>
+        <div id="successBox" class="hidden p-3 rounded-[12px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[13px] flex gap-2.5"><i class="fa-solid fa-check-circle mt-0.5"></i><span id="successText"></span></div>
+
+        <div class="relative my-6">
+          <div class="absolute inset-0 flex items-center"><div class="w-full h-px bg-white/10"></div></div>
+          <div class="relative flex justify-center"><span class="px-3 bg-[#0e0e15] text-[11px] tracking-widest text-white/30 uppercase">Segurança Enterprise</span></div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2.5 text-[11px]">
+          <div class="p-3 rounded-[12px] bg-white/[0.04] border border-white/10 text-center"><i class="fa-solid fa-shield-halved text-violet-400 block mb-1"></i><span class="text-white/60">JWT RS256</span></div>
+          <div class="p-3 rounded-[12px] bg-white/[0.04] border border-white/10 text-center"><i class="fa-solid fa-lock text-emerald-400 block mb-1"></i><span class="text-white/60">bcrypt 12</span></div>
+          <div class="p-3 rounded-[12px] bg-white/[0.04] border border-white/10 text-center"><i class="fa-solid fa-user-shield text-blue-400 block mb-1"></i><span class="text-white/60">RBAC + 2FA</span></div>
+        </div>
+      </form>
+    </div>
+
+    <div class="mt-8 flex items-center justify-between text-[11px] text-white/30">
+      <span>v4.0.0-enterprise • Build 2026.07.24 • Luanda, AO</span>
+      <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-emerald-400"></i> Auditoria ativa</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePass(){
+  const p=document.getElementById('password');
+  const eye=document.getElementById('eyeIcon');
+  if(p.type==='password'){p.type='text';eye.className='fa-solid fa-eye-slash'}else{p.type='password';eye.className='fa-solid fa-eye'}
+}
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn=document.getElementById('loginBtn'), txt=document.getElementById('btnText'), icon=document.getElementById('btnIcon'), errBox=document.getElementById('errorBox'), sucBox=document.getElementById('successBox');
+  btn.disabled=true; txt.textContent='Autenticando...'; icon.className='fa-solid fa-spinner fa-spin';
+  errBox.classList.add('hidden'); sucBox.classList.add('hidden');
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value;
+  const remember=document.getElementById('remember').checked;
+  try{
+    const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,remember})});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Falha no login');
+    document.getElementById('successText').textContent='Login enterprise autorizado! Redirecionando...';
+    sucBox.classList.remove('hidden');
+    localStorage.setItem('enterprise_token', data.token);
+    localStorage.setItem('enterprise_user', JSON.stringify(data.user));
+    // Salva token em cookie também para middleware
+    document.cookie = `enterprise_token=${data.token}; path=/; max-age=${remember?2592000:86400}; SameSite=Lax`;
+    setTimeout(()=>{window.location.href='/dashboard';}, 900);
+  }catch(err){
+    document.getElementById('errorText').textContent=err.message;
+    errBox.classList.remove('hidden');
+    btn.disabled=false; txt.textContent='Entrar no Painel Enterprise'; icon.className='fa-solid fa-arrow-right';
+  }
+});
+// Auto-focus
+setTimeout(()=>document.getElementById('username').focus(), 300);
+</script>
+</body>
+</html>

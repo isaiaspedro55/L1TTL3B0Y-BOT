@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1TTL3B0Y ENTERPRISE • Criar Conta</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{background:radial-gradient(1200px 600px at 20% -10%, #7c3aed20, transparent), radial-gradient(1000px 500px at 90% 10%, #a855f720, transparent), #07070a;font-family:Inter,sans-serif}</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+<div class="w-full max-w-[520px] rounded-[24px] bg-[#0e0e15] border border-white/10 p-8 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)]">
+  <div class="flex items-center gap-3 mb-8">
+    <div class="w-11 h-11 rounded-[12px] bg-gradient-to-br from-violet-600 to-fuchsia-600 grid place-items-center text-xl">🌀</div>
+    <div><div class="font-black text-white">L1TTL3B0Y ENTERPRISE</div><div class="text-[11px] tracking-widest text-violet-300/70 uppercase">Criar conta segura</div></div>
+    <span class="ml-auto text-[11px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"><i class="fa-solid fa-lock"></i> AES-256</span>
+  </div>
+
+  <h2 class="text-[24px] font-black text-white">Criar conta enterprise</h2>
+  <p class="text-white/50 text-[13px] mt-2 mb-6">Primeiro usuário vira Owner automaticamente. Demais viram Viewer até serem promovidos no painel Team.</p>
+
+  <form id="regForm" class="space-y-4">
+    <input id="username" required placeholder="Usuário (ex: isaias.admin)" class="w-full h-[48px] px-4 rounded-[12px] bg-white/[0.06] border border-white/10 text-white placeholder:text-white/30 outline-none focus:border-violet-500/50">
+    <input id="email" type="email" required placeholder="Email corporativo" class="w-full h-[48px] px-4 rounded-[12px] bg-white/[0.06] border border-white/10 text-white placeholder:text-white/30 outline-none focus:border-violet-500/50">
+    <div class="relative">
+      <input id="password" type="password" required placeholder="Senha forte (12+ caracteres, maiúscula, número, símbolo)" class="w-full h-[48px] px-4 pr-10 rounded-[12px] bg-white/[0.06] border border-white/10 text-white placeholder:text-white/30 outline-none focus:border-violet-500/50">
+      <button type="button" onclick="document.getElementById('password').type=document.getElementById('password').type==='password'?'text':'password'" class="absolute right-3 top-1/2 -translate-y-1/2 text-white/40"><i class="fa-solid fa-eye"></i></button>
+    </div>
+    <div class="p-3 rounded-[12px] bg-violet-500/10 border border-violet-500/20 text-[12px] text-violet-300">
+      <div class="font-bold mb-1"><i class="fa-solid fa-shield-halved"></i> Política de senha enterprise:</div>
+      • Mínimo 8 caracteres, recomendado 12+<br>
+      • Hash bcrypt 12 rounds<br>
+      • Criptografia AES-256-GCM em repouso<br>
+      • Tentativas limitadas (5) + lock 15min
+    </div>
+    <button type="submit" id="regBtn" class="w-full h-[50px] rounded-[12px] bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white font-black">Criar conta enterprise →</button>
+    <div id="msgBox" class="hidden p-3 rounded-[12px] text-[13px]"></div>
+    <div class="text-center text-[13px] text-white/50">Já tem conta? <a href="/login" class="text-violet-400 hover:text-violet-300 font-bold">Fazer login</a></div>
+  </form>
+</div>
+
+<script>
+document.getElementById('regForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const btn=document.getElementById('regBtn');
+  const msgBox=document.getElementById('msgBox');
+  btn.disabled=true; btn.textContent='Criando...';
+  msgBox.classList.add('hidden');
+  try{
+    const res=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      username:document.getElementById('username').value.trim(),
+      email:document.getElementById('email').value.trim(),
+      password:document.getElementById('password').value
+    })});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Falha');
+    msgBox.textContent='✅ Conta criada! Role: '+data.user.role+'. Redirecionando para login...';
+    msgBox.className='p-3 rounded-[12px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[13px]';
+    msgBox.classList.remove('hidden');
+    setTimeout(()=>location.href='/login',1500);
+  }catch(err){
+    msgBox.textContent='❌ '+err.message;
+    msgBox.className='p-3 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 text-[13px]';
+    msgBox.classList.remove('hidden');
+    btn.disabled=false; btn.textContent='Criar conta enterprise →';
+  }
+});
+</script>
+</body>
+</html>
