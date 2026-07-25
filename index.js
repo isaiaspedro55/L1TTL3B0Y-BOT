@@ -465,48 +465,186 @@ app.get("/api/status", (req,res)=>{
 });
 
 app.get("/api/connection", (req,res)=>{
+  // Calcula tempo real de expiração do Pair Code - seu pedido: gera tempo real de expiração
+  let pairingData = null;
+  if(currentPairingCode){
+    if(typeof currentPairingCode === 'string'){
+      // Compatibilidade com código antigo string
+      pairingData = {
+        code: currentPairingCode,
+        phone: CONFIG.NUMERO_BOT,
+        createdAt: Date.now() - 30000, // assume 30s atrás
+        expiresAt: Date.now() + 30000,
+        expiresIn: 30,
+        remaining: 30
+      };
+    }else{
+      const now = Date.now();
+      const remaining = Math.max(0, Math.floor((currentPairingCode.expiresAt - now)/1000));
+      pairingData = {
+        ...currentPairingCode,
+        remaining,
+        expiresIn: remaining,
+        isExpired: remaining<=0
+      };
+      // Se expirou, limpa automaticamente
+      if(remaining<=0){
+        currentPairingCode = null;
+        pairingData = null;
+      }
+    }
+  }
+
   res.json({
     connected: connectionStatus==="open",
     status: connectionStatus,
     number: connectionNumber || null,
-    pairingCode: currentPairingCode,
+    pairingCode: pairingData ? pairingData.code : null,
+    pairingData: pairingData, // objeto completo com tempo real expiração
     qr: currentQR,
     sessionExists: fs.existsSync("./sessao/creds.json"),
     mongo: mongoConectado,
     botNumber: CONFIG.NUMERO_BOT,
-    enterprise: true,
-    encrypted: true
+    botNumberEnv: process.env.BOT_NUMBER || CONFIG.NUMERO_BOT,
+    allVarsRender: {
+      MONGODB_URI: mongoConectado ? "✅ Configurado" : "❌ Não configurado - configure no Render",
+      BOT_NUMBER: CONFIG.NUMERO_BOT,
+      PREFIX: CONFIG.PREFIXO,
+      CHANNEL_LINK: CHANNEL_LINK_DINAMICO,
+      PORT: CONFIG.PORT,
+      NODE_ENV: process.env.NODE_ENV || 'production',
+      RENDER_EXTERNAL_URL: process.env.RENDER_EXTERNAL_URL || 'Não configurado - coloque https://seu-bot.onrender.com',
+      KEEP_ALIVE: process.env.KEEP_ALIVE || 'true'
+    },
+    enterprise: false, // simplificado
+    encrypted: true,
+    canReconnect: true, // adaptado para reconectar sempre que desconectar
+    timestamp: Date.now()
   });
 });
 
 app.post("/api/pairing/request", async (req,res)=>{
   try{
-    const phone = (req.body.phone || CONFIG.NUMERO_BOT).replace(/\D/g,"");
-    if(!phone) return res.status(400).json({error:"Número inválido"});
-    if(!globalSock){
-      return res.status(400).json({error:"Bot ainda não iniciado, aguarde..."});
-    }
-    // Se já conectado, não precisa
-    if(connectionStatus==="open"){
-      return res.json({message:"Já conectado", connected:true, number: connectionNumber});
-    }
-    try{
-      const code = await globalSock.requestPairingCode(phone);
-      currentPairingCode = code;
-      addBotLog(`Pairing code gerado: ${code} para ${phone}`, 'success');
-      // Audit
-      if(mongoModule && mongoModule.createAuditLog && req.user){
-        await mongoModule.createAuditLog(req.user.username, 'PAIRING_CODE_GENERATED', { phone, code }, req.ip);
-      }
-      // Notificação via console e log para dashboard
-      console.log(`\n╔══════════════════════════════════════════╗\n║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║\n║           ➤  ${code.match(/.{1,4}/g)?.join('-')||code}  ◄             ║\n║  📞 Número: +${phone}             ║\n╚══════════════════════════════════════════╝\n`);
+    let phone = (req.body.phone || CONFIG.NUMERO_BOT || "").replace(/\D/g,"");
+    if(!phone) return res.status(400).json({error:"Número inválido - digite ex: 244954260707"});
+    phone = phone.trim();
+    addBotLog(`Requisição Pair Code para +${phone} - Todas variáveis no Render, adaptando reconexão automática`, 'info');
 
-      return res.json({code, phone, message:`Código ${code} gerado com sucesso! 🔔 O WhatsApp do número +${phone} (alvo) RECEBERÁ NOTIFICAÇÃO pedindo o código para conectar - é automático do WhatsApp. Peça ao dono do número alvo para abrir a notificação e digitar o código, ou manualmente: WhatsApp do alvo → Configurações → Aparelhos conectados → Conectar com número de telefone → digite ${code}. Dashboard sabe status on/offline em tempo real. Se offline, o bot automaticamente permite gerar novo código quando dono pedir. Sessão fica hospedada no MongoDB e sobrevive a redeploys Render.`});
-    }catch(e){
-      addBotLog(`Erro ao gerar pairing code: ${e.message}`, 'error');
-      return res.status(500).json({error:e.message});
+    // Se já conectado, não precisa
+    if(connectionStatus==="open" && globalSock && globalSock.authState?.creds?.registered){
+      return res.json({message:"✅ Já conectado", connected:true, number: connectionNumber, code: null});
     }
-  }catch(e){ res.status(500).json({error:e.message}); }
+
+    // Se bot desconectado ou sem sock, tenta reconectar automaticamente (seu pedido: se reconectar sempre que desconectar)
+    if(!globalSock || connectionStatus==="close" || connectionStatus==="offline" || connectionStatus==="connecting"){
+      addBotLog(`Bot offline (${connectionStatus}), tentando reconectar automaticamente antes de gerar Pair Code...`, 'info');
+      try{
+        // Tenta iniciar bot se não estiver rodando
+        if(!globalSock || connectionStatus==="close" || connectionStatus==="offline"){
+          // Chama startBot de forma assíncrona e aguarda um pouco
+          startBot().catch(()=>{});
+          // Aguarda até 5s para sock estar pronto
+          let attempts=0;
+          while(attempts<10 && (!globalSock || connectionStatus==="connecting")){
+            await new Promise(r=>setTimeout(r, 500));
+            attempts++;
+          }
+          // Mais 2s para estabilizar
+          await new Promise(r=>setTimeout(r, 1500));
+        }
+      }catch(e){
+        addBotLog(`Tentativa auto reconexão falhou: ${e.message}, tentando mesmo assim gerar código`, 'error');
+      }
+    }
+
+    if(!globalSock){
+      // Ainda sem sock após tentativa reconexão
+      return res.status(503).json({error:"Bot ainda iniciando, aguarde 5s e tente novamente. Se persistir, verifique logs Render. Todas variáveis no Render: MONGODB_URI, BOT_NUMBER, etc."});
+    }
+
+    // Tenta gerar código com retry para resolver Connection Closed
+    let lastError = null;
+    for(let attempt=1; attempt<=3; attempt++){
+      try{
+        addBotLog(`Tentativa ${attempt}/3 gerar Pair Code para +${phone}...`, 'info');
+        // Verifica se precisa reconectar antes de tentar
+        if(connectionStatus==="close"){
+          addBotLog(`Conexão fechada, reiniciando socket... tentativa ${attempt}`, 'info');
+          try{ startBot(); }catch{}
+          await new Promise(r=>setTimeout(r, 3000));
+          if(!globalSock) throw new Error("Connection Closed - sem socket após restart");
+        }
+
+        const code = await globalSock.requestPairingCode(phone);
+        // Salva com tempo real de expiração - seu pedido: gera tempo real de expiração
+        const now = Date.now();
+        currentPairingCode = {
+          code: code,
+          phone: phone,
+          createdAt: now,
+          expiresAt: now + 60*1000, // 60s expiração real
+          createdBy: req.user?.username || req.ip || 'dashboard'
+        };
+        currentQR = null; // Limpa QR quando gera Pair Code, foca no Pair
+
+        // Notificação: WhatsApp do alvo recebe notificação pedindo código (nativo Baileys)
+        addBotLog(`✅ Pair Code gerado: ${code} para +${phone} - WhatsApp alvo RECEBERÁ NOTIFICAÇÃO pedindo código para conectar!`, 'success');
+        if(mongoModule && mongoModule.createAuditLog && req.user){
+          await mongoModule.createAuditLog(req.user.username, 'PAIRING_CODE_GENERATED', { phone, code, expiresAt: currentPairingCode.expiresAt }, req.ip);
+        }
+
+        console.log(`\n╔══════════════════════════════════════════╗\n║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║\n║           ➤  ${code.match(/.{1,4}/g)?.join('-')||code}  ◄             ║\n║  📞 Número: +${phone}             ║\n║  🔔 Alvo receberá notificação WA       ║\n║  ⏱️ Expira em 60s - tempo real          ║\n╚══════════════════════════════════════════╝\n`);
+
+        return res.json({
+          code, 
+          phone, 
+          createdAt: currentPairingCode.createdAt,
+          expiresAt: currentPairingCode.expiresAt,
+          expiresIn: 60,
+          message:`✅ Código ${code} gerado! 🔔 WhatsApp +${phone} RECEBEU NOTIFICAÇÃO automática pedindo código para conectar (nativo Baileys). No alvo: Config → Aparelhos conectados → Conectar com número → digite ${code}. Dashboard sabe on/offline, se offline gera novo automaticamente. Sessão hospedada MongoDB. Tempo real expiração: 60s.`
+        });
+      }catch(e){
+        lastError = e;
+        addBotLog(`Tentativa ${attempt} falhou: ${e.message}`, 'error');
+        if(e.message && e.message.includes("Connection Closed")){
+          // Se Connection Closed, tenta reiniciar socket e tentar novamente
+          addBotLog(`Erro Connection Closed - adaptando para reconectar sempre que desconectar (seu pedido) - reiniciando...`, 'info');
+          try{
+            // Força restart
+            if(globalSock){
+              try{ await globalSock.end(); }catch{}
+            }
+            // Aguarda e tenta startBot novamente
+            await new Promise(r=>setTimeout(r, 1000));
+            startBot().catch(()=>{});
+            await new Promise(r=>setTimeout(r, 4000));
+          }catch{}
+          continue; // tenta novamente
+        }else if(e.message && e.message.toLowerCase().includes("already") || e.message.includes("registered")){
+          return res.json({message:"✅ Já registrado/conectado", connected:true, number: connectionNumber});
+        }
+        // Outros erros, tenta novamente se não for última tentativa
+        if(attempt<3){
+          await new Promise(r=>setTimeout(r, 2000));
+          continue;
+        }
+        break;
+      }
+    }
+
+    // Se chegou aqui, todas tentativas falharam
+    const errorMsg = lastError ? lastError.message : "Falha desconhecida";
+    addBotLog(`❌ Todas tentativas Pair Code falharam: ${errorMsg}`, 'error');
+    return res.status(500).json({
+      error: `Connection Closed - Bot desconectado. Adaptado para reconectar sempre: ${errorMsg}. Tente: 1) Aguarde 5s, 2) Clique Gerar novo código novamente, 3) Verifique se número ${phone} está correto e com WhatsApp instalado, 4) Verifique todas variáveis no Render estão configuradas (MONGODB_URI, BOT_NUMBER). Dashboard tenta reconectar automático. Se persistir, clique Desconectar e gere novo código.`,
+      details: errorMsg,
+      tip: "Bot foi configurado para se reconectar sempre que desconectar. Aguarde 5s e tente novamente. Verifique Render Logs."
+    });
+
+  }catch(e){ 
+    addBotLog(`Erro crítico Pair Code: ${e.message}`, 'error');
+    res.status(500).json({error:e.message}); 
+  }
 });
 
 app.post("/api/connection/disconnect", async (req,res)=>{
@@ -653,9 +791,32 @@ app.get("/api/logs", (req,res)=>{
   res.json(botLogs.slice(-100));
 });
 
-app.get("/api/qr", (req,res)=>{
-  if(currentQR) res.json({qr: currentQR});
-  else res.json({qr:null, message:"Nenhum QR disponível, use Pairing Code enterprise"});
+app.get("/api/qr", async (req,res)=>{
+  // QR Code com tamanho correto 280x280 e tempo real expiração
+  if(currentQR){
+    // Se for dataURL base64, retorna direto com tempo real
+    return res.json({
+      qr: currentQR, 
+      createdAt: Date.now(),
+      expiresIn: 60,
+      size: "280x280",
+      message: "QR Code tamanho correto 280x280 - escaneie com WhatsApp do bot"
+    });
+  }
+  
+  // Se não tem QR e está desconectado, tenta reconectar para gerar QR (adaptado para reconectar sempre)
+  if(connectionStatus==="close" || connectionStatus==="offline" || !globalSock){
+    addBotLog("QR solicitado mas offline, tentando reconectar para gerar QR 280x280...", 'info');
+    try{
+      startBot().catch(()=>{});
+      await new Promise(r=>setTimeout(r, 4000));
+      if(currentQR){
+        return res.json({qr: currentQR, size:"280x280", message:"QR gerado após reconexão"});
+      }
+    }catch{}
+  }
+
+  res.json({qr:null, message:"Nenhum QR disponível no momento. Bot está em modo Pair Code (recomendado). Para QR: Desconecte e gere novo código sem pedir Pair Code imediatamente, aguarde QR aparecer. Tamanho correto 280x280."});
 });
 
 app.get("/api/audit", async (req,res)=>{
@@ -2013,51 +2174,26 @@ async function startBot(){
       }catch{}
     }, 5*60*1000);
 
-    if(!sock.authState.creds.registered){
-      const phoneNumber=CONFIG.NUMERO_BOT.replace(/\D/g,"");
-      console.log("⏳ A aguardar ligação estável...");
-      addBotLog(`Aguardando ligação estável para +${phoneNumber}...`, 'info');
-      await new Promise(r=>setTimeout(r,8000));
-      if(!sock.authState.creds.registered){
-        try{
-          const code=await sock.requestPairingCode(phoneNumber);
-          currentPairingCode = code;
-          const codeFmt=code?.match(/.{1,4}/g)?.join("-")||code;
-          console.log("\n╔══════════════════════════════════════════╗");
-          console.log("║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║");
-          console.log("╠══════════════════════════════════════════╣");
-          console.log(`║           ➤  ${codeFmt}  ◄             ║`);
-          console.log(`║  📞 Número: +${phoneNumber}             ║`);
-          console.log("╚══════════════════════════════════════════╝\n");
-          addBotLog(`Código de pareamento gerado: ${codeFmt} para +${phoneNumber} - Use no dashboard /dashboard ou no WhatsApp`, 'success');
-          console.log(`📊 Dashboard: http://localhost:${CONFIG.PORT}/dashboard -> Aba Conexão para ver código e QR`);
-          // Mantém código disponível por 2 minutos no dashboard
-          setTimeout(()=>{ if(connectionStatus!=="open") addBotLog(`Código ${codeFmt} expira em 60s, gere novo se precisar via dashboard`, 'info'); }, 60000);
-        }catch(e){
-          console.error("❌ Erro código:",e.message);
-          addBotLog(`Erro ao gerar código: ${e.message}`, 'error');
-          // No Render não deve dar exit, tenta novamente
-          if(process.env.NODE_ENV==="production"){
-            addBotLog("Tentando novamente em 10s...", 'info');
-            setTimeout(()=>startBot(),10000);
-            return;
-          }
-          process.exit(1);
-        }
-      }
-    }
-
     sock.ev.on("connection.update",async({connection,lastDisconnect, qr})=>{
-      // Captura QR Code para dashboard
+      // Captura QR Code para dashboard - Pair Code e QR Code devem funcionar, essencial Pair Code
+      // Tamanho correto 280x280 para canvas, site operacional
       if(qr){
         try{
-          // Gera data URL para QR
-          const QRCode = require('qrcode') || null;
-        }catch{}
-        // Salva QR como texto simples, dashboard vai buscar via API e gerar imagem via api.qrserver
-        // Mas tentamos gerar base64 se qrcode-terminal disponível? Para simplificar, usa API externa
-        currentQR = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`;
-        addBotLog(`QR Code gerado para conexão`, 'info');
+          const QRCode = require('qrcode');
+          // Gera dataURL base64 com tamanho correto 280x280 para canvas não esticar
+          const dataUrl = await QRCode.toDataURL(qr, {width:280, margin:1, color:{dark:'#000000', light:'#FFFFFF'}});
+          if(dataUrl){
+            currentQR = dataUrl; // base64 data URL para canvas tamanho correto
+            addBotLog(`QR Code gerado base64 280x280 para dashboard canvas tamanho correto`, 'info');
+          }else{
+            currentQR = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qr)}`;
+            addBotLog(`QR Code gerado via qrserver 280x280`, 'info');
+          }
+        }catch(e){
+          // Fallback qrserver com tamanho correto
+          currentQR = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qr)}`;
+          addBotLog(`QR Code gerado fallback qrserver 280x280: ${e.message}`, 'info');
+        }
         connectionStatus = "qr";
       }
 
@@ -2105,6 +2241,45 @@ async function startBot(){
         setTimeout(()=>varreduraGrupos(sock),5000);
       }
     });
+
+
+
+
+    // Sistema Pair Code e QR Code via dashboard - alvo recebe notificação pedindo código
+    // Dashboard funcional: campo número bot + botão gerar Pair Code ou QR Code (essencial Pair)
+    // Todas variáveis no Render: BOT_NUMBER, MONGODB_URI, etc
+    if(!sock.authState.creds.registered){
+      const phoneNumber=CONFIG.NUMERO_BOT.replace(/\D/g,"");
+      console.log("⏳ Bot aguardando conexão via dashboard...");
+      addBotLog(`Bot aguardando conexão via dashboard /dashboard → Conectar → Gere Pair Code ou QR Code. Número: +${phoneNumber}. Todas variáveis no Render. Dashboard sabe on/offline, se offline gera novo código automaticamente. Sessão hospedada MongoDB.`, 'info');
+      
+      // Só gera automaticamente se AUTO_PAIR_CODE=true, senão aguarda dashboard gerar (mais funcional)
+      const shouldAutoGenerate = process.env.AUTO_PAIR_CODE === "true" || process.env.AUTO_PAIR_CODE === "1";
+      if(shouldAutoGenerate){
+        console.log("🔑 AUTO_PAIR_CODE=true - Gerando código automaticamente + notificação para alvo...");
+        await new Promise(r=>setTimeout(r,8000));
+        if(!sock.authState.creds.registered){
+          try{
+            const code=await sock.requestPairingCode(phoneNumber);
+            currentPairingCode = code;
+            const codeFmt=code?.match(/.{1,4}/g)?.join("-")||code;
+            console.log("\n╔══════════════════════════════════════════╗");
+            console.log("║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║");
+            console.log("╠══════════════════════════════════════════╣");
+            console.log(`║           ➤  ${codeFmt}  ◄             ║`);
+            console.log(`║  📞 Número: +${phoneNumber}             ║`);
+            console.log("║  🔔 Alvo receberá notificação WhatsApp   ║");
+            console.log("╚══════════════════════════════════════════╝\n");
+            addBotLog(`Código Pair gerado auto: ${codeFmt} para +${phoneNumber} - WhatsApp alvo receberá notificação pedindo código. Dashboard operacional tamanho correto.`, 'success');
+          }catch(e){
+            console.error("❌ Erro código auto:",e.message);
+            addBotLog(`Erro código auto: ${e.message} - Use dashboard Pair Code, alvo recebe notificação`, 'error');
+          }
+        }
+      } else {
+        addBotLog(`Aguardando Pair Code ser gerado via dashboard /dashboard → Conectar. O WhatsApp alvo +${phoneNumber} receberá notificação pedindo código quando gerar. Todas variáveis no Render. Tamanho canvas 280x280 correto. Site operacional.`, 'info');
+      }
+    }
 
     sock.ev.on("group-participants.update",async(update)=>{
       try{

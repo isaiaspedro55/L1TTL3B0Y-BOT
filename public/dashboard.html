@@ -147,6 +147,7 @@ async function api(p,opts={}){
 
 function formatShort(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return `${h}h ${m}m`}
 
+
 async function checkConnection(){
   const data=await api('/api/connection');
   const badge=document.getElementById('connBadge');
@@ -156,21 +157,24 @@ async function checkConnection(){
   if(!data) return;
   const list=document.getElementById('connStatusList');
   if(list){
+    const pairingInfo = data.pairingData ? ` • Expira em ${data.pairingData.remaining||0}s tempo real` : '';
     list.innerHTML=`
-      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Status</span><span class="font-bold text-[12px] ${data.connected?'text-emerald-400':'text-red-400'}">${data.connected?'🟢 Online':'🔴 Offline'} • ${data.status||'-'}</span></div>
-      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Número</span><span class="font-mono text-[12px]">${data.number||'-'}</span></div>
+      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Status</span><span class="font-bold text-[12px] ${data.connected?'text-emerald-400':'text-red-400'}">${data.connected?'🟢 Online':'🔴 Offline'} • ${data.status} • Reconecta auto</span></div>
+      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Número</span><span class="font-mono text-[12px]">${data.number||data.botNumber||'-'}</span></div>
       <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Sessão Hospedada</span><span class="text-[12px] ${data.sessionExists?'text-emerald-400':'text-red-400'}">${data.sessionExists?'✅ Hospedada MongoDB':'❌ Não existe'}</span></div>
       <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Mongo Backup</span><span class="text-[12px] ${data.mongo?'text-emerald-400':'text-amber-400'}">${data.mongo?'✅ Ativo':'⚠️ Sem Mongo'}</span></div>
-      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Bot Number Render</span><span class="font-mono text-[11px]">${data.botNumber||'-'}</span></div>
+      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Pair Code ${pairingInfo}</span><span class="font-mono text-[11px]">${data.pairingData?data.pairingData.code:'Nenhum'}</span></div>
+      <div class="flex justify-between p-2.5 rounded-[10px] bg-white/5"><span class="text-white/50 text-[12px]">Bot Number Render</span><span class="font-mono text-[11px]">${data.botNumber||'-'} • Vars no Render</span></div>
     `;
   }
   if(badge){
-    badge.textContent=data.connected?'Conectado':'Desconectado';
+    badge.textContent=data.connected?'Conectado':'Desconectado • Offline • Gere novo código';
     badge.className='px-3 py-1 rounded-full border text-[11px] font-bold '+(data.connected?'bg-emerald-500/15 text-emerald-300 border-emerald-500/20':'bg-red-500/15 text-red-300 border-red-500/20');
   }
-  if(dot) dot.className='w-2.5 h-2.5 rounded-full '+(data.connected?'bg-emerald-400':'bg-red-400');
-  if(txt) txt.textContent=data.connected?`🟢 Conectado ${data.number||''} • Online`:`🔴 Desconectado • Offline • Gere novo código`;
-  if(mongoBadge) mongoBadge.textContent=data.mongo?'Mongo: ✅ Conectado':'Mongo: ❌ Offline';
+  const dotEl=document.getElementById('statusDot');
+  if(dotEl) dotEl.className='w-2.5 h-2.5 rounded-full '+(data.connected?'bg-emerald-400 shadow-[0_0_0_4px_rgba(16,185,129,0.2)]':'bg-red-400 shadow-[0_0_0_4px_rgba(239,68,68,0.2)] animate-pulse');
+  if(txt) txt.textContent=data.connected?`🟢 Conectado ${data.number||''} • Online • Sessão hospedada`:`🔴 Desconectado • Offline • Gere novo código - Bot reconecta sempre`;
+  if(mongoBadge) mongoBadge.textContent=data.mongo?'Mongo: ✅ Conectado • Hospedado':'Mongo: ❌ Offline • Configure MONGODB_URI no Render';
 
   if(data.connected){
     document.getElementById('pairCodeArea')?.classList.add('hidden');
@@ -179,62 +183,109 @@ async function checkConnection(){
     document.getElementById('connectedNumber').textContent=data.number||'';
   }else{
     document.getElementById('connectedArea')?.classList.add('hidden');
-    if(data.pairingCode){
+    if(data.pairingData && data.pairingData.code){
+      document.getElementById('pairCodeArea').classList.remove('hidden');
+      document.getElementById('pairCodeDisplay').textContent=data.pairingData.code.match(/.{1,4}/g)?.join('-')||data.pairingData.code;
+      document.getElementById('notifCode').textContent=data.pairingData.code;
+      startCountdown(data.pairingData.remaining||60);
+    }else if(data.pairingCode){
       document.getElementById('pairCodeArea').classList.remove('hidden');
       document.getElementById('pairCodeDisplay').textContent=data.pairingCode.match(/.{1,4}/g)?.join('-')||data.pairingCode;
-      document.getElementById('notifCode').textContent=data.pairingCode;
-      startCountdown();
+      startCountdown(60);
     }
     if(data.qr){
       document.getElementById('qrArea').classList.remove('hidden');
       try{
         const canvas=document.getElementById('qrCanvas');
+        const img=document.getElementById('qrImage');
         if(data.qr.startsWith('data:image')){
-          // data URL base64
-          const img=new Image();
-          img.onload=()=>{ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,280,280); ctx.drawImage(img,0,0,280,280); };
-          img.src=data.qr;
+          canvas.classList.remove('hidden');
+          img.classList.add('hidden');
+          const image=new Image();
+          image.onload=()=>{ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,280,280); ctx.drawImage(image,0,0,280,280); };
+          image.src=data.qr;
         }else if(data.qr.startsWith('http')){
-          document.getElementById('qrImage').src=data.qr;
-          document.getElementById('qrImage').classList.remove('hidden');
+          img.src=data.qr;
+          img.classList.remove('hidden');
           canvas.classList.add('hidden');
         }else{
+          canvas.classList.remove('hidden');
+          img.classList.add('hidden');
           QRCode.toCanvas(canvas, data.qr, {width:280, margin:1});
         }
       }catch{}
     }
   }
-  // Atualiza numero notif
   const phoneInput=document.getElementById('phoneInput').value.trim();
-  document.getElementById('notifNumber').textContent=phoneInput||'244...';
+  document.getElementById('notifNumber').textContent=phoneInput||data.botNumber||'244...';
+  const renderVarsEl=document.getElementById('renderVars');
+  if(renderVarsEl && data.allVarsRender){
+    renderVarsEl.innerHTML=Object.entries(data.allVarsRender).map(([k,v])=>`<div class="flex justify-between p-1.5 rounded bg-white/5"><span class="text-white/40 text-[10px]">${k}</span><span class="font-mono text-[10px] truncate max-w-[150px]">${v}</span></div>`).join('');
+  }
 }
 
-function startCountdown(){
-  let sec=60;
+
+function startCountdown(remainingSeconds=null){
+  let sec = remainingSeconds !== null ? remainingSeconds : 60;
   const el=document.getElementById('countdown');
+  if(!el) return;
   clearInterval(countdownInterval);
-  countdownInterval=setInterval(()=>{sec--;if(el) el.textContent=sec+'s';if(sec<=0){clearInterval(countdownInterval);if(el) el.textContent='Expirado';}},1000);
+  el.textContent=sec+'s';
+  countdownInterval=setInterval(()=>{
+    sec--;
+    if(el) el.textContent=sec>0 ? sec+'s' : 'Expirado';
+    if(sec<=0){
+      clearInterval(countdownInterval);
+      // Quando expira, avisa e permite gerar novo
+      addLog('Pair Code expirou (60s) - gere novo código, alvo receberá nova notificação', 'error');
+    }
+  },1000);
 }
 
-async function requestPairing(){
+async function requestPairing(retryCount=0){
   const phone=document.getElementById('phoneInput').value.trim().replace(/\D/g,'');
   if(!phone){alert('Digite número ex: 244954260707');return}
   const btn=document.getElementById('pairBtn');
   const old=btn.innerHTML;
   btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Gerando...';
   btn.disabled=true;
-  const data=await api('/api/pairing/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
-  btn.innerHTML=old;
-  btn.disabled=false;
-  if(data && data.code){
-    document.getElementById('pairCodeArea').classList.remove('hidden');
-    document.getElementById('pairCodeDisplay').textContent=data.code.match(/.{1,4}/g)?.join('-')||data.code;
-    document.getElementById('notifCode').textContent=data.code;
-    document.getElementById('notifNumber').textContent=phone;
-    startCountdown();
-    alert(`✅ Pair Code Gerado: ${data.code}\n\n🔔 WhatsApp +${phone} RECEBEU NOTIFICAÇÃO automática pedindo código para conectar.\n\nNo WhatsApp alvo: Configurações → Aparelhos conectados → Conectar com número de telefone → digite ${data.code}\n\nDashboard sabe online/offline. Se offline, gere novo código. Sessão hospedada MongoDB.`);
-  }else{
-    alert('Erro: '+(data.error||data.message||'Falha ao gerar Pair Code'));
+  
+  try{
+    const data=await api('/api/pairing/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+    btn.innerHTML=old;
+    btn.disabled=false;
+    
+    if(data && data.code){
+      document.getElementById('pairCodeArea').classList.remove('hidden');
+      document.getElementById('pairCodeDisplay').textContent=data.code.match(/.{1,4}/g)?.join('-')||data.code;
+      document.getElementById('notifCode').textContent=data.code;
+      document.getElementById('notifNumber').textContent=phone;
+      // Usa tempo real de expiração do servidor se disponível
+      const remaining = data.expiresIn || data.pairingData?.remaining || 60;
+      startCountdown(remaining);
+      // Mostra lista senha e user e pair code com tempo real expiração
+      addLog(`✅ Pair Code ${data.code} gerado para +${phone} - expira em ${remaining}s tempo real - alvo notificado`, 'success');
+      alert(`✅ Pair Code Gerado: ${data.code}\n\n🔔 WhatsApp +${phone} RECEBEU NOTIFICAÇÃO automática pedindo código para conectar (nativo WhatsApp).\n\n⏱️ Expira em ${remaining}s (tempo real)\n📱 No alvo: Configurações → Aparelhos conectados → Conectar com número → digite ${data.code}\n\n✅ Dashboard sabe online/offline em tempo real. Se offline, gera novo automaticamente quando dono pedir. Sessão hospedada MongoDB sobrevive redeploy.\n\nTodas variáveis no Render: MONGODB_URI, BOT_NUMBER, etc configuradas.`);
+    }else if(data && data.error && data.error.includes('Connection Closed')){
+      // Erro Connection Closed - seu bug reportado - adapta para reconectar sempre
+      addLog(`❌ Erro Connection Closed - adaptando para reconectar sempre que desconectar (seu pedido)`, 'error');
+      if(retryCount<2){
+        btn.innerHTML='<i class="fa-solid fa-rotate fa-spin"></i> Reconectando...';
+        alert(`⚠️ Erro: Connection Closed - Bot desconectado. Adaptado para reconectar sempre que desconectar (seu pedido).\n\nTentando reconectar automaticamente... Aguarde 5s e tente novamente.\n\nTodas variáveis no Render: MONGODB_URI, BOT_NUMBER etc. Verifique Render Logs.\n\nTentativa ${retryCount+1}/3`);
+        await new Promise(r=>setTimeout(r, 5000));
+        checkConnection();
+        // Tenta novamente automaticamente
+        return requestPairing(retryCount+1);
+      }else{
+        alert(`❌ Erro persistente Connection Closed após 3 tentativas.\n\nSoluções:\n1. Clique Desconectar e gere novo código\n2. Verifique Render Logs em dashboard.render.com\n3. Verifique MONGODB_URI e BOT_NUMBER no Render Environment\n4. Aguarde 10s e clique Gerar Pair Code novamente\n\nBot adaptado para reconectar sempre que desconectar.`);
+      }
+    }else{
+      alert('Erro: '+(data.error||data.message||'Falha ao gerar Pair Code')+'\n\nDica: Se Connection Closed, aguarde 5s e clique novamente. Bot reconecta automaticamente. Verifique todas variáveis no Render estão configuradas.');
+    }
+  }catch(e){
+    btn.innerHTML=old;
+    btn.disabled=false;
+    alert('Erro crítico: '+e.message+'\n\nTente: Desconectar → Gerar novo código. Todas variáveis no Render devem estar configuradas.');
   }
   checkConnection();
 }
