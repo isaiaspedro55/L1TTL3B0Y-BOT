@@ -53,3 +53,13 @@ services:
         sync: false
       - key: SENHA_BOT
         value: "lordinho2025"
+      - key: DASHBOARD_USER
+        value: "admin"
+      - key: DASHBOARD_PASS
+        value: "admin123"
+      - key: AUTO_PAIR_CODE
+        value: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false

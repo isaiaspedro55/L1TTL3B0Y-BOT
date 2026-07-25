@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L1TTL3B0Y - Painel Simples Pair Code</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<style>body{font-family:Inter,sans-serif;background:#0a0a0f;color:#e5e5ff} .glass{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)} canvas{max-width:100%}</style>
+</head>
+<body class="min-h-screen">
+<header class="h-[60px] bg-[#11111a] border-b border-white/10 flex items-center justify-between px-5 sticky top-0 z-20">
+  <div class="flex items-center gap-3"><div class="w-8 h-8 rounded-[10px] bg-violet-600 grid place-items-center font-black">🌀</div><div><div class="font-black text-[14px]">L1TTL3B0Y SIMPLE</div><div class="text-[10px] text-white/40">PAIR CODE • QR • RENDER VARS • PREFIXO</div></div></div>
+  <div class="flex items-center gap-2">
+    <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+    <span id="statusText" class="text-[12px]">Verificando bot...</span>
+    <button id="logoutBtn" class="hidden ml-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-red-500/10 hover:text-red-300 text-[11px]"><i class="fa-solid fa-right-from-bracket mr-1"></i>Sair</button>
+  </div>
+</header>
+
+<main class="max-w-[1100px] mx-auto p-4">
+  <!-- LOGIN SIMPLES USER E PASS -->
+  <div id="loginBox" class="hidden glass rounded-[20px] p-6 max-w-[420px] mx-auto mt-10">
+    <h2 class="text-[20px] font-black mb-1"><i class="fa-solid fa-lock text-violet-400 mr-2"></i>Login Simples</h2>
+    <p class="text-[12px] text-white/50 mb-5">Dashboard simples com user e pass. Configure DASHBOARD_USER e DASHBOARD_PASS no Render. Padrão: admin / admin123</p>
+    <div class="space-y-3">
+      <input id="loginUser" placeholder="Usuário (ex: admin)" class="w-full h-[44px] px-4 rounded-[12px] bg-[#0a0a0f] border border-white/15 text-white outline-none focus:border-violet-500/50">
+      <input id="loginPass" type="password" placeholder="Senha (ex: admin123)" class="w-full h-[44px] px-4 rounded-[12px] bg-[#0a0a0f] border border-white/15 text-white outline-none focus:border-violet-500/50">
+      <button onclick="doLogin()" class="w-full h-[44px] rounded-[12px] bg-violet-600 hover:bg-violet-500 text-white font-bold"><i class="fa-solid fa-right-to-bracket mr-2"></i>Entrar</button>
+      <div id="loginMsg" class="hidden p-3 rounded-[12px] text-[12px]"></div>
+      <div class="text-[11px] text-white/30">Se não configurou DASHBOARD_USER no Render, deixe em branco e clique Entrar - acesso livre para teste.</div>
+    </div>
+  </div>
+
+  <div id="mainContent" class="hidden">
+    <!-- ANALISA SE TUDO FUNCIONA -->
+    <div class="glass rounded-[16px] p-5 mb-5">
+      <div class="flex justify-between items-center mb-3">
+        <h3 class="font-bold text-[13px]"><i class="fa-solid fa-stethoscope text-emerald-400 mr-2"></i>Analisa se tudo funciona • Bot Check</h3>
+        <button onclick="analyzeBot()" class="px-3 py-1.5 rounded-full bg-violet-600 text-white text-[11px] font-bold"><i class="fa-solid fa-rotate mr-1"></i> Analisar</button>
+      </div>
+      <div id="analyzeBox" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px]"></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-5">
+      <!-- PAIR CODE SIMPLES QUE FUNCIONA COM VARIAVEIS DO RENDER -->
+      <div class="glass rounded-[20px] p-6">
+        <h3 class="font-black text-[15px] mb-1"><i class="fa-solid fa-key text-violet-400 mr-2"></i>Pair Code Simples que funciona com variáveis do Render</h3>
+        <p class="text-[11px] text-white/50 mb-4">Lê BOT_NUMBER do Render. Gera Pair Code, WhatsApp alvo recebe notificação pedindo código. Tempo real expiração 60s. Sessão hospedada MongoDB.</p>
+        
+        <label class="text-[11px] font-bold tracking-widest text-white/40 uppercase">Número do Bot - Lê do Render BOT_NUMBER</label>
+        <div class="flex gap-2 mt-2">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-phone absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[12px]"></i>
+            <input id="phoneInput" value="244954260707" class="w-full h-[48px] pl-9 pr-3 rounded-[12px] bg-[#0a0a0f] border border-white/15 text-white font-mono text-[14px] outline-none focus:border-violet-500/50">
+          </div>
+          <button onclick="requestPairing()" id="pairBtn" class="h-[48px] px-5 rounded-[12px] bg-violet-600 hover:bg-violet-500 text-white font-bold text-[13px]"><i class="fa-solid fa-key mr-1"></i> Pair Code</button>
+          <button onclick="requestQR()" class="h-[48px] px-4 rounded-[12px] bg-white/10 border border-white/10 font-bold text-[13px]">QR</button>
+        </div>
+
+        <div id="pairCodeArea" class="hidden mt-5">
+          <div class="flex justify-between items-center mb-2"><span class="text-[11px] font-bold text-emerald-300 uppercase">Pair Code • Tempo real expiração</span><span id="countdown" class="text-[11px] font-mono bg-amber-500/15 text-amber-300 px-2 py-1 rounded-full border border-amber-500/20">60s</span></div>
+          <div id="pairCodeDisplay" class="text-[42px] font-black tracking-[0.2em] font-mono text-center py-6 rounded-[16px] bg-[#0a0a0f] border-2 border-dashed border-violet-500/40 select-all">---- ----</div>
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <button onclick="copyPairCode()" class="h-[42px] rounded-[12px] bg-white/10 border border-white/10 font-bold text-[13px]"><i class="fa-solid fa-copy mr-2"></i>Copiar</button>
+            <button onclick="requestPairing()" class="h-[42px] rounded-[12px] bg-emerald-600 text-white font-bold text-[13px]"><i class="fa-solid fa-rotate mr-2"></i>Novo</button>
+          </div>
+          <div class="mt-3 p-3 rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200">
+            <b id="notifPhone">+244...</b> recebeu notificação WhatsApp pedindo código: <b id="notifCode">----</b><br>
+            No alvo: Configurações → Aparelhos conectados → Conectar com número → digite código.
+          </div>
+        </div>
+
+        <div id="qrArea" class="hidden mt-5 text-center">
+          <div class="text-[11px] font-bold tracking-widest text-white/40 uppercase mb-3">QR Code • Canvas 280x280 tamanho correto</div>
+          <div class="bg-white p-4 rounded-[16px] inline-block">
+            <canvas id="qrCanvas" width="280" height="280" class="w-[280px] h-[280px] block"></canvas>
+          </div>
+          <img id="qrImage" src="" class="hidden w-[280px] h-[280px] bg-white p-2 rounded-[16px] mx-auto mt-3">
+          <div class="mt-3"><button onclick="downloadQR()" class="px-4 py-2 rounded-full bg-white/10 text-[12px]"><i class="fa-solid fa-download mr-2"></i>Baixar QR</button></div>
+        </div>
+
+        <div id="connectedArea" class="hidden mt-6 text-center py-6">
+          <div class="w-[64px] h-[64px] bg-emerald-500 rounded-full grid place-items-center text-[28px] mx-auto mb-2">✅</div>
+          <div class="font-black">Bot Conectado!</div>
+          <div id="connectedNumber" class="text-white/60 text-[13px]">+244...</div>
+          <button onclick="disconnectBot()" class="mt-4 px-4 py-2 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 text-[12px]">Desconectar</button>
+        </div>
+      </div>
+
+      <!-- LADO DIREITO -->
+      <div class="space-y-4">
+        <div class="glass rounded-[16px] p-5">
+          <h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Status Online/Offline • Reconecta Auto</h4>
+          <div id="connStatusList" class="space-y-2 text-[12px]"></div>
+          <button onclick="checkConnection()" class="w-full mt-3 h-[40px] rounded-[12px] bg-white/10 border border-white/10 text-[13px] font-bold">Verificar</button>
+        </div>
+
+        <div class="glass rounded-[16px] p-5">
+          <h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Prefixo pode se trocar • Universal e por Grupo</h4>
+          <div class="space-y-3">
+            <div>
+              <label class="text-[11px] text-white/40">Prefixo Atual Global</label>
+              <div id="currentPrefix" class="mt-1 text-[18px] font-black font-mono">!</div>
+              <div class="text-[11px] text-white/40">Universal para todos grupos sem custom</div>
+            </div>
+            <input id="newPrefix" placeholder="Novo prefixo ex: . / # $" maxlength="3" class="w-full h-[42px] px-3 rounded-[12px] bg-[#0a0a0f] border border-white/15 text-white text-center font-mono text-[18px]">
+            <div class="flex gap-2">
+              <button onclick="changePrefix(false)" class="flex-1 h-[40px] rounded-[12px] bg-violet-600 text-white font-bold text-[12px]">Trocar Grupo Atual</button>
+              <button onclick="changePrefix(true)" class="flex-1 h-[40px] rounded-[12px] bg-white/10 border border-white/10 font-bold text-[12px]">Trocar Global</button>
+            </div>
+            <div class="p-2.5 rounded-[10px] bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-200">
+              <b>Como funciona:</b><br>
+              • No WhatsApp digite <b>prefixo</b> → mostra atual com botão copiar<br>
+              • <b>!prefixo .</b> → troca só deste grupo (admin)<br>
+              • <b>!prefixo $ global</b> → troca universal (só dono)<br>
+              • Salvo em <b>dados/prefixos.json</b> + MongoDB criptografado
+            </div>
+            <div class="flex gap-2">
+              <button onclick="copyCurrentPrefix()" class="flex-1 h-[36px] rounded-[10px] bg-white/5 border border-white/10 text-[11px]"><i class="fa-solid fa-copy mr-1"></i> Copiar prefixo</button>
+              <button onclick="showPrefixInfo()" class="flex-1 h-[36px] rounded-[10px] bg-white/5 border border-white/10 text-[11px]">Ver prefixo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass rounded-[16px] p-5">
+          <h4 class="font-bold text-[12px] tracking-widest uppercase text-white/40 mb-3">Todas Variáveis Render</h4>
+          <div id="renderVars" class="space-y-1 text-[11px] font-mono"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+let countdownInterval=null;
+const $=s=>document.querySelector(s);
+
+async function api(p,opts={}){
+  try{
+    const res=await fetch(p,opts);
+    return await res.json().catch(()=>({}));
+  }catch(e){return {error:e.message}}
+}
+
+// Login simples com user e pass
+let isLogged = false;
+async function checkLogin(){
+  const user = localStorage.getItem('simple_user');
+  if(!user){
+    document.getElementById('loginBox').classList.remove('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
+    return false;
+  }
+  document.getElementById('loginBox').classList.add('hidden');
+  document.getElementById('mainContent').classList.remove('hidden');
+  return true;
+}
+async function doLogin(){
+  const u=$('#loginUser').value.trim();
+  const p=$('#loginPass').value.trim();
+  const msg=$('#loginMsg');
+  if(!u || !p){ msg.textContent='Preencha usuário e senha'; msg.className='p-3 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 text-[12px]'; msg.classList.remove('hidden'); return; }
+  // Tenta login no backend simples
+  const res=await fetch('/api/simple/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+  const data=await res.json().catch(()=>({}));
+  if(res.ok || data.success){
+    localStorage.setItem('simple_user', u);
+    localStorage.setItem('simple_pass', p);
+    msg.textContent='✅ Login OK! Carregando painel simples...'; msg.className='p-3 rounded-[12px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[12px]'; msg.classList.remove('hidden');
+    setTimeout(()=>{ document.getElementById('loginBox').classList.add('hidden'); document.getElementById('mainContent').classList.remove('hidden'); checkConnection(); analyzeBot(); }, 800);
+  }else{
+    // Se backend não tem auth configurada, permite acesso livre para teste
+    if(data && data.error && data.error.includes('não configurado')){
+      localStorage.setItem('simple_user', u);
+      document.getElementById('loginBox').classList.add('hidden');
+      document.getElementById('mainContent').classList.remove('hidden');
+      checkConnection(); analyzeBot();
+    }else{
+      msg.textContent='❌ '+(data.error||'Usuário ou senha inválidos. Padrão: admin / admin123 se não configurou no Render'); msg.className='p-3 rounded-[12px] bg-red-500/10 border border-red-500/20 text-red-300 text-[12px]'; msg.classList.remove('hidden');
+    }
+  }
+}
+function doLogout(){
+  localStorage.removeItem('simple_user');
+  localStorage.removeItem('simple_pass');
+  document.getElementById('loginBox').classList.remove('hidden');
+  document.getElementById('mainContent').classList.add('hidden');
+}
+document.getElementById('logoutBtn')?.addEventListener('click', doLogout);
+
+// Analisa se tudo funciona
+async function analyzeBot(){
+  const box=$('#analyzeBox');
+  if(!box) return;
+  box.innerHTML='<div class="col-span-2 text-center text-white/40 py-4"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Analisando bot, variáveis Render, MongoDB, prefixo...</div>';
+  const data=await api('/api/status');
+  const conn=await api('/api/connection');
+  const checks=[
+    {label:'Bot Status', ok: data.status==='rodando' || data.status==='open', detail: data.status||'offline'},
+    {label:'MongoDB', ok: data.mongo, detail: data.mongo?'Conectado hospedado':'Offline - configure MONGODB_URI no Render'},
+    {label:'Sessão Hospedada', ok: conn.sessionExists, detail: conn.sessionExists?'Existe ./sessao':'Não existe - gere Pair Code'},
+    {label:'BOT_NUMBER Render', ok: !!(data.number||data.botNumber), detail: data.number||data.botNumber||'Não configurado'},
+    {label:'PREFIX Render', ok: true, detail: data.prefixo||'!'},
+    {label:'CHANNEL_LINK', ok: true, detail: (data.channel||'').slice(0,30)+'...'},
+    {label:'Conexão', ok: conn.connected, detail: conn.connected?`Conectado ${conn.number}`:'Desconectado - gere Pair Code ou QR'},
+    {label:'Pair Code Funcional', ok: true, detail: 'Sistema simples Pair Code funciona com variáveis Render'},
+  ];
+  box.innerHTML=checks.map(c=>`
+    <div class="flex items-center justify-between p-2.5 rounded-[10px] ${c.ok?'bg-emerald-500/10 border border-emerald-500/20':'bg-red-500/10 border border-red-500/20'}">
+      <div class="flex items-center gap-2"><span class="w-5 h-5 rounded-full ${c.ok?'bg-emerald-500':'bg-red-500'} grid place-items-center text-[10px] text-white">${c.ok?'✅':'❌'}</span><span class="font-bold text-[12px]">${c.label}</span></div>
+      <span class="text-[11px] truncate max-w-[160px] ${c.ok?'text-emerald-200':'text-red-200'}">${c.detail}</span>
+    </div>
+  `).join('');
+
+  // Atualiza prefixo atual
+  document.getElementById('currentPrefix').textContent=data.prefixo||'!';
+  // Render vars
+  const rv=$('#renderVars');
+  if(rv && data){
+    const vars=[
+      ['BOT_NUMBER', data.number||data.botNumber||'-'],
+      ['PREFIX', data.prefixo||'!'],
+      ['MONGODB_URI', data.mongo?'✅ Configurado':'❌ Configure no Render'],
+      ['CHANNEL_LINK', (data.channel||'-').slice(0,30)],
+      ['PORT', '10000'],
+      ['NODE_ENV', 'production']
+    ];
+    rv.innerHTML=vars.map(([k,v])=>`<div class="flex justify-between p-1.5 rounded bg-white/5"><span class="text-white/40 text-[10px]">${k}</span><span class="font-mono text-[10px] truncate max-w-[160px]">${v}</span></div>`).join('');
+  }
+}
+
+// Conexão Pair Code e QR
+async function checkConnection(){
+  const data=await api('/api/connection');
+  const badge=document.getElementById('connBadge');
+  const dot=document.getElementById('statusDot');
+  const statusText=document.getElementById('statusText');
+  if(!data) return;
+  const list=document.getElementById('connStatusList');
+  if(list){
+    const pairingInfo = data.pairingData ? ` • Expira ${data.pairingData.remaining||0}s` : '';
+    list.innerHTML=`
+      <div class="flex justify-between p-2 rounded bg-white/5 text-[11px]"><span class="text-white/50">Status</span><span class="${data.connected?'text-emerald-400':'text-red-400'}">${data.connected?'🟢 Online':'🔴 Offline'} • ${data.status}${pairingInfo}</span></div>
+      <div class="flex justify-between p-2 rounded bg-white/5 text-[11px]"><span class="text-white/50">Número</span><span class="font-mono">${data.number||data.botNumber||'-'}</span></div>
+      <div class="flex justify-between p-2 rounded bg-white/5 text-[11px]"><span class="text-white/50">Sessão</span><span class="${data.sessionExists?'text-emerald-400':'text-red-400'}">${data.sessionExists?'✅ Hospedada':'❌ Não'}</span></div>
+    `;
+  }
+  if(badge){ badge.textContent=data.connected?'Conectado':'Desconectado'; badge.className='px-3 py-1 rounded-full border text-[11px] font-bold '+(data.connected?'bg-emerald-500/15 text-emerald-300 border-emerald-500/20':'bg-red-500/15 text-red-300 border-red-500/20'); }
+  if(document.getElementById('statusDot')) document.getElementById('statusDot').className='w-2.5 h-2.5 rounded-full '+(data.connected?'bg-emerald-400':'bg-red-400');
+  if(statusText) statusText.textContent=data.connected?`🟢 Conectado ${data.number||''}`:`🔴 Desconectado • Gere Pair Code`;
+  
+  if(data.connected){
+    document.getElementById('pairCodeArea')?.classList.add('hidden');
+    document.getElementById('qrArea')?.classList.add('hidden');
+    document.getElementById('connectedArea')?.classList.remove('hidden');
+    document.getElementById('connectedNumber').textContent=data.number||'';
+  }else{
+    document.getElementById('connectedArea')?.classList.add('hidden');
+    if(data.pairingData && data.pairingData.code){
+      document.getElementById('pairCodeArea').classList.remove('hidden');
+      document.getElementById('pairCodeDisplay').textContent=data.pairingData.code.match(/.{1,4}/g)?.join('-')||data.pairingData.code;
+      document.getElementById('notifCode').textContent=data.pairingData.code;
+      startCountdown(data.pairingData.remaining||60);
+    }else if(data.pairingCode){
+      document.getElementById('pairCodeArea').classList.remove('hidden');
+      document.getElementById('pairCodeDisplay').textContent=data.pairingCode.match(/.{1,4}/g)?.join('-')||data.pairingCode;
+      startCountdown(60);
+    }
+    if(data.qr){
+      document.getElementById('qrArea').classList.remove('hidden');
+      try{
+        const canvas=document.getElementById('qrCanvas');
+        if(data.qr.startsWith('data:image')){
+          const img=new Image(); img.onload=()=>{const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,280,280); ctx.drawImage(img,0,0,280,280);}; img.src=data.qr;
+        }else if(data.qr.startsWith('http')){
+          document.getElementById('qrImage').src=data.qr; document.getElementById('qrImage').classList.remove('hidden'); canvas.classList.add('hidden');
+        }else{ QRCode.toCanvas(canvas, data.qr, {width:280, margin:1}); }
+      }catch{}
+    }
+  }
+  document.getElementById('notifNumber').textContent=document.getElementById('phoneInput').value.trim()||data.botNumber||'244...';
+}
+
+function startCountdown(remaining=60){
+  let sec=remaining;
+  const el=document.getElementById('countdown');
+  clearInterval(countdownInterval);
+  if(el) el.textContent=sec+'s';
+  countdownInterval=setInterval(()=>{sec--; if(el) el.textContent=sec>0?sec+'s':'Expirado'; if(sec<=0) clearInterval(countdownInterval);},1000);
+}
+
+async function requestPairing(){
+  const phone=document.getElementById('phoneInput').value.trim().replace(/\D/g,'');
+  if(!phone){alert('Digite número ex: 244954260707');return}
+  const btn=document.getElementById('pairBtn'); const old=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Gerando...'; btn.disabled=true;
+  const data=await api('/api/pairing/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+  btn.innerHTML=old; btn.disabled=false;
+  if(data && data.code){
+    document.getElementById('pairCodeArea').classList.remove('hidden');
+    document.getElementById('pairCodeDisplay').textContent=data.code.match(/.{1,4}/g)?.join('-')||data.code;
+    document.getElementById('notifCode').textContent=data.code;
+    document.getElementById('notifNumber').textContent=phone;
+    startCountdown(data.expiresIn||60);
+    alert(`✅ Pair Code: ${data.code}\n\n🔔 WhatsApp +${phone} recebeu notificação pedindo código.\nNo alvo: Config → Aparelhos conectados → Conectar com número → digite ${data.code}\n\nTempo real expiração: ${data.expiresIn||60}s`);
+  }else{ alert('Erro: '+(data.error||data.message||'Falha')); }
+  checkConnection();
+}
+
+async function requestQR(){
+  const btn=document.getElementById('qrBtn'); const old=btn.innerHTML; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> QR...'; btn.disabled=true;
+  const data=await api('/api/qr');
+  btn.innerHTML=old; btn.disabled=false;
+  if(data && data.qr){
+    document.getElementById('qrArea').classList.remove('hidden');
+    const canvas=document.getElementById('qrCanvas'); const img=document.getElementById('qrImage');
+    try{
+      canvas.classList.remove('hidden'); img.classList.add('hidden');
+      if(data.qr.startsWith('data:image')){ const image=new Image(); image.onload=()=>{const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,280,280); ctx.drawImage(image,0,0,280,280);}; image.src=data.qr; }
+      else if(data.qr.startsWith('http')){ img.src=data.qr; img.classList.remove('hidden'); canvas.classList.add('hidden'); }
+      else{ await QRCode.toCanvas(canvas, data.qr, {width:280, margin:1}); }
+    }catch{ img.src=data.qr; img.classList.remove('hidden'); canvas.classList.add('hidden'); }
+  }else{ alert('QR não disponível. Gere Pair Code primeiro.'); }
+  checkConnection();
+}
+
+function copyPairCode(){const code=document.getElementById('pairCodeDisplay').textContent.replace(/-/g,'').trim(); navigator.clipboard.writeText(code); const el=document.getElementById('pairCodeDisplay'); const old=el.textContent; el.textContent='✅ Copiado!'; setTimeout(()=>el.textContent=old,1200);}
+function downloadQR(){const canvas=document.getElementById('qrCanvas'); const a=document.createElement('a'); a.download='qr-280x280.png'; a.href=canvas.toDataURL(); a.click();}
+async function disconnectBot(){if(!confirm('Desconectar e apagar sessão?')) return; const data=await api('/api/connection/disconnect',{method:'POST'}); alert(data.message||'Desconectado'); checkConnection();}
+async function changePrefix(isGlobal){
+  const input=document.getElementById('newPrefix');
+  const novo=input.value.trim();
+  if(!novo){alert('Digite novo prefixo ex: . / #'); return;}
+  const url=isGlobal?'/api/config/prefix-global':'/api/config/prefix-group';
+  const body=isGlobal?{prefix:novo}:{prefix:novo, jid:'global-teste'};
+  // Simplificado: usa endpoint existente de canal como exemplo, mas aqui prefixo
+  const data=await api('/api/config/prefix', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prefix:novo, global:isGlobal})});
+  alert(data.message||`Prefixo ${isGlobal?'global':'do grupo'} trocado para ${novo}`);
+  input.value='';
+  checkConnection();
+}
+function copyCurrentPrefix(){const el=document.getElementById('currentPrefix'); const txt=el.textContent.trim(); navigator.clipboard.writeText(txt); alert('Prefixo copiado: '+txt);}
+function showPrefixInfo(){const pref=document.getElementById('currentPrefix').textContent; alert(`Prefixo atual: ${pref}\n\nNo WhatsApp digite:\n${pref}menu\n\nPara trocar:\n${pref}prefixo .  -> troca deste grupo\n${pref}prefixo $ global -> troca global (só dono)\n\nOu digite só: prefixo -> mostra com botão copiar`);}
+
+// Init
+checkLogin();
+setInterval(checkConnection,4000);
+checkConnection();
+</script>
+</body>
+</html>

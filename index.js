@@ -373,6 +373,63 @@ app.post('/api/auth/logout', (req,res)=>{
   res.json({ message: 'Logout seguro realizado, token revogado' });
 });
 
+// ===== SIMPLE LOGIN - SISTEMA SIMPLES COM USER E PASS (SEM ENTERPRISE) =====
+const SIMPLE_USER = process.env.DASHBOARD_USER || 'admin';
+const SIMPLE_PASS = process.env.DASHBOARD_PASS || 'admin123';
+
+app.post('/api/simple/login', (req,res)=>{
+  try{
+    const { username, password } = req.body;
+    if(!username || !password) return res.status(400).json({error:'Preencha usuário e senha'});
+    
+    const isConfigured = process.env.DASHBOARD_USER && process.env.DASHBOARD_PASS;
+    if(!isConfigured){
+      addBotLog(`Login simples sem config Render - acesso livre para ${username}`, 'info');
+      return res.json({success:true, message:'Acesso livre - configure DASHBOARD_USER e DASHBOARD_PASS no Render', user: username});
+    }
+
+    if(username===SIMPLE_USER && password===SIMPLE_PASS){
+      addBotLog(`Login simples OK: ${username}`, 'success');
+      if(mongoModule && mongoModule.createAuditLog){
+        mongoModule.createAuditLog(username, 'SIMPLE_LOGIN', {}, req.ip);
+      }
+      return res.json({success:true, message:'Login simples OK', user: username});
+    }else{
+      addBotLog(`Login simples falhou: ${username} IP ${req.ip}`, 'error');
+      return res.status(401).json({error:'Usuário ou senha inválidos. Padrão: admin / admin123 se não configurou no Render.'});
+    }
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
+app.post('/api/config/prefix', async (req,res)=>{
+  try{
+    const { prefix, global, jid } = req.body;
+    if(!prefix) return res.status(400).json({error:'Digite prefixo ex: . / # $'});
+    if(prefix.length>3) return res.status(400).json({error:'Prefixo muito longo, use 1 caractere'});
+    
+    if(global){
+      setPrefixoGlobal(prefix);
+      if(mongoModule && mongoConectado){
+        try{ await mongoModule.setConfig("PREFIXO_GLOBAL", prefix, true); }catch{}
+      }
+      addBotLog(`Prefixo global trocado para ${prefix} via dashboard simples por ${req.ip}`, 'info');
+      return res.json({message:`✅ Prefixo global trocado para ${prefix}`, prefix});
+    }else{
+      const targetJid = jid || 'global';
+      if(targetJid==='global' || !targetJid.endsWith('@g.us')){
+        setPrefixoGlobal(prefix);
+        if(mongoModule && mongoConectado){
+          try{ await mongoModule.setConfig("PREFIXO_GLOBAL", prefix, true); }catch{}
+        }
+        return res.json({message:`✅ Prefixo global trocado para ${prefix}`, prefix});
+      }else{
+        setPrefixoGrupo(targetJid, prefix);
+        return res.json({message:`✅ Prefixo do grupo ${targetJid} trocado para ${prefix}`, prefix});
+      }
+    }
+  }catch(e){ res.status(500).json({error:e.message}); }
+});
+
 app.get('/api/auth/me', authMiddleware, async (req,res)=>{
   try{
     let user = null;
@@ -438,6 +495,18 @@ app.get("/dashboard", (req,res)=>{
   const dashPath = path.join(__dirname,'public','dashboard.html');
   if(fs.existsSync(dashPath)) return res.sendFile(dashPath);
   return res.redirect('/');
+});
+
+app.get("/simple", (req,res)=>{
+  const simplePath = path.join(__dirname,'public','simple.html');
+  if(fs.existsSync(simplePath)) return res.sendFile(simplePath);
+  return res.redirect('/dashboard');
+});
+
+app.get("/pair", (req,res)=>{
+  const simplePath = path.join(__dirname,'public','simple.html');
+  if(fs.existsSync(simplePath)) return res.sendFile(simplePath);
+  return res.redirect('/dashboard');
 });
 
 app.get("/health", (req,res)=>res.status(200).send("OK"));
