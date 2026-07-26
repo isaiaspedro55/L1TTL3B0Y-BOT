@@ -797,6 +797,7 @@ async function varreduraGrupos(sock, ehPrimeira=true) {
           gruposAtivados.add(gJid);
           activados++;
           if (ehPrimeira) {
+            const caption = `✨️ *LORDE LÁ DJUM v3.5* acordou! 🤖\n✦ ─────────── ✦\n\nAs tuas Ordens meu senhor! ✨️👑\n\n@${donoNoGrupo.split("@")[0]}`;
             const gifOk = await enviarGif(sock, gJid, caption);
             if (!gifOk) await enviarComFoto(sock, gJid, caption, ppBotUrl);
           }
