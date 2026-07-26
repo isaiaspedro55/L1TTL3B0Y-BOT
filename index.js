@@ -231,9 +231,23 @@ async function enviarMenuPrincipal(sock, jid, msg, isDono, sender, isAdmin) {
 ｜✦ 🌀 ⁺ USUÁRIO: ${nomeUser}
 ｜✦ 🌀 ⁺ CARGO: ${cargo}
 ｜✦ 🌀 ⁺ PREFIXO: *${P}*
-｜✦ 🌀 ⁺ BOT: ${bt} | LINK: ${al} | VOZ: ${vz}
+｜✦ 🌀 ⁺ BOT: ${bt} 
 ｜✦ 🌀 ⁺ HORA: ${hora}
 └─☆·˖✶˖·✦·˖✶˖·☆·˖✶˖·✦─┘`;
+══════════════════
+🎵 *!menu musica*
+📱 *!menu social*
+🧠 *!menu ia*
+🎮 *!menu jogos*
+══════════════════
+🔢 *!menu util*
+🕵️ *!menu extra*
+📁 *!menu arq*
+══════════════════
+🛡️ *!menu adm*
+🏘️ *!menu grup*
+👑 *!menu dono*
+══════════════════
 
   const categorias = [
     { title: "🎵  MÚSICA & VÍDEO",   rowId: "cat_musica", description: "play, mp3, mp4, mp4hd, sticker, voz..." },
