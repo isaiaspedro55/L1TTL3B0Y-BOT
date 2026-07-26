@@ -1280,12 +1280,12 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
           rows: [
             { header: "🌀⃞ ᴍᴇɴᴜ-ᴘʀɪɴᴄɪᴘᴀʟ ", title: "_comandos principais e básicos._", id: prefix + "menu" },
             { header: "🌀⃞ ᴍᴇɴᴜ-ᴅᴏᴡɴʟᴏᴀᴅs ", title: "_comandos de download e upload._", id: prefix + "musica" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- ia", title: "_comandos de IA._", id: prefix + "ia" },
+            { header: "🌀⃞ ᴍᴇɴᴜ- IA", title: "_comandos de IA._", id: prefix + "ia" },
             { header: "🌀⃞ ᴍᴇɴᴜ-ʙʀɪɴᴄᴀᴅᴇɪʀᴀs", title: "_diversão e jogos para grupo._", id: prefix + "jogos" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- social", title: "_comandos para Redes Sociais._", id: prefix + "social" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- utilidades ", title: "_menu utilidades._", id: prefix + "util" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- extra ", title: "_comandos de Extras de Grupo._", id: prefix + "extra" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- arquivos ", title: "_comandos para Arquivos._", id: prefix + "arq" },
+            { header: "🌀⃞ ᴍᴇɴᴜ- Social", title: "_comandos para Redes Sociais._", id: prefix + "social" },
+            { header: "🌀⃞ ᴍᴇɴᴜ- Util ", title: "_menu utilidades._", id: prefix + "util" },
+            { header: "🌀⃞ ᴍᴇɴᴜ- Extra ", title: "_comandos de Extras de Grupo._", id: prefix + "extra" },
+            { header: "🌀⃞ ᴍᴇɴᴜ+ arquivos ", title: "_comandos para Arquivos._", id: prefix + "arq" },
             { header: "🌀⃞ ᴍᴇɴᴜ-ᴀᴅᴍ", title: "_comandos para ADM de grupo._", id: prefix + "menuadm" },
             { header: "🌀⃞ ᴍᴇɴᴜ-ᴅᴏɴᴏ", title: "_apenas dono_", id: prefix + "dono" }
           ]
@@ -1329,7 +1329,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
 
 *L1ttl3bot aos Seus Serviços.*
 *Todos comandos prontos e feito para você!*
-*Criador:Isaías Pedro*
+*Criador: Isaías Pedro*
 
 👑 *Criador:* ${CONFIG.DONO_NOME}
 📞 *Contato:* ${CONFIG.DONO_NUM}`;
