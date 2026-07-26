@@ -233,8 +233,8 @@ async function enviarMenuPrincipal(sock, jid, msg, isDono, sender, isAdmin) {
 ｜✦ 🌀 ⁺ PREFIXO: *${P}*
 ｜✦ 🌀 ⁺ BOT: ${bt} 
 ｜✦ 🌀 ⁺ HORA: ${hora}
-└─☆·˖✶˖·✦·˖✶˖·☆·˖✶˖·✦─┘`;
 ══════════════════
+
 🎵 *!menu musica*
 📱 *!menu social*
 🧠 *!menu ia*
@@ -247,7 +247,7 @@ async function enviarMenuPrincipal(sock, jid, msg, isDono, sender, isAdmin) {
 🛡️ *!menu adm*
 🏘️ *!menu grup*
 👑 *!menu dono*
-══════════════════
+└─☆·˖✶˖·✦·˖✶˖·☆·˖✶˖·✦─┘`;
 
   const categorias = [
     { title: "🎵  MÚSICA & VÍDEO",   rowId: "cat_musica", description: "play, mp3, mp4, mp4hd, sticker, voz..." },
