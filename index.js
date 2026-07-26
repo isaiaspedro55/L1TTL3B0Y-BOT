@@ -1329,7 +1329,6 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
 
 *L1ttl3bot aos Seus Serviços.*
 *Todos comandos prontos e feito para você!*
-*Criador:Isaías Pedro*
 
 👑 *Criador:* ${CONFIG.DONO_NOME}
 📞 *Contato:* ${CONFIG.DONO_NUM}`;
