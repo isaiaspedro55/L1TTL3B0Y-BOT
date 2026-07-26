@@ -1223,7 +1223,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
   const prefix = P;
   const from = jid;
 
-  try { await reagir(sock,msg,"🧧"); } catch {}
+  try { await reagir(sock,msg,"💣"); } catch {}
 
   // ===== NOVO MENU CAROUSEL ESTILO HITADORI ADAPTADO PARA L1TTL3B0Y =====
   try {
@@ -1317,7 +1317,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
     }];
 
     const corpoNovo = `╭─☆·˖✶˖·✦·˖✶˖·☆─╮
-│  🌀 *L1TTL3B0Y • LORDE LÁ DJUM* 🌀
+│  🌀 *L1TTL3B0Y•LÁ DJUM* 🌀
 ╰─☆·˖✶˖·✦·˖✶˖·☆─╯
 
 ║𝚄𝚂𝚄Á𝚁𝙸𝙾: ${pushname}
