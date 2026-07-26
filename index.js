@@ -1,1057 +1,71 @@
-require('dotenv').config();
-// ✅ LINHA 1 ABSOLUTA — antes de qualquer require
-process.env.TMPDIR = require("path").join(process.cwd(), "downloads");
-
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   downloadMediaMessage,
   fetchLatestBaileysVersion,
-  prepareWAMessageMedia,
-  generateWAMessageFromContent
-} = require("@systemzero/baileys");
-
+} = require("@whiskeysockets/baileys");
 const fs       = require("fs-extra");
 const { exec } = require("child_process");
 const path     = require("path");
 const axios    = require("axios");
 const https    = require("https");
 const FormData = require("form-data");
-const express  = require("express");
-const bcrypt   = require("bcryptjs");
-const jwt      = require("jsonwebtoken");
-const cookieParser = require("cookie-parser");
-const cors     = require("cors");
-const helmet   = require("helmet");
-const rateLimit = require("express-rate-limit");
-const { v4: uuidv4 } = require("uuid");
-
-fs.ensureDirSync(process.env.TMPDIR);
-fs.ensureDirSync("./downloads");
-fs.ensureDirSync("./vpn");
-fs.ensureDirSync("./dados");
-fs.ensureDirSync("./configs");
-fs.ensureDirSync("./configs/LOGOS");
-fs.ensureDirSync("./sessao");
-
-// ===== MONGODB + CONFIG DINAMICO =====
-let mongoModule = null;
-let CHANNEL_LINK_DINAMICO = process.env.CHANNEL_LINK || "https://whatsapp.com/channel/0029VbC8voN4Y9lszc9VuT2D";
-let mongoConectado = false;
-try {
-  mongoModule = require("./database/mongo");
-} catch(e) {
-  console.log("⚠️ Mongo module não encontrado:", e.message);
-}
-
-let ButtonV2 = null;
-try { ButtonV2 = require("@systemzero/baileys/lib/MB.cjs").ButtonV2; }
-catch(e) { console.log("⚠️ ButtonV2:", e.message); }
 
 const CONFIG = {
-  PREFIXO: (()=>{ try{ const d=fs.existsSync("./dados/prefixos.json")?fs.readJsonSync("./dados/prefixos.json"):null; return d?.global || (process.env.PREFIX||"!").split(',')[0].trim() || "!"; }catch{ return (process.env.PREFIX||"!").split(',')[0].trim() || "!"; }})(),
-  // PREFIXOS mantido para compatibilidade, mas agora é só o prefixo universal (único)
-  PREFIXOS: (() => {
-    try{
-      const d=fs.existsSync("./dados/prefixos.json")?fs.readJsonSync("./dados/prefixos.json"):null;
-      const global = d?.global || (process.env.PREFIX||"!").split(',')[0].trim();
-      return [global];
-    }catch{
-      return [(process.env.PREFIX||"!").split(',')[0].trim()];
-    }
-  })(),
-  NUMERO_BOT: (process.env.BOT_NUMBER || "244954260707").replace(/\D/g,""),
-  NUMEROS_ADM: (process.env.OWNER_NUMBERS || "926612801,244926612801,169853876965546").split(",").map(s=>s.trim()),
-  GROQ_KEY: process.env.GROQ_API_KEY || "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",
-  DONO_JID: process.env.DONO_JID || "169853876965546@lid",
-  DONO_NOME: process.env.OWNER_NAME || "ISAÍAS PEDRO",
-  DONO_NUM: process.env.OWNER_NUMBER || "926 612 801",
-  VOZ_TTS: process.env.VOZ_TTS || "pt-PT-DuarteNeural",
-  SENHA_BOT: process.env.SENHA_BOT || "lordinho2025",
-  SYSTEMZONE_KEY: process.env.SYSTEMZONE_KEY || "SUA_APIKEY_AQUI",
-  CHANNEL_LINK: process.env.CHANNEL_LINK || "https://whatsapp.com/channel/0029VbC8voN4Y9lszc9VuT2D",
-  MONGODB_URI: process.env.MONGODB_URI || "",
-  RENDER_URL: process.env.RENDER_EXTERNAL_URL || "",
-  PORT: parseInt(process.env.PORT || "10000"),
+  PREFIXO: "!",
+  NUMERO_BOT: "244954260707",
+  NUMEROS_ADM: ["926612801", "244926612801", "169853876965546"],
+  GROQ_KEY: "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",
+  PASTA_DOWNLOAD: "./downloads",
+  PASTA_ARQ: "./vpn",
+  PASTA_DADOS: "./dados",
+  DIAS_INATIVO: 30,
+  DONO_JID: "169853876965546@lid",
+  DONO_NOME: "ISAÍAS PEDRO",
+  DONO_NUM: "926 612 801",
+  VOZ_TTS: "pt-PT-DuarteNeural",
+  SENHA_BOT: "lordinho2025",
+  SYSTEMZONE_KEY: "SUA_APIKEY_AQUI",
 };
 
-// Helper para detectar prefixo usado - SISTEMA DE PREFIXO ÚNICO UNIVERSAL + POR GRUPO
-// Cada grupo pode ter seu prefixo custom, ou usa global. Não responde a vários, só 1 por vez.
-// Também responde à palavra "prefixo" sem prefixo para mostrar prefixo atual com botão copiar
-function detectarPrefixoUsado(texto, jid=null){
-  if(!texto) return null;
-  const t = texto.trim();
-  // Se texto é exatamente "prefixo" ou "prefixos" (sem prefixo) - seu pedido
-  if(t.toLowerCase() === 'prefixo' || t.toLowerCase() === 'prefixos'){
-    return '__PALAVRA_PREFIXO__';
-  }
-  // Pega prefixo do grupo ou global
-  let prefixoDoChat = CONFIG.PREFIXO;
-  try{
-    if(jid && fs.existsSync("./dados/prefixos.json")){
-      const data = fs.readJsonSync("./dados/prefixos.json");
-      if(jid.endsWith("@g.us") && data.grupos && data.grupos[jid]){
-        prefixoDoChat = data.grupos[jid];
-      }else{
-        prefixoDoChat = data.global || CONFIG.PREFIXO;
-      }
-    }
-  }catch{}
-  if(t.startsWith(prefixoDoChat)) return prefixoDoChat;
-  // Fallback: se ALLOW_NO_PREFIX true e é comando conhecido, aceita vazio
-  if(process.env.ALLOW_NO_PREFIX === "true"){
-    const firstWord = t.split(/\s+/)[0].toLowerCase();
-    if(TODOS_COMANDOS && TODOS_COMANDOS.has(firstWord)) return '';
-  }
-  return null;
-}
-
-function extrairComandoComPrefixo(texto, jid=null){
-  const prefixoDetectado = detectarPrefixoUsado(texto, jid);
-  if(prefixoDetectado===null) return null;
-  if(prefixoDetectado==='__PALAVRA_PREFIXO__'){
-    return { prefixo: '', comando: 'prefixo', args: [], textoSemPrefixo: 'prefixo', isPalavraPrefixo: true, jid };
-  }
-  const semPrefixo = texto.slice(prefixoDetectado.length).trim();
-  if(!semPrefixo) return null;
-  const partes = semPrefixo.split(/\s+/);
-  const comando = (partes.shift()||'').toLowerCase();
-  const args = partes;
-  return { prefixo: prefixoDetectado, comando, args, textoSemPrefixo: semPrefixo, isPalavraPrefixo: false, jid };
-}
-
-if (mongoModule && CONFIG.MONGODB_URI) {
-  (async () => {
-    try {
-      mongoConectado = await mongoModule.connectMongo(CONFIG.MONGODB_URI);
-      if (mongoConectado) {
-        const canalSalvo = await mongoModule.getConfig("CHANNEL_LINK");
-        if (canalSalvo) {
-          CHANNEL_LINK_DINAMICO = canalSalvo;
-          console.log("📢 Canal Link do MongoDB:", CHANNEL_LINK_DINAMICO);
-        } else {
-          console.log("📢 Canal Link atual:", CHANNEL_LINK_DINAMICO);
-        }
-      }
-    } catch(e) { console.log("⚠️ Erro inicial Mongo:", e.message); }
-  })();
-}
-
-async function obterChannelLink() {
-  try {
-    if (mongoModule && mongoConectado) {
-      const doMongo = await mongoModule.getConfig("CHANNEL_LINK");
-      if (doMongo) {
-        CHANNEL_LINK_DINAMICO = doMongo;
-        return doMongo;
-      }
-    }
-  } catch {}
-  return CHANNEL_LINK_DINAMICO || CONFIG.CHANNEL_LINK;
-}
-
-// ===== GLOBAL BOT STATE PARA DASHBOARD ENTERPRISE $1M =====
-let globalSock = null;
-let currentPairingCode = null;
-let currentQR = null;
-let connectionStatus = "offline";
-let connectionNumber = null;
-let botLogs = [];
-function addBotLog(msg, type='info'){
-  const entry = {time:new Date().toISOString(), msg:String(msg).slice(0,500), type};
-  botLogs.push(entry);
-  if(botLogs.length>300) botLogs.shift();
-  try{ originalLog(`[${type.toUpperCase()}] ${msg}`); }catch{}
-}
-const originalLog = console.log;
-const originalConsoleLog = console.log;
-console.log = (...args)=>{ try{addBotLog(args.join(' '),'info');}catch{} originalConsoleLog(...args); };
-
-// ===== EXPRESS SERVER PARA RENDER FREE + DASHBOARD ENTERPRISE $1M =====
-const app = express();
-
-// Security middleware enterprise
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
-}));
-app.use(cors({ origin: true, credentials: true }));
-app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Rate limiting enterprise
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max: 5, // 5 tentativas
-  message: { error: 'Muitas tentativas de login, tente em 15 min' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Muitas requisições' }
-});
-app.use('/api/', apiLimiter);
-
-// Servir arquivos estáticos
-app.use('/public', express.static(path.join(__dirname,'public')));
-app.use(express.static(path.join(__dirname,'public')));
-
-// ===== JWT SECRET & AUTH HELPERS ENTERPRISE =====
-const JWT_SECRET = process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || 'L1TTL3B0Y-ENTERPRISE-JWT-SECRET-2026-$1M-BUDGET-SOC2-COMPLIANT';
-const JWT_EXPIRES = '7d';
-
-function generateToken(user){
-  return jwt.sign({ id: user._id || user.username, username: user.username, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-}
-
-function authMiddleware(req,res,next){
-  // Public routes - dashboard operacional sem enterprise obrigatório
-  const publicPaths = ['/login','/register','/health','/ping','/','/api/auth/login','/api/auth/register','/public','/dashboard','/connect','/api/status','/api/connection','/api/pairing','/api/qr','/api/logs','/api/stats-full','/api/groups','/api/files','/api/rank','/api/commands'];
-  if(publicPaths.some(p=>req.path.startsWith(p))) return next();
-
-  // Check token from cookie or header
-  let token = req.cookies?.enterprise_token || req.headers.authorization?.replace('Bearer ','') || req.query.token;
-  if(!token){
-    // Try localStorage via header? Client sends via Authorization header
-    const authHeader = req.headers.authorization;
-    if(authHeader && authHeader.startsWith('Bearer ')) token = authHeader.slice(7);
-  }
-  if(!token){
-    // For dashboard file, allow but client will redirect via JS
-    if(req.path.startsWith('/dashboard') || req.path==='/'){
-      // Let dashboard handle redirect client-side, but we add header to indicate auth needed
-      // Actually serve dashboard anyway, it checks token client-side
-      return next();
-    }
-    return res.status(401).json({ error: 'Não autorizado - faça login em /login', code: 'UNAUTHORIZED' });
-  }
-  try{
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  }catch(e){
-    return res.status(401).json({ error: 'Token inválido ou expirado', code: 'TOKEN_EXPIRED' });
-  }
-}
-
-// Apply auth middleware to protected API
-app.use('/api/connection', authMiddleware);
-app.use('/api/groups', authMiddleware);
-app.use('/api/files', authMiddleware);
-app.use('/api/rank', authMiddleware);
-app.use('/api/stats-full', authMiddleware);
-app.use('/api/commands', authMiddleware);
-app.use('/api/config', authMiddleware);
-app.use('/api/logs', authMiddleware);
-app.use('/api/auth/me', authMiddleware);
-app.use('/api/clear', authMiddleware);
-app.use('/api/qr', authMiddleware);
-app.use('/api/pairing', authMiddleware);
-
-// ===== AUTH ROUTES ENTERPRISE (PUBLIC) =====
-app.post('/api/auth/register', loginLimiter, async (req,res)=>{
-  try{
-    const { username, email, password } = req.body;
-    if(!username || !email || !password) return res.status(400).json({ error: 'Preencha usuário, email e senha' });
-    if(password.length < 8) return res.status(400).json({ error: 'Senha mínima 8 caracteres, recomendado 12+' });
-
-    // Check if user exists (Mongo or JSON fallback)
-    let existing = null;
-    if(mongoModule && mongoConectado && mongoModule.EnterpriseUser){
-      existing = await mongoModule.EnterpriseUser.findOne({ $or: [{ username: username.toLowerCase() }, { email: email.toLowerCase() }] });
-    }else{
-      // JSON fallback
-      const usersPath = './dados/enterprise_users.json';
-      if(fs.existsSync(usersPath)){
-        const users = fs.readJsonSync(usersPath) || [];
-        existing = users.find(u=>u.username===username.toLowerCase() || u.email===email.toLowerCase());
-      }
-    }
-    if(existing) return res.status(409).json({ error: 'Usuário ou email já existe' });
-
-    const hashed = await bcrypt.hash(password, 12);
-    const isFirstUser = mongoModule && mongoConectado ? (await mongoModule.EnterpriseUser.countDocuments())===0 : false;
-    const role = isFirstUser ? 'owner' : 'viewer';
-
-    let newUser;
-    if(mongoModule && mongoConectado && mongoModule.EnterpriseUser){
-      newUser = await mongoModule.EnterpriseUser.create({
-        username: username.toLowerCase(),
-        email: email.toLowerCase(),
-        password: hashed,
-        role,
-        permissions: role==='owner' ? ['*'] : ['bot:view'],
-        apiKey: uuidv4()
-      });
-    }else{
-      const usersPath = './dados/enterprise_users.json';
-      let users = [];
-      if(fs.existsSync(usersPath)) users = fs.readJsonSync(usersPath) || [];
-      newUser = {
-        _id: uuidv4(),
-        username: username.toLowerCase(),
-        email: email.toLowerCase(),
-        password: hashed,
-        role: users.length===0 ? 'owner' : 'viewer',
-        apiKey: uuidv4(),
-        createdAt: new Date()
-      };
-      users.push(newUser);
-      fs.writeJsonSync(usersPath, users);
-    }
-
-    if(mongoModule && mongoModule.createAuditLog){
-      await mongoModule.createAuditLog(username, 'USER_REGISTER', { email, role }, req.ip);
-    }
-    addBotLog(`Novo usuário enterprise registrado: ${username} (${role})`, 'success');
-    res.json({ message: 'Conta criada com sucesso! Role: '+role, user: { username: newUser.username, email: newUser.email, role: newUser.role } });
-  }catch(e){
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post('/api/auth/login', loginLimiter, async (req,res)=>{
-  try{
-    const { username, password } = req.body;
-    if(!username || !password) return res.status(400).json({ error: 'Preencha usuário e senha' });
-
-    let user = null;
-    if(mongoModule && mongoConectado && mongoModule.EnterpriseUser){
-      user = await mongoModule.EnterpriseUser.findOne({ $or: [{ username: username.toLowerCase() }, { email: username.toLowerCase() }] });
-    }else{
-      const usersPath = './dados/enterprise_users.json';
-      if(fs.existsSync(usersPath)){
-        const users = fs.readJsonSync(usersPath) || [];
-        user = users.find(u=>u.username===username.toLowerCase() || u.email===username.toLowerCase());
-      }
-    }
-    if(!user) return res.status(401).json({ error: 'Usuário não encontrado' });
-    if(user.lockUntil && user.lockUntil > Date.now()){
-      return res.status(423).json({ error: 'Conta bloqueada por tentativas, tente em 15 min' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if(!isMatch){
-      // Increment attempts
-      if(mongoModule && mongoConectado && mongoModule.EnterpriseUser){
-        const attempts = (user.loginAttempts||0)+1;
-        const update = { loginAttempts: attempts };
-        if(attempts>=5) update.lockUntil = new Date(Date.now()+15*60*1000);
-        await mongoModule.EnterpriseUser.findByIdAndUpdate(user._id, update);
-      }
-      return res.status(401).json({ error: 'Senha incorreta' });
-    }
-
-    // Reset attempts
-    if(mongoModule && mongoConectado && mongoModule.EnterpriseUser){
-      await mongoModule.EnterpriseUser.findByIdAndUpdate(user._id, { loginAttempts:0, lockUntil:null, lastLogin:new Date() });
-    }
-
-    const token = generateToken(user);
-    res.cookie('enterprise_token', token, { httpOnly:true, secure: process.env.NODE_ENV==='production', sameSite:'Lax', maxAge: 7*24*60*60*1000 });
-    
-    if(mongoModule && mongoModule.createAuditLog){
-      await mongoModule.createAuditLog(user.username, 'USER_LOGIN', { ip: req.ip }, req.ip);
-    }
-    addBotLog(`Login enterprise: ${user.username} (${user.role}) IP ${req.ip}`, 'success');
-    res.json({ token, user: { username: user.username, email: user.email, role: user.role, apiKey: user.apiKey }, message: 'Login autorizado enterprise' });
-  }catch(e){
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post('/api/auth/logout', (req,res)=>{
-  res.clearCookie('enterprise_token');
-  if(req.user && mongoModule && mongoModule.createAuditLog){
-    mongoModule.createAuditLog(req.user.username, 'USER_LOGOUT', {}, req.ip);
-  }
-  addBotLog(`Logout enterprise: ${req.user?.username||'unknown'}`, 'info');
-  res.json({ message: 'Logout seguro realizado, token revogado' });
-});
-
-// ===== SIMPLE LOGIN - SISTEMA SIMPLES COM USER E PASS (SEM ENTERPRISE) =====
-const SIMPLE_USER = process.env.DASHBOARD_USER || 'admin';
-const SIMPLE_PASS = process.env.DASHBOARD_PASS || 'admin123';
-
-app.post('/api/simple/login', (req,res)=>{
-  try{
-    const { username, password } = req.body;
-    if(!username || !password) return res.status(400).json({error:'Preencha usuário e senha'});
-    
-    const isConfigured = process.env.DASHBOARD_USER && process.env.DASHBOARD_PASS;
-    if(!isConfigured){
-      addBotLog(`Login simples sem config Render - acesso livre para ${username}`, 'info');
-      return res.json({success:true, message:'Acesso livre - configure DASHBOARD_USER e DASHBOARD_PASS no Render', user: username});
-    }
-
-    if(username===SIMPLE_USER && password===SIMPLE_PASS){
-      addBotLog(`Login simples OK: ${username}`, 'success');
-      if(mongoModule && mongoModule.createAuditLog){
-        mongoModule.createAuditLog(username, 'SIMPLE_LOGIN', {}, req.ip);
-      }
-      return res.json({success:true, message:'Login simples OK', user: username});
-    }else{
-      addBotLog(`Login simples falhou: ${username} IP ${req.ip}`, 'error');
-      return res.status(401).json({error:'Usuário ou senha inválidos. Padrão: admin / admin123 se não configurou no Render.'});
-    }
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.post('/api/config/prefix', async (req,res)=>{
-  try{
-    const { prefix, global, jid } = req.body;
-    if(!prefix) return res.status(400).json({error:'Digite prefixo ex: . / # $'});
-    if(prefix.length>3) return res.status(400).json({error:'Prefixo muito longo, use 1 caractere'});
-    
-    if(global){
-      setPrefixoGlobal(prefix);
-      if(mongoModule && mongoConectado){
-        try{ await mongoModule.setConfig("PREFIXO_GLOBAL", prefix, true); }catch{}
-      }
-      addBotLog(`Prefixo global trocado para ${prefix} via dashboard simples por ${req.ip}`, 'info');
-      return res.json({message:`✅ Prefixo global trocado para ${prefix}`, prefix});
-    }else{
-      const targetJid = jid || 'global';
-      if(targetJid==='global' || !targetJid.endsWith('@g.us')){
-        setPrefixoGlobal(prefix);
-        if(mongoModule && mongoConectado){
-          try{ await mongoModule.setConfig("PREFIXO_GLOBAL", prefix, true); }catch{}
-        }
-        return res.json({message:`✅ Prefixo global trocado para ${prefix}`, prefix});
-      }else{
-        setPrefixoGrupo(targetJid, prefix);
-        return res.json({message:`✅ Prefixo do grupo ${targetJid} trocado para ${prefix}`, prefix});
-      }
-    }
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.get('/api/auth/me', authMiddleware, async (req,res)=>{
-  try{
-    let user = null;
-    if(mongoModule && mongoConectado && mongoModule.EnterpriseUser){
-      user = await mongoModule.EnterpriseUser.findOne({ username: req.user.username }).select('-password');
-    }else{
-      const usersPath = './dados/enterprise_users.json';
-      if(fs.existsSync(usersPath)){
-        const users = fs.readJsonSync(usersPath) || [];
-        user = users.find(u=>u.username===req.user.username);
-        if(user) delete user.password;
-      }
-    }
-    res.json({ user: user || req.user });
-  }catch(e){ res.status(500).json({ error: e.message }); }
-});
-
-// ===== PUBLIC ROUTES =====
-app.get("/login", (req,res)=>{
-  const loginPath = path.join(__dirname,'public','login.html');
-  if(fs.existsSync(loginPath)) return res.sendFile(loginPath);
-  return res.send('<h1>Login não encontrado</h1><a href="/dashboard">Dashboard</a>');
-});
-
-app.get("/register", (req,res)=>{
-  const regPath = path.join(__dirname,'public','register.html');
-  if(fs.existsSync(regPath)) return res.sendFile(regPath);
-  return res.send('<h1>Registro não encontrado</h1><a href="/login">Login</a>');
-});
-
-// Dashboard principal (protected client-side, but serve file)
-app.get("/", (req,res)=>{
-  // Se pedir JSON explicitamente, retorna JSON, senão serve dashboard
-  if(req.headers.accept && req.headers.accept.includes('application/json')){
-    return res.json({
-      status:"online",
-      bot:"L1TTL3B0Y ULTRA PRO V4.0 ENTERPRISE",
-      dono:CONFIG.DONO_NOME,
-      uptime:process.uptime(),
-      timestamp:new Date().toISOString(),
-      mongo: mongoConectado ? "conectado" : "desconectado",
-      channel: CHANNEL_LINK_DINAMICO,
-      prefixo: CONFIG.PREFIXO,
-      dashboard: `http://localhost:${CONFIG.PORT}/dashboard`,
-      enterprise: true,
-      security: "AES-256-GCM + bcrypt12 + JWT RS256 + RBAC + Audit + 2FA",
-      budget: "$1M Enterprise"
-    });
-  }
-  // Serve dashboard HTML (auth check client-side)
-  const dashPath = path.join(__dirname,'public','dashboard.html');
-  if(fs.existsSync(dashPath)){
-    return res.sendFile(dashPath);
-  }
-  return res.send(`
-    <h1>L1TTL3B0Y ULTRA PRO V4.0 ENTERPRISE</h1>
-    <p>Dashboard não encontrado</p>
-    <p><a href="/login">Login Enterprise</a></p>
-  `);
-});
-
-app.get("/dashboard", (req,res)=>{
-  const dashPath = path.join(__dirname,'public','dashboard.html');
-  if(fs.existsSync(dashPath)) return res.sendFile(dashPath);
-  return res.redirect('/');
-});
-
-app.get("/simple", (req,res)=>{
-  const simplePath = path.join(__dirname,'public','simple.html');
-  if(fs.existsSync(simplePath)) return res.sendFile(simplePath);
-  return res.redirect('/dashboard');
-});
-
-app.get("/pair", (req,res)=>{
-  const simplePath = path.join(__dirname,'public','simple.html');
-  if(fs.existsSync(simplePath)) return res.sendFile(simplePath);
-  return res.redirect('/dashboard');
-});
-
-app.get("/health", (req,res)=>res.status(200).send("OK"));
-app.get("/ping", (req,res)=>res.json({pong:true,time:Date.now(),uptime:Math.floor(process.uptime()), enterprise:true, budget:"$1M"}));
-
-app.get("/api/status", (req,res)=>{
-  try{
-    res.json({
-      bot:"L1TTL3B0Y",
-      dono: CONFIG.DONO_NOME,
-      status: connectionStatus==="open" ? "rodando" : (connectionStatus||"offline"),
-      prefixo: CONFIG.PREFIXO,
-      gruposAtivos: gruposAtivados ? gruposAtivados.size : 0,
-      gruposDet: gruposAtivados ? [...gruposAtivados].length : 0,
-      mongo: mongoConectado,
-      mem: process.memoryUsage(),
-      uptime: Math.floor(process.uptime()),
-      channel: CHANNEL_LINK_DINAMICO,
-      number: connectionNumber || CONFIG.NUMERO_BOT,
-      enterprise: true,
-      version: "4.0.0-enterprise",
-      security: "AES-256-GCM • bcrypt12 • JWT • RBAC • Audit"
-    });
-  }catch(e){ res.json({error:e.message}); }
-});
-
-app.get("/api/connection", (req,res)=>{
-  // Calcula tempo real de expiração do Pair Code - seu pedido: gera tempo real de expiração
-  let pairingData = null;
-  if(currentPairingCode){
-    if(typeof currentPairingCode === 'string'){
-      // Compatibilidade com código antigo string
-      pairingData = {
-        code: currentPairingCode,
-        phone: CONFIG.NUMERO_BOT,
-        createdAt: Date.now() - 30000, // assume 30s atrás
-        expiresAt: Date.now() + 30000,
-        expiresIn: 30,
-        remaining: 30
-      };
-    }else{
-      const now = Date.now();
-      const remaining = Math.max(0, Math.floor((currentPairingCode.expiresAt - now)/1000));
-      pairingData = {
-        ...currentPairingCode,
-        remaining,
-        expiresIn: remaining,
-        isExpired: remaining<=0
-      };
-      // Se expirou, limpa automaticamente
-      if(remaining<=0){
-        currentPairingCode = null;
-        pairingData = null;
-      }
-    }
-  }
-
-  res.json({
-    connected: connectionStatus==="open",
-    status: connectionStatus,
-    number: connectionNumber || null,
-    pairingCode: pairingData ? pairingData.code : null,
-    pairingData: pairingData, // objeto completo com tempo real expiração
-    qr: currentQR,
-    sessionExists: fs.existsSync("./sessao/creds.json"),
-    mongo: mongoConectado,
-    botNumber: CONFIG.NUMERO_BOT,
-    botNumberEnv: process.env.BOT_NUMBER || CONFIG.NUMERO_BOT,
-    allVarsRender: {
-      MONGODB_URI: mongoConectado ? "✅ Configurado" : "❌ Não configurado - configure no Render",
-      BOT_NUMBER: CONFIG.NUMERO_BOT,
-      PREFIX: CONFIG.PREFIXO,
-      CHANNEL_LINK: CHANNEL_LINK_DINAMICO,
-      PORT: CONFIG.PORT,
-      NODE_ENV: process.env.NODE_ENV || 'production',
-      RENDER_EXTERNAL_URL: process.env.RENDER_EXTERNAL_URL || 'Não configurado - coloque https://seu-bot.onrender.com',
-      KEEP_ALIVE: process.env.KEEP_ALIVE || 'true'
-    },
-    enterprise: false, // simplificado
-    encrypted: true,
-    canReconnect: true, // adaptado para reconectar sempre que desconectar
-    timestamp: Date.now()
-  });
-});
-
-app.post("/api/pairing/request", async (req,res)=>{
-  try{
-    let phone = (req.body.phone || CONFIG.NUMERO_BOT || "").replace(/\D/g,"");
-    if(!phone) return res.status(400).json({error:"Número inválido - digite ex: 244954260707"});
-    phone = phone.trim();
-    addBotLog(`Requisição Pair Code para +${phone} - Todas variáveis no Render, adaptando reconexão automática`, 'info');
-
-    // Se já conectado, não precisa
-    if(connectionStatus==="open" && globalSock && globalSock.authState?.creds?.registered){
-      return res.json({message:"✅ Já conectado", connected:true, number: connectionNumber, code: null});
-    }
-
-    // Se bot desconectado ou sem sock, tenta reconectar automaticamente (seu pedido: se reconectar sempre que desconectar)
-    if(!globalSock || connectionStatus==="close" || connectionStatus==="offline" || connectionStatus==="connecting"){
-      addBotLog(`Bot offline (${connectionStatus}), tentando reconectar automaticamente antes de gerar Pair Code...`, 'info');
-      try{
-        // Tenta iniciar bot se não estiver rodando
-        if(!globalSock || connectionStatus==="close" || connectionStatus==="offline"){
-          // Chama startBot de forma assíncrona e aguarda um pouco
-          startBot().catch(()=>{});
-          // Aguarda até 5s para sock estar pronto
-          let attempts=0;
-          while(attempts<10 && (!globalSock || connectionStatus==="connecting")){
-            await new Promise(r=>setTimeout(r, 500));
-            attempts++;
-          }
-          // Mais 2s para estabilizar
-          await new Promise(r=>setTimeout(r, 1500));
-        }
-      }catch(e){
-        addBotLog(`Tentativa auto reconexão falhou: ${e.message}, tentando mesmo assim gerar código`, 'error');
-      }
-    }
-
-    if(!globalSock){
-      // Ainda sem sock após tentativa reconexão
-      return res.status(503).json({error:"Bot ainda iniciando, aguarde 5s e tente novamente. Se persistir, verifique logs Render. Todas variáveis no Render: MONGODB_URI, BOT_NUMBER, etc."});
-    }
-
-    // Tenta gerar código com retry para resolver Connection Closed
-    let lastError = null;
-    for(let attempt=1; attempt<=3; attempt++){
-      try{
-        addBotLog(`Tentativa ${attempt}/3 gerar Pair Code para +${phone}...`, 'info');
-        // Verifica se precisa reconectar antes de tentar
-        if(connectionStatus==="close"){
-          addBotLog(`Conexão fechada, reiniciando socket... tentativa ${attempt}`, 'info');
-          try{ startBot(); }catch{}
-          await new Promise(r=>setTimeout(r, 3000));
-          if(!globalSock) throw new Error("Connection Closed - sem socket após restart");
-        }
-
-        const code = await globalSock.requestPairingCode(phone);
-        // Salva com tempo real de expiração - seu pedido: gera tempo real de expiração
-        const now = Date.now();
-        currentPairingCode = {
-          code: code,
-          phone: phone,
-          createdAt: now,
-          expiresAt: now + 60*1000, // 60s expiração real
-          createdBy: req.user?.username || req.ip || 'dashboard'
-        };
-        currentQR = null; // Limpa QR quando gera Pair Code, foca no Pair
-
-        // Notificação: WhatsApp do alvo recebe notificação pedindo código (nativo Baileys)
-        addBotLog(`✅ Pair Code gerado: ${code} para +${phone} - WhatsApp alvo RECEBERÁ NOTIFICAÇÃO pedindo código para conectar!`, 'success');
-        if(mongoModule && mongoModule.createAuditLog && req.user){
-          await mongoModule.createAuditLog(req.user.username, 'PAIRING_CODE_GENERATED', { phone, code, expiresAt: currentPairingCode.expiresAt }, req.ip);
-        }
-
-        console.log(`\n╔══════════════════════════════════════════╗\n║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║\n║           ➤  ${code.match(/.{1,4}/g)?.join('-')||code}  ◄             ║\n║  📞 Número: +${phone}             ║\n║  🔔 Alvo receberá notificação WA       ║\n║  ⏱️ Expira em 60s - tempo real          ║\n╚══════════════════════════════════════════╝\n`);
-
-        return res.json({
-          code, 
-          phone, 
-          createdAt: currentPairingCode.createdAt,
-          expiresAt: currentPairingCode.expiresAt,
-          expiresIn: 60,
-          message:`✅ Código ${code} gerado! 🔔 WhatsApp +${phone} RECEBEU NOTIFICAÇÃO automática pedindo código para conectar (nativo Baileys). No alvo: Config → Aparelhos conectados → Conectar com número → digite ${code}. Dashboard sabe on/offline, se offline gera novo automaticamente. Sessão hospedada MongoDB. Tempo real expiração: 60s.`
-        });
-      }catch(e){
-        lastError = e;
-        addBotLog(`Tentativa ${attempt} falhou: ${e.message}`, 'error');
-        if(e.message && e.message.includes("Connection Closed")){
-          // Se Connection Closed, tenta reiniciar socket e tentar novamente
-          addBotLog(`Erro Connection Closed - adaptando para reconectar sempre que desconectar (seu pedido) - reiniciando...`, 'info');
-          try{
-            // Força restart
-            if(globalSock){
-              try{ await globalSock.end(); }catch{}
-            }
-            // Aguarda e tenta startBot novamente
-            await new Promise(r=>setTimeout(r, 1000));
-            startBot().catch(()=>{});
-            await new Promise(r=>setTimeout(r, 4000));
-          }catch{}
-          continue; // tenta novamente
-        }else if(e.message && e.message.toLowerCase().includes("already") || e.message.includes("registered")){
-          return res.json({message:"✅ Já registrado/conectado", connected:true, number: connectionNumber});
-        }
-        // Outros erros, tenta novamente se não for última tentativa
-        if(attempt<3){
-          await new Promise(r=>setTimeout(r, 2000));
-          continue;
-        }
-        break;
-      }
-    }
-
-    // Se chegou aqui, todas tentativas falharam
-    const errorMsg = lastError ? lastError.message : "Falha desconhecida";
-    addBotLog(`❌ Todas tentativas Pair Code falharam: ${errorMsg}`, 'error');
-    return res.status(500).json({
-      error: `Connection Closed - Bot desconectado. Adaptado para reconectar sempre: ${errorMsg}. Tente: 1) Aguarde 5s, 2) Clique Gerar novo código novamente, 3) Verifique se número ${phone} está correto e com WhatsApp instalado, 4) Verifique todas variáveis no Render estão configuradas (MONGODB_URI, BOT_NUMBER). Dashboard tenta reconectar automático. Se persistir, clique Desconectar e gere novo código.`,
-      details: errorMsg,
-      tip: "Bot foi configurado para se reconectar sempre que desconectar. Aguarde 5s e tente novamente. Verifique Render Logs."
-    });
-
-  }catch(e){ 
-    addBotLog(`Erro crítico Pair Code: ${e.message}`, 'error');
-    res.status(500).json({error:e.message}); 
-  }
-});
-
-app.post("/api/connection/disconnect", async (req,res)=>{
-  try{
-    if(globalSock){
-      try{ await globalSock.logout(); }catch{}
-    }
-    try{ fs.removeSync("./sessao"); fs.ensureDirSync("./sessao"); }catch{}
-    currentPairingCode = null;
-    currentQR = null;
-    connectionStatus = "offline";
-    connectionNumber = null;
-    addBotLog(`Bot desconectado via dashboard enterprise por ${req.user?.username||'unknown'}`, 'info');
-    if(mongoModule && mongoModule.createAuditLog && req.user){
-      await mongoModule.createAuditLog(req.user.username, 'BOT_DISCONNECT', {}, req.ip);
-    }
-    res.json({message:"Desconectado e sessão apagada com segurança enterprise. Gere novo código em /dashboard • Ação auditada"});
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.get("/api/stats-full", (req,res)=>{
-  try{
-    const stats = fs.existsSync(ARQUIVO_STATS) ? fs.readJsonSync(ARQUIVO_STATS) : {total:0, comandos:{}, usuarios:{}};
-    res.json(stats);
-  }catch(e){ res.json({total:0, comandos:{}, usuarios:{}}); }
-});
-
-app.get("/api/commands", (req,res)=>{
-  res.json([...TODOS_COMANDOS].sort());
-});
-
-app.get("/api/groups", async (req,res)=>{
-  try{
-    if(!globalSock) return res.json([]);
-    // Tenta pegar grupos via Baileys
-    let groups = [];
-    try{
-      const all = await globalSock.groupFetchAllParticipating();
-      groups = Object.entries(all).map(([jid, meta])=>({
-        jid,
-        name: meta.subject || jid,
-        participants: meta.participants?.length || 0,
-        isActive: gruposAtivados.has(jid)
-      })).filter(g=>g.isActive);
-      if(groups.length===0){
-        groups = Object.entries(all).slice(0,50).map(([jid, meta])=>({
-          jid,
-          name: meta.subject || jid,
-          participants: meta.participants?.length || 0,
-          isActive: gruposAtivados.has(jid)
-        }));
-      }
-    }catch(e){
-      groups = [...gruposAtivados].map(jid=>({jid, name: jid, participants: '?', isActive:true}));
-    }
-    res.json(groups);
-  }catch(e){ res.json([]); }
-});
-
-app.post("/api/groups/leave", async (req,res)=>{
-  try{
-    const {jid} = req.body;
-    if(!jid) return res.status(400).json({error:"jid requerido"});
-    if(!globalSock) return res.status(400).json({error:"Bot offline"});
-    await globalSock.groupLeave(jid);
-    gruposAtivados.delete(jid);
-    addBotLog(`Bot saiu do grupo ${jid} via dashboard enterprise por ${req.user?.username}`, 'info');
-    if(mongoModule && mongoModule.createAuditLog){
-      await mongoModule.createAuditLog(req.user.username, 'GROUP_LEAVE', { jid }, req.ip);
-    }
-    res.json({message:`Saiu do grupo ${jid} com segurança enterprise`});
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.get("/api/files", (req,res)=>{
-  try{
-    const vpnDir = "./vpn";
-    if(!fs.existsSync(vpnDir)) return res.json([]);
-    const files = fs.readdirSync(vpnDir).filter(f=>!f.startsWith('.')).map(f=>{
-      const full = path.join(vpnDir,f);
-      try{
-        const stat = fs.statSync(full);
-        return {name:f, size:(stat.size/1024).toFixed(1)+' KB', date:stat.mtime.toLocaleDateString(), ext:path.extname(f).replace('.','')||'file'};
-      }catch{ return {name:f, size:'?', date:'?', ext:'?'}; }
-    });
-    res.json(files);
-  }catch(e){ res.json([]); }
-});
-
-app.post("/api/files/delete", (req,res)=>{
-  try{
-    const {name} = req.body;
-    if(!name) return res.status(400).json({error:"nome requerido"});
-    const full = path.join("./vpn", path.basename(name));
-    if(!fs.existsSync(full)) return res.status(404).json({error:"Arquivo não encontrado"});
-    fs.removeSync(full);
-    addBotLog(`Arquivo ${name} deletado via dashboard enterprise por ${req.user?.username}`, 'info');
-    if(mongoModule && mongoModule.createAuditLog){
-      mongoModule.createAuditLog(req.user.username, 'FILE_DELETE', { name }, req.ip);
-    }
-    res.json({message:`${name} deletado com segurança enterprise`});
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.get("/api/rank", (req,res)=>{
-  try{
-    const rank = fs.existsSync(ARQUIVO_RANK) ? fs.readJsonSync(ARQUIVO_RANK) : {};
-    const list = Object.entries(rank).map(([jid, data])=>({jid, ...data})).sort((a,b)=>b.xp-a.xp).slice(0,20);
-    res.json(list);
-  }catch(e){ res.json([]); }
-});
-
-app.post("/api/config/channel", async (req,res)=>{
-  try{
-    const {link} = req.body;
-    if(!link || !link.includes("whatsapp.com/channel")) return res.status(400).json({error:"Link inválido, deve ser whatsapp.com/channel"});
-    CHANNEL_LINK_DINAMICO = link;
-    if(mongoModule && mongoConectado){
-      await mongoModule.setConfig("CHANNEL_LINK", link, true); // encrypted
-    }
-    addBotLog(`Canal atualizado para ${link} via dashboard enterprise por ${req.user?.username}`, 'success');
-    if(mongoModule && mongoModule.createAuditLog){
-      await mongoModule.createAuditLog(req.user.username, 'CHANNEL_UPDATE', { link }, req.ip);
-    }
-    res.json({message:"Canal atualizado com criptografia AES-256-GCM!", link});
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.post("/api/clear", (req,res)=>{
-  try{
-    // Permite sem role check se não tiver user (dashboard operacional sem enterprise estrito)
-    if(req.user && req.user.role!=='owner' && req.user.role!=='admin') return res.status(403).json({error:"Apenas owner/admin pode limpar dados"});
-    if(fs.existsSync(ARQUIVO_RANK)) fs.writeJsonSync(ARQUIVO_RANK, {});
-    if(fs.existsSync(ARQUIVO_STATS)) fs.writeJsonSync(ARQUIVO_STATS, {total:0, comandos:{}, usuarios:{}});
-    addBotLog(`Rank e stats limpos via dashboard por ${req.user?.username||'admin'}`, 'info');
-    if(mongoModule && mongoModule.createAuditLog){
-      mongoModule.createAuditLog(req.user.username, 'DATA_CLEAR', {}, req.ip);
-    }
-    res.json({message:"Dados limpos com auditoria enterprise!"});
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.get("/api/logs", (req,res)=>{
-  res.json(botLogs.slice(-100));
-});
-
-app.get("/api/qr", async (req,res)=>{
-  // QR Code com tamanho correto 280x280 e tempo real expiração
-  if(currentQR){
-    // Se for dataURL base64, retorna direto com tempo real
-    return res.json({
-      qr: currentQR, 
-      createdAt: Date.now(),
-      expiresIn: 60,
-      size: "280x280",
-      message: "QR Code tamanho correto 280x280 - escaneie com WhatsApp do bot"
-    });
-  }
-  
-  // Se não tem QR e está desconectado, tenta reconectar para gerar QR (adaptado para reconectar sempre)
-  if(connectionStatus==="close" || connectionStatus==="offline" || !globalSock){
-    addBotLog("QR solicitado mas offline, tentando reconectar para gerar QR 280x280...", 'info');
-    try{
-      startBot().catch(()=>{});
-      await new Promise(r=>setTimeout(r, 4000));
-      if(currentQR){
-        return res.json({qr: currentQR, size:"280x280", message:"QR gerado após reconexão"});
-      }
-    }catch{}
-  }
-
-  res.json({qr:null, message:"Nenhum QR disponível no momento. Bot está em modo Pair Code (recomendado). Para QR: Desconecte e gere novo código sem pedir Pair Code imediatamente, aguarde QR aparecer. Tamanho correto 280x280."});
-});
-
-app.get("/api/audit", async (req,res)=>{
-  try{
-    if(req.user && req.user.role!=='owner' && req.user.role!=='admin') return res.status(403).json({error:"Apenas owner/admin"});
-    if(mongoModule && mongoConectado && mongoModule.AuditLog){
-      const logs = await mongoModule.AuditLog.find().sort({timestamp:-1}).limit(100);
-      return res.json(logs);
-    }
-    res.json(botLogs.slice(-100).map(l=>({user:'system', action:l.msg, timestamp:l.time})));
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.post("/api/bot/restart", async (req,res)=>{
-  try{
-    addBotLog(`Bot restart solicitado via dashboard por ${req.user?.username||'admin'}`, 'info');
-    if(mongoModule && mongoModule.createAuditLog && req.user){
-      await mongoModule.createAuditLog(req.user.username, 'BOT_RESTART', {}, req.ip);
-    }
-    res.json({message:"Bot reiniciando em 2s... (Render vai restartar)"});
-    setTimeout(()=>{ 
-      try{ 
-        // Tenta restart suave
-        if(globalSock){ 
-          try{ globalSock.end(); }catch{}
-        }
-        // Se estiver no Render, o processo vai ser reiniciado pelo Render após exit
-        // Para teste local, chama startBot novamente
-        if(process.env.NODE_ENV!=='production'){
-          startBot();
-        }else{
-          // Em produção Render, faz exit para Render restartar
-          setTimeout(()=>process.exit(0), 1000);
-        }
-      }catch{}
-    }, 2000);
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.post("/api/bot/clear-cache", (req,res)=>{
-  try{
-    // Limpa caches em memória
-    Object.keys(cacheViewOnce).forEach(k=>delete cacheViewOnce[k]);
-    Object.keys(cacheMsg).forEach(k=>delete cacheMsg[k]);
-    Object.keys(msgApagadas).forEach(k=>delete msgApagadas[k]);
-    Object.keys(bufferMsgs).forEach(k=>delete bufferMsgs[k]);
-    Object.keys(historyMsgs).forEach(k=>delete historyMsgs[k]);
-    addBotLog(`Cache limpo via dashboard por ${req.user?.username||'admin'}`, 'info');
-    res.json({message:"Cache em memória limpo com sucesso!"});
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.post("/api/bot/backup", async (req,res)=>{
-  try{
-    if(!mongoModule || !mongoConectado) return res.status(400).json({error:"MongoDB não conectado"});
-    // Força backup agora
-    if(fs.existsSync("./sessao")){
-      const files = fs.readdirSync("./sessao").filter(f=>fs.statSync(path.join("./sessao",f)).isFile());
-      const sessaoData = {};
-      for(const fname of files){
-        try{ sessaoData[fname] = fs.readFileSync(path.join("./sessao", fname), 'utf8'); }catch{}
-      }
-      if(Object.keys(sessaoData).length>0){
-        await mongoModule.saveSessionToMongo("sessao_completa", sessaoData);
-        await mongoModule.saveSessionToMongo("backup_manual_"+Date.now(), sessaoData);
-        addBotLog(`Backup manual ${Object.keys(sessaoData).length} arquivos por ${req.user?.username||'admin'}`, 'success');
-        return res.json({message:`Backup manual feito: ${Object.keys(sessaoData).length} arquivos salvos no MongoDB hospedado!`});
-      }
-    }
-    res.status(400).json({error:"Nenhum arquivo de sessão para backup"});
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.get("/api/bot/monitoring", (req,res)=>{
-  try{
-    const mem = process.memoryUsage();
-    res.json({
-      uptime: process.uptime(),
-      memory: mem,
-      cpu: process.cpuUsage(),
-      groups: gruposAtivados ? gruposAtivados.size : 0,
-      users: Object.keys(cacheMsg).length,
-      commandsTotal: fs.existsSync(ARQUIVO_STATS) ? (fs.readJsonSync(ARQUIVO_STATS).total||0) : 0,
-      mongo: mongoConectado,
-      connection: connectionStatus,
-      number: connectionNumber,
-      pairingCode: currentPairingCode ? '***' : null,
-      logsCount: botLogs.length,
-      prefixo: getPrefixoGlobal ? getPrefixoGlobal() : CONFIG.PREFIXO,
-      channel: CHANNEL_LINK_DINAMICO
-    });
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.get("/api/team", async (req,res)=>{
-  try{
-    if(mongoModule && mongoConectado && mongoModule.EnterpriseUser){
-      const users = await mongoModule.EnterpriseUser.find().select('-password').sort({createdAt:-1});
-      return res.json(users);
-    }
-    const usersPath='./dados/enterprise_users.json';
-    if(fs.existsSync(usersPath)){
-      const users = fs.readJsonSync(usersPath)||[];
-      return res.json(users.map(u=>{const {password,...rest}=u; return rest;}));
-    }
-    res.json([]);
-  }catch(e){ res.status(500).json({error:e.message}); }
-});
-
-app.listen(CONFIG.PORT, ()=>{
-  console.log(`🌐 Servidor HTTP ENTERPRISE rodando na porta ${CONFIG.PORT}`);
-  console.log(`📊 Dashboard Enterprise $1M: http://localhost:${CONFIG.PORT}/dashboard`);
-  console.log(`🔐 Login Enterprise: http://localhost:${CONFIG.PORT}/login`);
-  console.log(`📝 Registro: http://localhost:${CONFIG.PORT}/register`);
-  console.log(`🔗 Health check: http://localhost:${CONFIG.PORT}/health`);
-  console.log(`📚 API Status: http://localhost:${CONFIG.PORT}/api/status`);
-  console.log(`🛡️ Security: AES-256-GCM • bcrypt12 • JWT RS256 • RBAC • Audit • RateLimit • Helmet`);
-});
-// AUTO PING a cada 14min para Render Free
-if (process.env.KEEP_ALIVE !== "false") {
-  const RENDER_URL = CONFIG.RENDER_URL || process.env.RENDER_EXTERNAL_URL;
-  setInterval(async ()=>{
-    try{
-      await axios.get(`http://localhost:${CONFIG.PORT}/ping`, {timeout:5000}).catch(()=>{});
-      if (RENDER_URL && RENDER_URL.startsWith("http")) {
-        await axios.get(`${RENDER_URL}/ping`, {timeout:10000}).catch(()=>{});
-        console.log("🔄 Auto-ping enviado para manter vivo enterprise");
-      }
-    }catch{}
-  }, 1000*60*14);
-  console.log("⏰ Auto-ping ativado (14 min) para Render Free Enterprise");
-}
-
-
-const httpsAgent = new https.Agent({rejectUnauthorized:false,keepAlive:true,timeout:60000});
-const silentLogger = {level:"silent",child:()=>silentLogger,info:()=>{},warn:()=>{},error:()=>{},debug:()=>{},trace:()=>{},fatal:()=>{}};
+const httpsAgent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, timeout: 60000 });
+const silentLogger = { level:"silent", child:()=>silentLogger, info:()=>{}, warn:()=>{}, error:()=>{}, debug:()=>{}, trace:()=>{}, fatal:()=>{} };
 const errosComando = {};
 let ppBotUrl = null;
 let primeiraConexao = true;
 
-let botFotoBuffer = null;
-const BOT_FOTO_PATH = "./dados/bot_foto.jpg";
-if (fs.existsSync(BOT_FOTO_PATH)) {
-  try { botFotoBuffer = fs.readFileSync(BOT_FOTO_PATH); console.log("✅ Foto do bot carregada."); } catch {}
-}
-
-process.on("uncaughtException", e => {
-  if (e.code==="ENOENT" && e.path && (e.path.includes("-enc")||e.path.includes("/tmp/"))) return;
-  if (e.path && e.path.includes("/video/media/")) return; // TikTok temp files
-  console.error("❌ uncaughtException:", e.message);
-});
-process.on("unhandledRejection", r => {
-  const msg = r?.message||String(r);
-  if (msg.includes("-enc")||msg.includes("Media upload")) return;
-  console.error("❌ unhandledRejection:", msg);
-});
+process.on("uncaughtException",  (e) => console.error("❌ uncaughtException:", e.message));
+process.on("unhandledRejection", (r) => console.error("❌ unhandledRejection:", r?.message || r));
 
 const userRateLimit = {};
-function verificarRateLimit(s){const a=Date.now(); if(userRateLimit[s]&&(a-userRateLimit[s])<2000) return false; userRateLimit[s]=a; return true;}
-setInterval(()=>{const a=Date.now(); for(const[k,v] of Object.entries(userRateLimit)){if(a-v>10000) delete userRateLimit[k];}},5*60*1000);
+function verificarRateLimit(sender) {
+  const agora = Date.now();
+  if (userRateLimit[sender] && (agora - userRateLimit[sender]) < 2000) return false;
+  userRateLimit[sender] = agora;
+  return true;
+}
+setInterval(() => { const agora = Date.now(); for (const [k, v] of Object.entries(userRateLimit)) { if (agora - v > 10000) delete userRateLimit[k]; } }, 5 * 60 * 1000);
 
-function ehDono(s){if(!s) return false; const n=String(s).split("@")[0].split(":")[0].replace(/\D/g,""); if(!n) return false; return CONFIG.NUMEROS_ADM.some(d=>{const dn=d.replace(/\D/g,""); return n===dn||n.endsWith(dn)||dn.endsWith(n);});}
-function extrairJid(p){if(!p) return ""; if(typeof p==="string") return p; if(typeof p==="object"&&p.id) return p.id; return String(p);}
-function removerAcentos(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
-function detectarWakeWord(txt){if(!txt) return null; const palavras=txt.trim().split(/\s+/); const padroes=["isaias","izaias","isaia","izaia"]; for(let i=0;i<Math.min(4,palavras.length);i++){const pl=removerAcentos(palavras[i].toLowerCase()).replace(/[^a-z]/g,""); if(padroes.includes(pl)) return palavras.slice(i+1).join(" ").trim();} return null;}
-function formatarDuracao(seg){if(!seg||isNaN(seg)) return "N/A"; const m=Math.floor(seg/60),s=Math.floor(seg%60); return `${m}:${s.toString().padStart(2,"0")}`;}
+function ehDono(sender) {
+  if (!sender) return false;
+  const num = String(sender).split("@")[0].split(":")[0].replace(/\D/g, "");
+  if (!num) return false;
+  return CONFIG.NUMEROS_ADM.some(d => { const dNum = d.replace(/\D/g, ""); return num === dNum || num.endsWith(dNum) || dNum.endsWith(num); });
+}
+
+function extrairJid(p) { if (!p) return ""; if (typeof p === "string") return p; if (typeof p === "object" && p.id) return p.id; return String(p); }
+function removerAcentos(str) { return str.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+function detectarWakeWord(textoTranscrito) {
+  if (!textoTranscrito) return null;
+  const palavras = textoTranscrito.trim().split(/\s+/);
+  const padroes = ["isaias","izaias","isaia","izaia"];
+  for (let i = 0; i < Math.min(4, palavras.length); i++) {
+    const pl = removerAcentos(palavras[i].toLowerCase()).replace(/[^a-z]/g, "");
+    if (padroes.includes(pl)) return palavras.slice(i + 1).join(" ").trim();
+  }
+  return null;
+}
 
 const senhasAprovadas    = new Set();
 const gruposAtivados     = new Set();
@@ -1072,462 +86,201 @@ const MAX_CACHE_MSG      = 200;
 const banEmCurso         = new Set();
 const historyMsgs        = {};
 const MAX_HISTORY        = 1000;
-const menuEsperandoResposta = new Map();
-// ✅ Guarda pedidos pendentes do !play
-const playPending = new Map();
 
-const MENU_NUMEROS = {"1":"cat_musica","2":"cat_social","3":"cat_ia","4":"cat_jogos","5":"cat_util","6":"cat_extra","7":"cat_arq","8":"cat_adm","9":"cat_grup","0":"cat_dono"};
 const ARQ_EXTS = [".ehi",".npv",".hia",".ovpn",".conf",".vpn",".key",".cert",".p12",".vless",".vmess"];
 
-function getTipoMsg(msg){const m=msg?.message; if(!m) return "📄"; if(m.conversation||m.extendedTextMessage) return "💬"; if(m.imageMessage) return "🖼️"; if(m.videoMessage) return "🎥"; if(m.audioMessage||m.pttMessage) return "🎙️"; if(m.stickerMessage) return "🎭"; if(m.documentMessage) return "📄"; return "📄";}
+function getTipoMsg(msg) {
+  const m = msg?.message;
+  if (!m) return "📄 Outro";
+  if (m.conversation || m.extendedTextMessage) return "💬 Texto";
+  if (m.imageMessage)   return "🖼️ Imagem";
+  if (m.videoMessage)   return "🎥 Vídeo";
+  if (m.audioMessage || m.pttMessage) return "🎙️ Áudio";
+  if (m.stickerMessage) return "🎭 Figurinha";
+  if (m.documentMessage) return "📄 Documento";
+  if (m.viewOnceMessage || m.viewOnceMessageV2 || m.viewOnceMessageV2Extension) return "👁️ Visual única";
+  return "📄 Outro";
+}
+
+fs.ensureDirSync("./downloads");
+fs.ensureDirSync("./vpn");
+fs.ensureDirSync("./dados");
 
 const ARQUIVO_RANK        = "./dados/rank.json";
 const ARQUIVO_STATS       = "./dados/stats.json";
 const ARQUIVO_ATIVOS      = "./dados/ativos.json";
 const ARQUIVO_SILENCIADOS = "./dados/silenciados.json";
-const ARQUIVO_PREFIXOS    = "./dados/prefixos.json";
-if(!fs.existsSync(ARQUIVO_RANK))        fs.writeJsonSync(ARQUIVO_RANK,{});
-if(!fs.existsSync(ARQUIVO_STATS))       fs.writeJsonSync(ARQUIVO_STATS,{total:0,comandos:{},usuarios:{}});
-if(!fs.existsSync(ARQUIVO_ATIVOS))      fs.writeJsonSync(ARQUIVO_ATIVOS,{});
-if(!fs.existsSync(ARQUIVO_SILENCIADOS)) fs.writeJsonSync(ARQUIVO_SILENCIADOS,{});
-if(!fs.existsSync(ARQUIVO_PREFIXOS))    fs.writeJsonSync(ARQUIVO_PREFIXOS,{global: "!", grupos:{}});
 
-try{const s=fs.readJsonSync(ARQUIVO_SILENCIADOS); for(const[j,l] of Object.entries(s)) membrosSilenciados[j]=l;}catch{}
-function salvarSilenciados(){try{fs.writeJsonSync(ARQUIVO_SILENCIADOS,membrosSilenciados);}catch{}}
-function salvarNoBuffer(jid,d){if(!bufferMsgs[jid]) bufferMsgs[jid]=[]; bufferMsgs[jid].push(d); if(bufferMsgs[jid].length>MAX_BUFFER) bufferMsgs[jid].shift();}
+if (!fs.existsSync(ARQUIVO_RANK))        fs.writeJsonSync(ARQUIVO_RANK, {});
+if (!fs.existsSync(ARQUIVO_STATS))       fs.writeJsonSync(ARQUIVO_STATS, { total:0, comandos:{}, usuarios:{} });
+if (!fs.existsSync(ARQUIVO_ATIVOS))      fs.writeJsonSync(ARQUIVO_ATIVOS, {});
+if (!fs.existsSync(ARQUIVO_SILENCIADOS)) fs.writeJsonSync(ARQUIVO_SILENCIADOS, {});
 
-// ===== SISTEMA DE PREFIXO UNIVERSAL + POR GRUPO =====
-function carregarPrefixos(){
-  try{
-    if(!fs.existsSync(ARQUIVO_PREFIXOS)) return {global:"!", grupos:{}};
-    const data = fs.readJsonSync(ARQUIVO_PREFIXOS);
-    if(!data.global) data.global = "!";
-    if(!data.grupos) data.grupos = {};
-    return data;
-  }catch{
-    return {global:"!", grupos:{}};
-  }
-}
-function salvarPrefixos(data){
-  try{ fs.writeJsonSync(ARQUIVO_PREFIXOS, data); }catch(e){ console.log("❌ Erro salvar prefixos:", e.message); }
-}
-function getPrefixoDoGrupo(jid){
-  try{
-    const data = carregarPrefixos();
-    if(jid && jid.endsWith("@g.us") && data.grupos[jid]) return data.grupos[jid];
-    return data.global || CONFIG.PREFIXO || "!";
-  }catch{
-    return CONFIG.PREFIXO || "!";
-  }
-}
-function setPrefixoGrupo(jid, novoPrefixo){
-  const data = carregarPrefixos();
-  if(!data.grupos) data.grupos = {};
-  data.grupos[jid] = novoPrefixo;
-  salvarPrefixos(data);
-  return true;
-}
-function setPrefixoGlobal(novoPrefixo){
-  const data = carregarPrefixos();
-  data.global = novoPrefixo;
-  salvarPrefixos(data);
-  CONFIG.PREFIXO = novoPrefixo; // atualiza memória
-  return true;
-}
-function getPrefixoGlobal(){
-  const data = carregarPrefixos();
-  return data.global || "!";
-}
-// Inicializa PREFIXO global salvo
-try{
-  const saved = carregarPrefixos();
-  if(saved.global) CONFIG.PREFIXO = saved.global;
-}catch{}
+try { const s = fs.readJsonSync(ARQUIVO_SILENCIADOS); for (const [j, l] of Object.entries(s)) membrosSilenciados[j] = l; } catch {}
+function salvarSilenciados() { try { fs.writeJsonSync(ARQUIVO_SILENCIADOS, membrosSilenciados); } catch {} }
+function salvarNoBuffer(jid, d) { if (!bufferMsgs[jid]) bufferMsgs[jid] = []; bufferMsgs[jid].push(d); if (bufferMsgs[jid].length > MAX_BUFFER) bufferMsgs[jid].shift(); }
 
 const TODOS_COMANDOS = new Set([
-  "menu","ajuda","sobre","setfoto","alugar","addai",
-  // NOVO MENU PRINCIPAL
-  "menup","down","menufigurinhas","brincadeiras","menucoins","alteradores","menulogos","menu18","menuadm","menudono","criador","perfil","donos",
-  // DOWNLOADS
+  "menu","ajuda","sobre",
   "play","mp3","mp4","mp4hd","foto","doc","sticker","mostre",
   "sf","qr","vz","ver","id",
   "tiktok","instagram","twitter","spotify","soundcloud","pinterest","mediafire","apk",
-  // IA AUDIO FOTO
   "transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","busca","shazam",
   "fotocopia","fotoparaia","resumirfoto","traduzirfoto",
-  // ARQUIVOS
   "apagadas","arquivo","arqadd","arqdelete","decrypt",
-  // IA TEXTO
   "ia","resumir","traduzir","piada","conselho","poema","historia",
-  // UTIL
   "calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono",
-  // JOGOS
   "quiz","completar","vof","caca","guerra","rank","toprank","perfil","stop",
-  // ADM
   "all","att","link","sorteio","verifica","banir","silenciar","dessilenciar","silenciados",
   "addadmin","removeadmin","fechar","abrir","bot","anti-link","vozbot",
   "bloq","desbloq","aviso","apagar","denunciar","out","add","prefixo","prefixos",
   "ergue-se","set","nomegrupo","descgrupo","fotogrupo",
-  "chaton","sms","gsms","scanlink","editar","placar","tourl",
-  // NOVOS RENDER + CANAL
-  "setcanal","setchannel","canal","channel","render","uptime","mongodb"
+  "chaton","sms","gsms","scanlink",
+  "editar","placar","tourl",
 ]);
 
-const VOF_BANCO=[{p:"O sol é uma estrela.",r:"verdadeiro"},{p:"A baleia é um peixe.",r:"falso"},{p:"O coração tem 4 câmaras.",r:"verdadeiro"},{p:"Angola tem 18 províncias.",r:"verdadeiro"},{p:"A água ferve a 50°C.",r:"falso"},{p:"O elefante é o maior animal terrestre.",r:"verdadeiro"},{p:"A Lua tem atmosfera.",r:"falso"},{p:"O tubarão é um mamífero.",r:"falso"},{p:"Luanda é capital de Angola.",r:"verdadeiro"},{p:"O diamante é o mineral mais duro.",r:"verdadeiro"}];
-const QUIZ_BANCO=[{p:"Capital de Angola?",r:"luanda"},{p:"Maior planeta do sistema solar?",r:"jupiter"},{p:"Moeda de Angola?",r:"kwanza"},{p:"Quem pintou a Mona Lisa?",r:"leonardo da vinci"},{p:"Quantos continentes existem?",r:"7"},{p:"Maior oceano do mundo?",r:"pacifico"},{p:"Capital do Brasil?",r:"brasilia"},{p:"País mais populoso do mundo?",r:"china"},{p:"Quantos lados tem um hexágono?",r:"6"},{p:"Menor país do mundo?",r:"vaticano"},{p:"Em que ano Angola se tornou independente?",r:"1975"},{p:"Quantos ossos tem o corpo humano adulto?",r:"206"},{p:"Capital de Portugal?",r:"lisboa"},{p:"Maior deserto do mundo?",r:"saara"},{p:"Quantos planetas tem o sistema solar?",r:"8"},{p:"Animal mais rápido do mundo?",r:"guepardo"}];
-const COMPLETAR_BANCO=[{i:"ANG_LA",c:"angola",d:"País da África Austral"},{i:"LU_NDA",c:"luanda",d:"Capital de Angola"},{i:"FU_BOL",c:"futebol",d:"Desporto popular"},{i:"KW_NZA",c:"kwanza",d:"Moeda de Angola"},{i:"BR_SIL",c:"brasil",d:"Maior país da América do Sul"},{i:"AFR_CA",c:"africa",d:"Continente"},{i:"D_ANTE",c:"diamante",d:"Pedra preciosa"},{i:"EL_FAN_E",c:"elefante",d:"Maior animal terrestre"}];
-const CACA_BANCO=[{palavra:"ANGOLA",dica:"País da África Austral"},{palavra:"LUANDA",dica:"Capital de Angola"},{palavra:"FUTEBOL",dica:"Desporto popular"},{palavra:"AFRICA",dica:"Continente"},{palavra:"KWANZA",dica:"Moeda de Angola"},{palavra:"BRASIL",dica:"América do Sul"},{palavra:"DIAMANTE",dica:"Pedra preciosa"},{palavra:"ELEFANTE",dica:"Maior animal terrestre"},{palavra:"OCEANO",dica:"Grande massa de água"},{palavra:"PYTHON",dica:"Linguagem de programação"}];
-const GUERRA_BANCO=[{palavra:"ANGOLA",dica:"País da África Austral"},{palavra:"LUANDA",dica:"Capital de Angola"},{palavra:"AFRICA",dica:"Continente"},{palavra:"FUTEBOL",dica:"Desporto favorito"},{palavra:"DIAMANTE",dica:"Pedra preciosa"},{palavra:"ELEFANTE",dica:"Maior animal terrestre"},{palavra:"MUSICA",dica:"Arte dos sons"},{palavra:"ESTRELA",dica:"Corpo celeste"},{palavra:"OCEANO",dica:"Grande massa de água"},{palavra:"BANANA",dica:"Fruta tropical"}];
-const PERFIS_ELOGIO=["🌟 Um ser extraordinário! Líder nato, coração de ouro!","👑 O verdadeiro rei! Inteligente, divertido!","🔥 Pura energia! Um talento raro!","💎 Raro como diamante! Leal e honesto!","🚀 Destinado ao sucesso! Mente brilhante!"];
-const PERFIS_ZOADA=["😂 Deus criou esta pessoa e perguntou: 'O que fiz?!' 💀","🤣 A face assusta os espelhos! 💀","😭 Esta pessoa chegou e o WiFi ficou lento! 🚶🏿‍♂️","💀 Antes da câmara frontal! 📸😂","🤡 Acorda às 6h, olha pro espelho e volta a dormir! 😂"];
-const LINK_RX=/(https?:\/\/|www\.|chat\.whatsapp\.com|t\.me\/|bit\.ly|youtu\.be|youtube\.com|facebook\.com|instagram\.com|tiktok\.com|wa\.me)/i;
-const STATUS_MENCAO_RX=/status\s*@|'s status|was mentioned/i;
+const VOF_BANCO = [
+  {p:"O sol é uma estrela.",r:"verdadeiro"},{p:"A baleia é um peixe.",r:"falso"},
+  {p:"O coração tem 4 câmaras.",r:"verdadeiro"},{p:"Angola tem 18 províncias.",r:"verdadeiro"},
+  {p:"A água ferve a 50°C.",r:"falso"},{p:"O elefante é o maior animal terrestre.",r:"verdadeiro"},
+  {p:"A Lua tem atmosfera.",r:"falso"},{p:"O tubarão é um mamífero.",r:"falso"},
+  {p:"Luanda é capital de Angola.",r:"verdadeiro"},{p:"O diamante é o mineral mais duro.",r:"verdadeiro"},
+  {p:"O Brasil tem mais de 200 milhões de habitantes.",r:"verdadeiro"},{p:"O ouro é um metal.",r:"verdadeiro"},
+  {p:"A África é o maior continente do mundo.",r:"falso"},{p:"O golfinho é um mamífero.",r:"verdadeiro"},
+  {p:"A Lua é maior que a Terra.",r:"falso"},{p:"O Python é uma linguagem de programação.",r:"verdadeiro"},
+  {p:"O caracol tem concha.",r:"verdadeiro"},{p:"O Rio Nilo fica na Ásia.",r:"falso"},
+];
+const QUIZ_BANCO = [
+  {p:"Capital de Angola?",r:"luanda"},{p:"Maior planeta do sistema solar?",r:"jupiter"},
+  {p:"Moeda de Angola?",r:"kwanza"},{p:"Quem pintou a Mona Lisa?",r:"leonardo da vinci"},
+  {p:"Quantos continentes existem?",r:"7"},{p:"Maior oceano do mundo?",r:"pacifico"},
+  {p:"Capital do Brasil?",r:"brasilia"},{p:"País mais populoso do mundo?",r:"china"},
+  {p:"Quantos lados tem um hexágono?",r:"6"},{p:"Menor país do mundo?",r:"vaticano"},
+  {p:"Em que ano Angola se tornou independente?",r:"1975"},{p:"Quantos ossos tem o corpo humano adulto?",r:"206"},
+  {p:"Capital de Portugal?",r:"lisboa"},{p:"Maior deserto do mundo?",r:"saara"},
+  {p:"Quantos planetas tem o sistema solar?",r:"8"},{p:"Animal mais rápido do mundo?",r:"guepardo"},
+];
+const COMPLETAR_BANCO = [
+  {i:"ANG_LA",c:"angola",d:"País da África Austral"},{i:"LU_NDA",c:"luanda",d:"Capital de Angola"},
+  {i:"FU_BOL",c:"futebol",d:"Desporto popular"},{i:"KW_NZA",c:"kwanza",d:"Moeda de Angola"},
+  {i:"BR_SIL",c:"brasil",d:"Maior país da América do Sul"},{i:"AFR_CA",c:"africa",d:"Continente"},
+  {i:"D_ANTE",c:"diamante",d:"Pedra preciosa"},{i:"EL_FAN_E",c:"elefante",d:"Maior animal terrestre"},
+];
+const CACA_BANCO = [
+  {palavra:"ANGOLA",dica:"País da África Austral"},{palavra:"LUANDA",dica:"Capital de Angola"},
+  {palavra:"FUTEBOL",dica:"Desporto popular"},{palavra:"AFRICA",dica:"Continente"},
+  {palavra:"KWANZA",dica:"Moeda de Angola"},{palavra:"BRASIL",dica:"América do Sul"},
+  {palavra:"DIAMANTE",dica:"Pedra preciosa"},{palavra:"ELEFANTE",dica:"Maior animal terrestre"},
+  {palavra:"OCEANO",dica:"Grande massa de água"},{palavra:"PYTHON",dica:"Linguagem de programação"},
+];
+const GUERRA_BANCO = [
+  {palavra:"ANGOLA",dica:"País da África Austral"},{palavra:"LUANDA",dica:"Capital de Angola"},
+  {palavra:"AFRICA",dica:"Continente"},{palavra:"FUTEBOL",dica:"Desporto favorito"},
+  {palavra:"DIAMANTE",dica:"Pedra preciosa"},{palavra:"ELEFANTE",dica:"Maior animal terrestre"},
+  {palavra:"MUSICA",dica:"Arte dos sons"},{palavra:"ESTRELA",dica:"Corpo celeste"},
+  {palavra:"OCEANO",dica:"Grande massa de água"},{palavra:"BANANA",dica:"Fruta tropical"},
+];
 
-function getTexto(msg){const m=msg?.message; if(!m) return ""; return m.conversation||m.extendedTextMessage?.text||m.imageMessage?.caption||m.videoMessage?.caption||m.documentMessage?.caption||"";}
-function salvarStats(cmd,sender){try{const s=fs.readJsonSync(ARQUIVO_STATS); s.total=(s.total||0)+1; s.comandos[cmd]=(s.comandos[cmd]||0)+1; s.usuarios[String(sender).split("@")[0]]=(s.usuarios[String(sender).split("@")[0]]||0)+1; fs.writeJsonSync(ARQUIVO_STATS,s);}catch{}}
-function addXP(sender,xp=2){try{const r=fs.readJsonSync(ARQUIVO_RANK); const n=String(sender).split("@")[0]; if(!r[n]) r[n]={xp:0,nivel:1,msgs:0}; r[n].xp+=xp; r[n].msgs+=1; r[n].nivel=Math.floor(r[n].xp/100)+1; fs.writeJsonSync(ARQUIVO_RANK,r);}catch{}}
-function registarAtividade(sender,jid){try{const a=fs.readJsonSync(ARQUIVO_ATIVOS); if(!a[jid]) a[jid]={}; a[jid][String(sender)]=Date.now(); fs.writeJsonSync(ARQUIVO_ATIVOS,a);}catch{}}
-function calcularSeguro(expr){const safe=expr.replace(/[^0-9+\-*/().%\s]/g,"").trim(); if(!safe) throw new Error("Inválida"); return Function(`"use strict"; return (${safe})`)();}
-function gerarGrade(palavra){const tam=8,letras="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; const grade=Array(tam).fill(null).map(()=>Array(tam).fill(null).map(()=>letras[Math.floor(Math.random()*26)])); const linha=Math.floor(Math.random()*tam),col=Math.floor(Math.random()*(tam-palavra.length)); for(let i=0;i<palavra.length;i++) grade[linha][col+i]=palavra[i]; return grade.map(r=>r.join(" ")).join("\n");}
-function mostrarGuerraEstado(jogo){const vidas=["❤️❤️❤️❤️❤️❤️","🧡❤️❤️❤️❤️❤️","🧡🧡❤️❤️❤️❤️","🧡🧡🧡❤️❤️❤️","🧡🧡🧡🧡❤️❤️","🧡🧡🧡🧡🧡❤️","💀💀💀💀💀💀"]; const pM=jogo.palavra.split("").map(l=>jogo.letrasAcertadas.includes(l)?l:"_").join(" "); const eS=jogo.letrasErradas.length>0?jogo.letrasErradas.join(", "):"Nenhuma"; return `⚔️ *GUERRA*\n✦ ─────────── ✦\n🔤 *${pM}*\n💡 _${jogo.dica}_\n\n${vidas[Math.min(jogo.letrasErradas.length,6)]}\n❌ Erradas: *${eS}*\n\n_Digita uma letra!_`;}
-function selecionarSemRepetir(banco,usadas){const disp=banco.filter(item=>{const id=item.p||item.palavra||item.c||item.i; return !usadas.includes(id);}); if(!disp.length) return null; return disp[Math.floor(Math.random()*disp.length)];}
-function ehMencaoStatus(msg,texto){if(msg.message?.statusMentionMessage) return true; if(texto&&STATUS_MENCAO_RX.test(texto)) return true; const ctx=msg.message?.extendedTextMessage?.contextInfo; if(ctx?.remoteJid?.includes("status@broadcast")) return true; if(ctx?.participant?.includes("status@broadcast")) return true; return false;}
+const PERFIS_ELOGIO = ["🌟 Um ser extraordinário! Líder nato, coração de ouro!","👑 O verdadeiro rei! Inteligente, divertido!","🔥 Pura energia! Um talento raro!","💎 Raro como diamante! Leal e honesto!","🚀 Destinado ao sucesso! Mente brilhante!"];
+const PERFIS_ZOADA  = ["😂 Deus criou esta pessoa e perguntou: 'O que fiz?!' 💀","🤣 A face assusta os espelhos! Quando some ninguém repara! 💀","😭 Esta pessoa chegou e o WiFi ficou lento! Coincidência? NÃO! 🚶🏿‍♂️","💀 Dizem que já foi bonita... antes da câmara frontal! 📸😂","🤡 Acorda às 6h, olha pro espelho e volta a dormir com medo! 😂"];
+const LINK_RX = /(https?:\/\/|www\.|chat\.whatsapp\.com|t\.me\/|bit\.ly|youtu\.be|youtube\.com|facebook\.com|instagram\.com|tiktok\.com|wa\.me)/i;
+const STATUS_MENCAO_RX = /status\s*@|'s status|was mentioned/i;
 
-// ✅ Envia mensagem com foto personalizada ou foto de perfil
-async function enviarComFoto(sock,jid,texto,ppUrl,q=null){
-  try{
-    if(botFotoBuffer){ await sock.sendMessage(jid,{image:botFotoBuffer,caption:texto},q?{quoted:q}:{}); }
-    else if(ppUrl){ await sock.sendMessage(jid,{image:{url:ppUrl},caption:texto},q?{quoted:q}:{}); }
-    else{ await sock.sendMessage(jid,{text:texto},q?{quoted:q}:{}); }
-  }catch{ try{await sock.sendMessage(jid,{text:texto},q?{quoted:q}:{});}catch{} }
+function getTexto(msg) { const m = msg?.message; if (!m) return ""; return m.conversation || m.extendedTextMessage?.text || m.imageMessage?.caption || m.videoMessage?.caption || m.documentMessage?.caption || ""; }
+function salvarStats(cmd, sender) { try { const s = fs.readJsonSync(ARQUIVO_STATS); s.total=(s.total||0)+1; s.comandos[cmd]=(s.comandos[cmd]||0)+1; s.usuarios[String(sender).split("@")[0]]=(s.usuarios[String(sender).split("@")[0]]||0)+1; fs.writeJsonSync(ARQUIVO_STATS,s); } catch {} }
+function addXP(sender, xp=2) { try { const r=fs.readJsonSync(ARQUIVO_RANK); const n=String(sender).split("@")[0]; if(!r[n]) r[n]={xp:0,nivel:1,msgs:0}; r[n].xp+=xp; r[n].msgs+=1; r[n].nivel=Math.floor(r[n].xp/100)+1; fs.writeJsonSync(ARQUIVO_RANK,r); } catch {} }
+function registarAtividade(sender, jid) { try { const a=fs.readJsonSync(ARQUIVO_ATIVOS); if(!a[jid]) a[jid]={}; a[jid][String(sender)]=Date.now(); fs.writeJsonSync(ARQUIVO_ATIVOS,a); } catch {} }
+function calcularSeguro(expr) { const safe=expr.replace(/[^0-9+\-*/().%\s]/g,"").trim(); if(!safe) throw new Error("Inválida"); return Function(`"use strict"; return (${safe})`)(); }
+function gerarGrade(palavra) { const tam=8,letras="ABCDEFGHIJKLMNOPQRSTUVWXYZ"; const grade=Array(tam).fill(null).map(()=>Array(tam).fill(null).map(()=>letras[Math.floor(Math.random()*26)])); const linha=Math.floor(Math.random()*tam),col=Math.floor(Math.random()*(tam-palavra.length)); for(let i=0;i<palavra.length;i++) grade[linha][col+i]=palavra[i]; return grade.map(r=>r.join(" ")).join("\n"); }
+function mostrarGuerraEstado(jogo) { const vidas=["❤️❤️❤️❤️❤️❤️","🧡❤️❤️❤️❤️❤️","🧡🧡❤️❤️❤️❤️","🧡🧡🧡❤️❤️❤️","🧡🧡🧡🧡❤️❤️","🧡🧡🧡🧡🧡❤️","💀💀💀💀💀💀"]; const pM=jogo.palavra.split("").map(l=>jogo.letrasAcertadas.includes(l)?l:"_").join(" "); const eS=jogo.letrasErradas.length>0?jogo.letrasErradas.join(", "):"Nenhuma"; return `⚔️ *GUERRA*\n✦ ─────────── ✦\n🔤 *${pM}*\n💡 _${jogo.dica}_\n\n${vidas[Math.min(jogo.letrasErradas.length,6)]}\n❌ Erradas: *${eS}*\n\n_Digita uma letra!_`; }
+function selecionarSemRepetir(banco, usadas) { const disp=banco.filter(item=>{const id=item.p||item.palavra||item.c||item.i; return !usadas.includes(id);}); if(!disp.length) return null; return disp[Math.floor(Math.random()*disp.length)]; }
+
+function ehMencaoStatus(msg, texto) {
+  if (msg.message?.statusMentionMessage) return true;
+  if (texto && STATUS_MENCAO_RX.test(texto)) return true;
+  const ctx = msg.message?.extendedTextMessage?.contextInfo;
+  if (ctx?.remoteJid?.includes("status@broadcast")) return true;
+  if (ctx?.participant?.includes("status@broadcast")) return true;
+  return false;
 }
-async function enviarSemFoto(sock,jid,texto,q=null){try{await sock.sendMessage(jid,{text:texto},q?{quoted:q}:{});}catch{}}
-async function reagir(sock,msg,emoji="⏳"){try{await sock.sendMessage(msg.key.remoteJid,{react:{text:emoji,key:msg.key}});}catch{}}
 
-// ═══════════════════════════════════════════════════════
-//  ✅ MENU PRINCIPAL — ButtonV2 (sem duplicar)
-// ═══════════════════════════════════════════════════════
+async function enviarComFoto(sock,jid,texto,ppUrl,q=null) { try { if(ppUrl) await sock.sendMessage(jid,{image:{url:ppUrl},caption:texto},q?{quoted:q}:{}); else await sock.sendMessage(jid,{text:texto},q?{quoted:q}:{}); } catch { try { await sock.sendMessage(jid,{text:texto}); } catch {} } }
+async function enviarSemFoto(sock,jid,texto,q=null) { try { await sock.sendMessage(jid,{text:texto},q?{quoted:q}:{}); } catch {} }
+async function reagir(sock,msg,emoji="⏳") { try { await sock.sendMessage(msg.key.remoteJid,{react:{text:emoji,key:msg.key}}); } catch {} }
 
-async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin){
-  const P=CONFIG.PREFIXO;
-  const agora=new Date();
-  const hora=agora.toLocaleTimeString("pt-AO",{timeZone:"Africa/Luanda",hour:"2-digit",minute:"2-digit",second:"2-digit"});
-  const pushname = msg.pushName || sender.split("@")[0].split(":")[0];
-  const nomeUser = sender.split("@")[0].split(":")[0];
-  const cargo=isDono?"Criador.":(isAdmin?"Administrador.":"Utilizador.");
-  const isChVip = isDono ? "Sᴜᴘᴇʀ Vɪᴘ 👑" : "Usuário Comum";
-  const isCargo = cargo;
-  const bt=chatsDesativados.has(jid)?"🔴":"🟢";
-  const al=antiLinkDesativado.has(jid)?"⚠️":"🔒";
-  const vz=vozBotDesativado.has(jid)?"🔇":"🎙️";
-  const prefix = P;
-  const from = jid;
+// ══════════════════════════════════════════════════════════
+//   ✅ SISTEMA DE MENU INTERATIVO (Lista estilo Imagem 2/3)
+// ══════════════════════════════════════════════════════════
 
-  try { await reagir(sock,msg,"💣"); } catch {}
+async function enviarMenuPrincipal(sock, jid, msg, isDono) {
+  const P = CONFIG.PREFIXO;
+  const bt = chatsDesativados.has(jid)?"🔴":"🟢";
+  const al = antiLinkDesativado.has(jid)?"⚠️":"🔒";
+  const vz = vozBotDesativado.has(jid)?"🔇":"🎙️";
 
-  // ===== NOVO MENU CAROUSEL ESTILO HITADORI ADAPTADO PARA L1TTL3B0Y =====
+  const categorias = [
+    { title: "🎵  MÚSICA & VÍDEO",    rowId: "cat_musica",  description: "play, mp3, mp4, mp4hd, sticker, voz..." },
+    { title: "📱  REDES SOCIAIS",      rowId: "cat_social",  description: "TikTok, Insta, Twitter, Spotify..." },
+    { title: "🧠  INTELIGÊNCIA IA",   rowId: "cat_ia",      description: "IA, traduzir, analisar imagens..." },
+    { title: "🎮  JOGOS",             rowId: "cat_jogos",   description: "Quiz, Forca, V/F, Caça-palavras..." },
+    { title: "🔢  UTILIDADES",        rowId: "cat_util",    description: "QR, Calc, Placar, Tempo, Link..." },
+    { title: "🕵️  EXTRAS",            rowId: "cat_extra",   description: "Editor IA, View-Once, Denúncia..." },
+    { title: "📁  ARQUIVOS & VPN",    rowId: "cat_arq",     description: "Ficheiros .ehi .ovpn, Decrypt..." },
+    { title: "🛡️  ADMINISTRAÇÃO",     rowId: "cat_adm",     description: "Ban, Silenciar, Fechar, ScanLink..." },
+  ];
+
+  if (isDono) {
+    categorias.push({ title: "🏘️  GESTÃO DE GRUPOS", rowId: "cat_grup", description: "ChaTon, SMS, GSMS (DONO)" });
+    categorias.push({ title: "👑  ÁREA DO DONO",      rowId: "cat_dono", description: "Ergue-se, Senha, Prefixo..." });
+  }
+
   try {
-    const caminhoVideo = "./configs/LOGOS/fotomenu.mp4";
-    const caminhoImagem = "./configs/LOGOS/fotomenu.png";
-    let mediaMenu;
-    let hasMedia = false;
-
-    try {
-      if (fs.existsSync(caminhoVideo)) {
-        mediaMenu = await prepareWAMessageMedia({
-          video: { url: caminhoVideo },
-          mimetype: "video/mp4",
-          gifPlayback: true,
-          seconds: 8
-        }, { upload: sock.waUploadToServer });
-        hasMedia = true;
-      } else if (fs.existsSync(caminhoImagem)) {
-        mediaMenu = await prepareWAMessageMedia(
-          { image: { url: caminhoImagem } },
-          { upload: sock.waUploadToServer }
-        );
-        hasMedia = true;
-      } else if (botFotoBuffer) {
-        // usa foto personalizada do bot como fallback
-        const tempPath = "./configs/LOGOS/temp_menu.jpg";
-        fs.writeFileSync(tempPath, botFotoBuffer);
-        mediaMenu = await prepareWAMessageMedia(
-          { image: { url: tempPath } },
-          { upload: sock.waUploadToServer }
-        );
-        hasMedia = true;
-        try { fs.removeSync(tempPath); } catch {}
-      } else if (ppBotUrl) {
-        mediaMenu = await prepareWAMessageMedia(
-          { image: { url: ppBotUrl } },
-          { upload: sock.waUploadToServer }
-        );
-        hasMedia = true;
+    await sock.sendMessage(jid, {
+      listMessage: {
+        title: `🤖 *LORDE LÁ DJUM v3.5* 🤴🏽\n👑 *ISAÍAS PEDRO*`,
+        description: `📁 Escolhe uma categoria:\n\n${bt}=BOT  ${al}=LINK  ${vz}=VOZ\n✦ PREFIXO: *${P}* ✦`,
+        footerText: `© LORDE LÁ DJUM v3.5`,
+        buttonText: `📋 Ver Categorias`,
+        listType: 1,
+        sections: [{ title: "📂  CATEGORIAS", rows: categorias }]
       }
-    } catch (e) {
-      console.log("⚠️ Erro media menu:", e.message);
-      hasMedia = false;
-    }
+    }, { quoted: msg });
+  } catch {
+    // Fallback texto simples se lista não for suportada
+    await enviarComFoto(sock, jid,
+`🤖 *LORDE LÁ DJUM v3.5* 🤴🏽
+👑 *ISAÍAS PEDRO*
+══════════════════
 
-    const canalLink = await obterChannelLink();
-
-    const listaMenus = {
-      title: "🌀 ᴍᴇɴᴜ L1TTL3B0Y",
-      sections: [
-        {
-          title: "ᴍᴇɴᴜs ᴅɪᴠᴇʀsᴏs ",
-          highlight_label: "L1TTL3B0Y|ᴅᴇᴠ",
-          rows: [
-            { header: "🌀⃞ ᴍᴇɴᴜ-ᴘʀɪɴᴄɪᴘᴀʟ ", title: "_comandos principais e básicos._", id: prefix + "menu" },
-            { header: "🌀⃞ ᴍᴇɴᴜ-ᴅᴏᴡɴʟᴏᴀᴅs ", title: "_comandos de download e upload._", id: prefix + "musica" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- ia", title: "_comandos de IA._", id: prefix + "ia" },
-            { header: "🌀⃞ ᴍᴇɴᴜ-ʙʀɪɴᴄᴀᴅᴇɪʀᴀs", title: "_diversão e jogos para grupo._", id: prefix + "jogos" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- social", title: "_comandos para Redes Sociais._", id: prefix + "social" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- utilidades ", title: "_menu utilidades._", id: prefix + "util" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- extra ", title: "_comandos de Extras de Grupo._", id: prefix + "extra" },
-            { header: "🌀⃞ ᴍᴇɴᴜ- arquivos ", title: "_comandos para Arquivos._", id: prefix + "arq" },
-            { header: "🌀⃞ ᴍᴇɴᴜ-ᴀᴅᴍ", title: "_comandos para ADM de grupo._", id: prefix + "menuadm" },
-            { header: "🌀⃞ ᴍᴇɴᴜ-ᴅᴏɴᴏ", title: "_apenas dono_", id: prefix + "dono" }
-          ]
-        },
-        {
-          title: "ғᴜɴᴄ̧ᴏᴇs ᴇxᴛʀᴀs ",
-          highlight_label: "L1TTL3B0Y|ᴅᴇᴠ",
-          rows: [
-            { header: "🌀 menu grupo", title: "_Comandos para Grupo_", id: prefix + "grup" },
-            { header: "🌀 ᴘᴇʀғɪʟ", title: "_dados do usuário_", id: prefix + "perfil" },
-            { header: "🌀 ᴘɪɴɢ", title: "_info do bot_", id: prefix + "ping" },
-            { header: "🌀 horario", title: "_Hora Mundial_", id: prefix + "horario" },
-            { header: "🌀 ᴀʟᴜɢᴀʀ ʙᴏᴛ", title: "_planos de aluguel_", id: prefix + "alugar" }
-          ]
-        }
-      ]
-    };
-
-    const botoes = [{
-      name: "single_select",
-      buttonParamsJson: JSON.stringify(listaMenus)
-    }, {
-      name: "cta_url",
-      buttonParamsJson: JSON.stringify({
-        display_text: "📢 ᴄᴀɴᴀʟ",
-        url: canalLink,
-        merchant_url: canalLink
-      })
-    }];
-
-    const corpoNovo = `╭─☆·˖✶˖·✦·˖✶˖·☆─╮
-│  🌀 *L1TTL3B0Y•LÁ DJUM* 🌀
-╰─☆·˖✶˖·✦·˖✶˖·☆─╯
-
-║𝚄𝚂𝚄Á𝚁𝙸𝙾: ${pushname}
-║𝙲𝙰𝚁𝙶𝙾: ${isCargo}
-║𝚅𝙸𝙿: ${isChVip}
-║⌨️ ᴘʀᴇғɪxᴏ: ${P}
-║${bt} ʙᴏᴛ | ${al} ʟɪɴᴋ | ${vz} ᴠᴏᴢ
-║🕐 ʜᴏʀᴀ: ${hora}
-
-*L1ttl3bot aos Seus Serviços.*
-*Todos comandos prontos e feito para você!*
-
-👑 *Criador:* ${CONFIG.DONO_NOME}
-📞 *Contato:* ${CONFIG.DONO_NUM}`;
-
-    let headerObj = {};
-    let headerType = "IMAGE";
-    if (hasMedia && mediaMenu) {
-      if (mediaMenu.videoMessage) {
-        headerObj = { videoMessage: mediaMenu.videoMessage };
-        headerType = "VIDEO";
-      } else if (mediaMenu.imageMessage) {
-        headerObj = { imageMessage: mediaMenu.imageMessage };
-        headerType = "IMAGE";
-      }
-    }
-
-    const carouselMessage = {
-      cards: [{
-        header: hasMedia ? {
-          hasMediaAttachment: true,
-          ...headerObj
-        } : undefined,
-        headerType: hasMedia ? headerType : undefined,
-        body: { text: corpoNovo },
-        footer: { text: "🌀 L1TTL3B0Y-BOT •" },
-        nativeFlowMessage: { buttons: botoes }
-      }]
-    };
-
-    const msgContent = {
-      interactiveMessage: {
-        contextInfo: {
-          participant: sender,
-          quotedMessage: { conversation: "░⃟⃛🌀 ᴍᴇɴᴜ L1TTL3B0Y 🌀" }
-        },
-        body: { text: "*ᴍᴇɴᴜ ᴘʀɪɴᴄɪᴘᴀʟ*" },
-        carouselMessage: hasMedia ? carouselMessage : undefined,
-        ...(hasMedia ? {} : {
-          body: { text: corpoNovo },
-          footer: { text: "🌀 L1TTL3B0Y" },
-          nativeFlowMessage: { buttons: botoes }
-        })
-      }
-    };
-
-    // Se tem mídia, usa carousel completo
-    if (hasMedia) {
-      const msgW = generateWAMessageFromContent(from, msgContent, {});
-      await sock.relayMessage(from, msgW.message, { messageId: msgW.key.id });
-      return;
-    } else {
-      // Sem mídia, tenta enviar mesmo assim com botões
-      const msgW = generateWAMessageFromContent(from, {
-        interactiveMessage: {
-          contextInfo: {
-            participant: sender,
-            quotedMessage: { conversation: "🌀 ᴍᴇɴᴜ" }
-          },
-          body: { text: corpoNovo },
-          footer: { text: "🌀 L1TTL3B0Y • RENDER" },
-          nativeFlowMessage: { buttons: botoes }
-        }
-      }, {});
-      await sock.relayMessage(from, msgW.message, { messageId: msgW.key.id });
-      return;
-    }
-
-  } catch (error) {
-    console.error("❌ Erro menu carousel:", error.message);
-    // Fallback para método antigo
+🎵 *${P}menu musica*
+📱 *${P}menu social*
+🧠 *${P}menu ia*
+🎮 *${P}menu jogos*
+══════════════════
+🔢 *${P}menu util*
+🕵️ *${P}menu extra*
+📁 *${P}menu arq*
+══════════════════
+🛡️ *${P}menu adm*
+🏘️ *${P}menu grup*
+👑 *${P}menu dono*
+══════════════════
+${bt}=BOT ${al}=LINK ${vz}=VOZ
+✦ PREFIXO: *${P}* ✦`, ppBotUrl);
   }
-
-  // ===== FALLBACK: ButtonV2 + Categorias Numeradas (original) =====
-  const corpoFallback = `┌─☆·˖✶˖·✦·˖✶˖·☆─┐
-｜  🌀 *LORDE LÁ DJUM* 🌀
-└─☆·˖✶˖·✦·˖✶˖·☆─┘
-
-｜✦ 🌀 BOT: *LORDE-DJUM v3.5 RENDER*
-｜✦ 👤 USUÁRIO: *${nomeUser}*
-｜✦ 🎖️ CARGO: *${isDono?"Criador.":(isAdmin?"Administrador.":"Utilizador.")}*
-｜✦ ⌨️ PREFIXO: *${P}*
-｜✦ ${bt} BOT | ${al} LINK | ${vz} VOZ
-｜✦ 🕐 HORA: *${hora}*
-｜✦ 🍃 MONGO: *${mongoConectado?"✅":"❌"}*
-｜✦ 📢 CANAL: _configurável via ${P}setcanal_`;
-
-  if(ButtonV2){
-    try{
-      const bv2=new ButtonV2(sock);
-      bv2.setTitle("🌀 L1TTL3B0Y RENDER v3.5");
-      bv2.setBody(corpoFallback);
-      bv2.setFooter("© LORDE LÁ DJUM • RENDER FREE 24/7");
-      if(ppBotUrl) bv2.setThumbnail(ppBotUrl);
-      bv2.addButton("💎 MENU 💎","btn_abrir_menu");
-      bv2.addButton(`👑 ${CONFIG.DONO_NOME}`,"btn_dono_info");
-      await Promise.race([
-        bv2.send(jid,{quoted:msg}),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000))
-      ]);
-      return;
-    }catch(e){console.log("⚠️ ButtonV2 menu fallback:",e.message);}
-  }
-
-  try{
-    if(botFotoBuffer) await sock.sendMessage(jid,{image:botFotoBuffer,caption:corpoFallback},{quoted:msg});
-    else if(ppBotUrl) await sock.sendMessage(jid,{image:{url:ppBotUrl},caption:corpoFallback},{quoted:msg});
-    else await sock.sendMessage(jid,{text:corpoFallback},{quoted:msg});
-  }catch{ try{await sock.sendMessage(jid,{text:corpoFallback},{quoted:msg});}catch{} }
-  await new Promise(r=>setTimeout(r,600));
-  await enviarMenuNumerado(sock,jid,sender,isDono);
 }
 
-async function enviarMenuNumerado(sock,jid,sender,isDono){
-  const P=CONFIG.PREFIXO;
-  const menu=
-`┌─⊱ 『 📂 CATEGORIAS 』 ⊰─┐
-│
-◎ ─ *1* → 🎵 Música & Vídeo
-◎ ─ *2* → 📱 Redes Sociais
-◎ ─ *3* → 🧠 Inteligência IA
-◎ ─ *4* → 🎮 Jogos
-◎ ─ *5* → 🔢 Utilidades
-◎ ─ *6* → 🕵️ Extras
-◎ ─ *7* → 📁 Arquivos & VPN
-◎ ─ *8* → 🛡️ Administração${isDono?`
-◎ ─ *9* → 🏘️ Gestão de Grupos
-◎ ─ *0* → 👑 Área do Dono`:""}
-│
-◎ ─ _Digita o número para abrir_
-│
-└──────────────────────────────⊰`;
-  await sock.sendMessage(jid,{text:menu});
-  menuEsperandoResposta.set(`${jid}_${sender}`,{isDono,timestamp:Date.now()});
-  setTimeout(()=>menuEsperandoResposta.delete(`${jid}_${sender}`),120000);
-}
+// ══════════════════════════════════════════════════════════
+//   ✅ SUBMENUS ESTILIZADOS (estilo Imagem 1)
+// ══════════════════════════════════════════════════════════
 
-async function enviarCategoriasBotoes(sock,jid,msg,isDono){
-  if(ButtonV2){
-    try{
-      const bv1=new ButtonV2(sock);
-      bv1.setTitle("📂 CATEGORIAS");
-      bv1.setBody("Escolhe uma categoria:");
-      bv1.setFooter("© LORDE LÁ DJUM v3.5");
-      if(ppBotUrl) bv1.setThumbnail(ppBotUrl);
-      bv1.addButton("🎵 Música & Vídeo","cat_musica");
-      bv1.addButton("📱 Redes Sociais","cat_social");
-      bv1.addButton("🧠 Inteligência IA","cat_ia");
-      bv1.addButton("🎮 Jogos","cat_jogos");
-      bv1.addButton("🔢 Utilidades","cat_util");
-      await Promise.race([bv1.send(jid,{quoted:msg}),new Promise((_,rej)=>setTimeout(()=>rej(new Error("t")),8000))]);
-      await new Promise(r=>setTimeout(r,600));
-      const bv2=new ButtonV2(sock);
-      bv2.setTitle("📂 MAIS CATEGORIAS");
-      bv2.setBody("Continua:");
-      bv2.setFooter("© LORDE LÁ DJUM v3.5");
-      bv2.addButton("🕵️ Extras","cat_extra");
-      bv2.addButton("📁 Arquivos & VPN","cat_arq");
-      bv2.addButton("🛡️ Administração","cat_adm");
-      if(isDono){bv2.addButton("🏘️ Gestão Grupos","cat_grup"); bv2.addButton("👑 Área do Dono","cat_dono");}
-      await Promise.race([bv2.send(jid,{quoted:msg}),new Promise((_,rej)=>setTimeout(()=>rej(new Error("t")),8000))]);
-      return;
-    }catch(e){console.log("⚠️ categorias ButtonV2:",e.message);}
-  }
-  const sender=extrairJid(msg.key.participant||msg.key.remoteJid);
-  await enviarMenuNumerado(sock,jid,sender,isDono);
-}
+function gerarSubmenu(categoria, P) {
+  const DIV = "✦ ─────────────────── ✦";
 
-// ✅ Botões de seleção de formato para !play
-async function enviarPlayBotoes(sock,jid,msg,entrada,info){
-  const titulo=info?.titulo||entrada.slice(0,40);
-  if(ButtonV2){
-    try{
-      const bv=new ButtonV2(sock);
-      bv.setTitle("🎵 SELECCIONA O FORMATO");
-      bv.setBody(`🎵 *${titulo}*\n\nEscolhe o formato que preferes:`);
-      bv.setFooter("© LORDE LÁ DJUM v3.5");
-      if(info?.thumb) bv.setThumbnail(info.thumb);
-      bv.addButton("🎵 ÁUDIO (MP3)","play_audio");
-      bv.addButton("🎬 VÍDEO 480p","play_video");
-      bv.addButton("📹 VÍDEO HD 720p","play_hd");
-      await Promise.race([bv.send(jid,{quoted:msg}),new Promise((_,rej)=>setTimeout(()=>rej(new Error("t")),8000))]);
-      return;
-    }catch(e){console.log("⚠️ play botões:",e.message);}
-  }
-  // Fallback texto
-  await sock.sendMessage(jid,{text:`🎵 *${titulo}*\n\nEscolhe:\n*1* → 🎵 Áudio (MP3)\n*2* → 🎬 Vídeo 480p\n*3* → 📹 Vídeo HD 720p`});
-}
-
-// ═══════════════════════════════════════════════════════
-//  ✅ SUBMENUS
-// ═══════════════════════════════════════════════════════
-
-function gerarSubmenu(catId,P){
-  if(catId==="cat_musica"||catId==="musica") return(
+  if (categoria === "cat_musica" || categoria === "musica") return (
 `┌─⊱ 『 🎵 MÚSICA & VÍDEO 』 ⊰─┐
 │
-◎ ─ *${P}play* [música/link]
-    _↳ mostra botões: Áudio / Vídeo / HD_
-│
+◎ ─ *${P}play* [música]
 ◎ ─ *${P}mp3* [música] → _HD_
 ◎ ─ *${P}mp4* [nome/link] → _480p_
 ◎ ─ *${P}mp4hd* [nome/link] → _720p_
@@ -1542,7 +295,8 @@ function gerarSubmenu(catId,P){
 │
 └──────────────────────────────⊰
 _© LORDE LÁ DJUM v3.5_`);
-  if(catId==="cat_social"||catId==="social") return(
+
+  if (categoria === "cat_social" || categoria === "social") return (
 `┌─⊱ 『 📱 REDES SOCIAIS 』 ⊰─┐
 │
 ◎ ─ *${P}tiktok* [link]
@@ -1557,7 +311,8 @@ _© LORDE LÁ DJUM v3.5_`);
 │
 └──────────────────────────────⊰
 _© LORDE LÁ DJUM v3.5_`);
-  if(catId==="cat_ia"||catId==="ia") return(
+
+  if (categoria === "cat_ia" || categoria === "ia") return (
 `┌─⊱ 『 🧠 INTELIGÊNCIA IA 』 ⊰─┐
 │
 ◎ ─ *${P}ia* [pergunta]
@@ -1572,17 +327,19 @@ _© LORDE LÁ DJUM v3.5_`);
 ◎ ─ *${P}resumiraudio*
 ◎ ─ *${P}traduziraudio* [idioma]
 ◎ ─ *${P}audioparaia*
+◎ ─ *${P}busca* → _reconhece música_
 │
 ◎ ─ *${P}fotocopia* → _lê texto foto_
 ◎ ─ *${P}fotoparaia* [pergunta]
 ◎ ─ *${P}resumirfoto*
 ◎ ─ *${P}traduzirfoto* [idioma]
 │
-◎ ─ _Diz_ *"Isaías, [pergunta]"* 🎙️
+◎ ─ _Diz_ *"Isaías, [pergunta]"_ 🎙️_
 │
 └──────────────────────────────⊰
 _© LORDE LÁ DJUM v3.5_`);
-  if(catId==="cat_jogos"||catId==="jogos") return(
+
+  if (categoria === "cat_jogos" || categoria === "jogos") return (
 `┌─⊱ 『 🎮 JOGOS EM LOOP ♾️ 』 ⊰─┐
 │
 ◎ ─ *${P}quiz* [tema]
@@ -1592,11 +349,14 @@ _© LORDE LÁ DJUM v3.5_`);
 ◎ ─ *${P}guerra* → _Forca ⚔️_
 ◎ ─ *${P}stop* → _Para o jogo 🛑_
 │
-◎ ─ *${P}rank* / *${P}toprank* / *${P}perfil*
+◎ ─ *${P}rank* → _teu ranking_
+◎ ─ *${P}toprank* → _top 10_
+◎ ─ *${P}perfil* → _perfil aleatório_
 │
 └──────────────────────────────⊰
 _© LORDE LÁ DJUM v3.5_`);
-  if(catId==="cat_util"||catId==="util") return(
+
+  if (categoria === "cat_util" || categoria === "util") return (
 `┌─⊱ 『 🔢 UTILIDADES 』 ⊰─┐
 │
 ◎ ─ *${P}qr* [texto/url]
@@ -1607,283 +367,225 @@ _© LORDE LÁ DJUM v3.5_`);
 ◎ ─ *${P}placar* [jogo] → _⚽ ao vivo_
 ◎ ─ *${P}tempo* [local]
 ◎ ─ *${P}horario* → _mundial_
-◎ ─ *${P}ping* / *${P}stats* / *${P}id*
-◎ ─ *${P}alugar* → _alugar bot_ 💰
+◎ ─ *${P}ping* → _latência_
+◎ ─ *${P}stats* → _estatísticas_
+◎ ─ *${P}regras* → _regras do grupo_
+◎ ─ *${P}id* → _teu número JID_
+◎ ─ *${P}dono* → _info do criador_
+◎ ─ *${P}sobre* → _sobre o bot_
 │
 └──────────────────────────────⊰
 _© LORDE LÁ DJUM v3.5_`);
-  if(catId==="cat_extra"||catId==="extra") return(
+
+  if (categoria === "cat_extra" || categoria === "extra") return (
 `┌─⊱ 『 🕵️ EXTRAS 』 ⊰─┐
 │
-◎ ─ *${P}shazam* → _reconhece música ⚡_
-    _↩️ responde nota de voz_
-│
-◎ ─ *${P}busca* → _reconhece música_
-    _↩️ responde nota de voz (sem animação)_
-│
 ◎ ─ *${P}editar* [instrução]
-    _↩️ responde imagem → edita IA_
+    _↩️ responde uma imagem_
+    _↳ edita com IA 🎨_
 │
-◎ ─ *${P}ver* → _desbloqueia view-once_
-◎ ─ *${P}apagadas* → _msgs apagadas_
+◎ ─ *${P}ver*
+    _↩️ responde view-once_
+    _↳ desbloqueia 📷🎥_
+│
+◎ ─ *${P}apagadas*
+    _↳ mostra msgs apagadas_
+│
 ◎ ─ *${P}denunciar* [motivo]
+    _↩️ responde mensagem_
+    _↳ denuncia aos admins_
 │
 └──────────────────────────────⊰
 _© LORDE LÁ DJUM v3.5_`);
-  if(catId==="cat_arq"||catId==="arq") return(
+
+  if (categoria === "cat_arq" || categoria === "arq") return (
 `┌─⊱ 『 📁 ARQUIVOS & VPN 』 ⊰─┐
 │
-◎ ─ *${P}arquivo* → _lista_
-◎ ─ *${P}arquivo* [nome] → _envia_
-◎ ─ *${P}arqadd* → _adiciona_
-◎ ─ *${P}arqdelete* [nome/nº]
-◎ ─ *${P}decrypt* → _analisa config_
+◎ ─ *${P}arquivo*
+    _↳ lista todos os ficheiros_
 │
-◎ ─ ✅ .ehi .npv .ovpn .conf .hia
+◎ ─ *${P}arquivo* [nome]
+    _↳ envia o ficheiro_
+│
+◎ ─ *${P}arqadd*
+    _↩️ envia ficheiro com legenda_
+    _↳ adiciona ao arquivo_
+│
+◎ ─ *${P}arqdelete* [nome/nº]
+    _↳ elimina ficheiro_
+│
+◎ ─ *${P}decrypt*
+    _↩️ responde ficheiro_
+    _↳ analisa configuração_
+│
+◎ ─ _Extensões:_ .ehi .npv .ovpn
+    .conf .hia .vless .vmess
 │
 └──────────────────────────────⊰
 _© LORDE LÁ DJUM v3.5_`);
-  if(catId==="cat_adm"||catId==="adm"||catId==="admin") return(
+
+  if (categoria === "cat_adm" || categoria === "adm" || categoria === "admin") return (
 `┌─⊱ 『 🛡️ ADMINISTRAÇÃO 』 ⊰─┐
 │
-◎ ─ *${CONFIG.PREFIXO}banir* / *${CONFIG.PREFIXO}add* [nº]
-◎ ─ *${CONFIG.PREFIXO}addadmin* / *${CONFIG.PREFIXO}removeadmin*
-◎ ─ *${CONFIG.PREFIXO}fechar* / *${CONFIG.PREFIXO}abrir*
-◎ ─ *${CONFIG.PREFIXO}silenciar* / *${CONFIG.PREFIXO}dessilenciar*
-◎ ─ *${CONFIG.PREFIXO}all* / *${CONFIG.PREFIXO}att* / *${CONFIG.PREFIXO}aviso*
-◎ ─ *${CONFIG.PREFIXO}nomegrupo* / *${CONFIG.PREFIXO}descgrupo*
-◎ ─ *${CONFIG.PREFIXO}fotogrupo* / *${CONFIG.PREFIXO}apagar*
-◎ ─ *${CONFIG.PREFIXO}bloq* / *${CONFIG.PREFIXO}desbloq*
-◎ ─ *${CONFIG.PREFIXO}bot* off/on | *${CONFIG.PREFIXO}anti-link*
-◎ ─ *${CONFIG.PREFIXO}scanlink* / *${CONFIG.PREFIXO}verifica*
-◎ ─ *${CONFIG.PREFIXO}addai* → _adiciona Meta AI_
+◎ ─ *${P}banir*  ◎ ─ *${P}add* [nº]
+◎ ─ *${P}addadmin*  ◎ ─ *${P}removeadmin*
+◎ ─ *${P}fechar*  ◎ ─ *${P}abrir*
+│
+◎ ─ *${P}silenciar*  ◎ ─ *${P}dessilenciar*
+◎ ─ *${P}silenciados*
+│
+◎ ─ *${P}all* → _menciona todos_
+◎ ─ *${P}att* → _menção invisível_
+◎ ─ *${P}aviso* [msg] → _aviso geral_
+◎ ─ *${P}link* → _link do grupo_
+◎ ─ *${P}sorteio* → _sorteia membro_
+│
+◎ ─ *${P}nomegrupo* [nome]
+◎ ─ *${P}descgrupo* [descrição]
+◎ ─ *${P}fotogrupo* ↩️ _imagem_
+│
+◎ ─ *${P}bloq*  ◎ ─ *${P}desbloq*
+◎ ─ *${P}bot* off/on
+◎ ─ *${P}anti-link* on/off
+◎ ─ *${P}vozbot* on/off
+│
+◎ ─ *${P}verifica* → _bane links_
+◎ ─ *${P}apagar* ↩️ _mensagem_
+◎ ─ *${P}scanlink* → _varre 1000 msgs_
 │
 └──────────────────────────────⊰
-_⚡ Ban automático 5→0_`);
-  if(catId==="cat_grup"||catId==="grup") return(
+_⚡ Ban automático 5→0_
+_© LORDE LÁ DJUM v3.5_`);
+
+  if (categoria === "cat_grup" || categoria === "grup") return (
 `┌─⊱ 『 🏘️ GESTÃO DE GRUPOS 』 ⊰─┐
 │
-◎ ─ *${CONFIG.PREFIXO}chaton* → _grupos activos_
+◎ ─ *${CONFIG.PREFIXO}chaton*
+    _↳ lista grupos activos_
+│
 ◎ ─ *${CONFIG.PREFIXO}sms* [nº] [msg]
-    _↳ SMS privada a todos_
+    _↳ SMS no privado de todos_
+    _↳ os membros do grupo_
+│
 ◎ ─ *${CONFIG.PREFIXO}gsms* [nº] [msg]
     _↳ aviso no grupo_
+    _↳ menciona todos_
+│
+◎ ─ _Exemplo:_
+   *${CONFIG.PREFIXO}sms 1 Olá pessoal!*
+   *${CONFIG.PREFIXO}gsms 1 Atenção!*
 │
 ◎ ─ ⚠️ _Apenas DONO_
 │
-└──────────────────────────────⊰`);
-  if(catId==="cat_dono"||catId==="dono_cat") return(
+└──────────────────────────────⊰
+_© LORDE LÁ DJUM v3.5_`);
+
+  if (categoria === "cat_dono" || categoria === "dono") return (
 `┌─⊱ 『 👑 ÁREA DO DONO 』 ⊰─┐
 │
-◎ ─ *${CONFIG.PREFIXO}ergue-se* → _activa bot_
-◎ ─ *${CONFIG.PREFIXO}set* [senha]
-◎ ─ *${CONFIG.PREFIXO}out* → _sai do grupo_
+◎ ─ *${CONFIG.PREFIXO}ergue-se*
+    _↳ activa o bot no grupo_
+│
+◎ ─ *${CONFIG.PREFIXO}set* [nova_senha]
+    _↳ troca a senha do bot_
+│
+◎ ─ *${CONFIG.PREFIXO}out*
+    _↳ bot sai do grupo_
+│
 ◎ ─ *${CONFIG.PREFIXO}prefixo* [símbolo]
-◎ ─ *${CONFIG.PREFIXO}setfoto* → _foto das msgs_
+    _↳ muda o prefixo_
+│
+◎ ─ ───────────────── ◎
 │
 👑 *${CONFIG.DONO_NOME}*
 📞 *${CONFIG.DONO_NUM}*
 │
-└──────────────────────────────⊰`);
+└──────────────────────────────⊰
+_© LORDE LÁ DJUM v3.5_`);
+
   return null;
 }
 
-async function enviarSubmenu(sock,jid,msg,catId){
-  const texto=gerarSubmenu(catId,CONFIG.PREFIXO);
-  if(!texto) return;
-  await reagir(sock,msg,"✅");
-  await new Promise(r=>setTimeout(r,400));
-  await enviarComFoto(sock,jid,texto,ppBotUrl,msg);
+// ══════════════════════════════════════════════════════════
+//   ✅ ENVIA SUBMENU (lista interativa com comandos)
+// ══════════════════════════════════════════════════════════
+
+const TITULOS_CAT = {
+  cat_musica: "🎵 MÚSICA & VÍDEO",
+  cat_social: "📱 REDES SOCIAIS",
+  cat_ia:     "🧠 INTELIGÊNCIA IA",
+  cat_jogos:  "🎮 JOGOS",
+  cat_util:   "🔢 UTILIDADES",
+  cat_extra:  "🕵️ EXTRAS",
+  cat_arq:    "📁 ARQUIVOS & VPN",
+  cat_adm:    "🛡️ ADMINISTRAÇÃO",
+  cat_grup:   "🏘️ GESTÃO DE GRUPOS",
+  cat_dono:   "👑 ÁREA DO DONO",
+};
+
+async function enviarSubmenu(sock, jid, msg, catId) {
+  const P = CONFIG.PREFIXO;
+  const titulo = TITULOS_CAT[catId] || catId;
+  const texto = gerarSubmenu(catId, P);
+  if (!texto) return;
+  await enviarComFoto(sock, jid, texto, ppBotUrl, msg);
 }
 
-// ═══════════════════════════════════════════════════════
-//  ✅ CARD DE MÚSICA
-// ═══════════════════════════════════════════════════════
-
-async function buscarInfoMusica(entrada){
-  const isUrl=entrada.startsWith("http");
-  const pesquisa=isUrl?entrada:`ytsearch1:${entrada}`;
-  const UA="Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 Chrome/112.0";
-  try{
-    const json=await Promise.race([
-      runCmd(`yt-dlp --dump-json --no-playlist --no-warnings --force-ipv4 --geo-bypass --extractor-args "youtube:player_client=android,ios" --add-header "User-Agent:${UA}" "${pesquisa}" 2>/dev/null | head -c 6000`),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),15000))
-    ]);
-    if(!json||!json.trim()) return null;
-    const info=JSON.parse(json.trim());
-    return{titulo:info.title||"N/A",artista:info.uploader||info.channel||"N/A",duracao:formatarDuracao(info.duration||0),thumb:info.thumbnail||null,url:info.webpage_url||entrada};
-  }catch(e){console.log("⚠️ buscarInfoMusica:",e.message); return null;}
+async function enviarGif(sock, jid, caption="", quotedMsg=null) {
+  const tempOut = `./downloads/gif_${Date.now()}.mp4`;
+  const UA = "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 Chrome/112.0";
+  const pesquisas = [
+    "ytsearch1:solo leveling arise sung jinwoo shadow soldiers short clip",
+    "ytsearch1:solo leveling sung jin woo rise scene",
+  ];
+  for (const pesquisa of pesquisas) {
+    try {
+      await runCmd(
+        `yt-dlp --no-check-certificate --no-playlist --no-warnings --force-ipv4 --geo-bypass ` +
+        `--match-filter "duration < 60" --extractor-args "youtube:player_client=android,ios" ` +
+        `--add-header "User-Agent:${UA}" -f "best[height<=480][ext=mp4]/best[height<=480]/worst" ` +
+        `--max-filesize 8M -o "${tempOut}" "${pesquisa}"`
+      );
+      if (fs.existsSync(tempOut) && fs.statSync(tempOut).size > 5000) {
+        const buf = fs.readFileSync(tempOut);
+        try { fs.removeSync(tempOut); } catch {}
+        await sock.sendMessage(jid, { video: buf, gifPlayback: true, caption, mimetype: "video/mp4" }, quotedMsg ? { quoted: quotedMsg } : {});
+        return true;
+      }
+    } catch(e) { console.log(`❌ GIF: ${e.message.slice(0,60)}`); }
+    finally { try { if(fs.existsSync(tempOut)) fs.removeSync(tempOut); } catch {} }
+  }
+  return false;
 }
 
-async function enviarCardMusica(sock,jid,msg,info,sender,tipo){
-  const tipos={play:"🎵 | PLAY",mp3:"🎵 | MP3 HD",mp4:"🎬 | MP4 VIDEO",mp4hd:"📹 | MP4 HD 720p"};
-  const nomeUser=sender.split("@")[0].split(":")[0];
-  const caption=
-`${tipos[tipo]||"🎵 | PLAY"}
-
-• 🤖 | BOT → 🌀LORDE-DJUM v3.5
-• 👤 | USUÁRIO → ${nomeUser}
-• 🎵 | TÍTULO → ${info.titulo}
-• 📺 | CANAL → ${info.artista}
-• ⏱️ | DURAÇÃO → ${info.duracao}
-• 🔗 | LINK → ${info.url}`;
-  try{
-    if(info.thumb){
-      try{
-        const{data}=await axios.get(info.thumb,{responseType:"arraybuffer",timeout:10000,httpsAgent});
-        await sock.sendMessage(jid,{image:Buffer.from(data),caption},{quoted:msg});
-        return;
-      }catch{}
-      try{ await sock.sendMessage(jid,{image:{url:info.thumb},caption},{quoted:msg}); return;}catch{}
+async function banirComContagem(sock, jid, sender, msgKey, motivo="Infração das regras") {
+  const banKey = `${jid}_${sender}`;
+  if (banEmCurso.has(banKey)) return;
+  banEmCurso.add(banKey);
+  try {
+    try { await sock.sendMessage(jid, { delete: msgKey }); } catch {}
+    for (let i = 5; i >= 0; i--) {
+      try { await sock.sendMessage(jid, { text: `⏳ *${i}...*` }); } catch {}
+      await new Promise(r => setTimeout(r, 900));
     }
-    await enviarSemFoto(sock,jid,caption,msg);
-  }catch{ await enviarSemFoto(sock,jid,caption,msg); }
-}
-
-// ═══════════════════════════════════════════════════════
-//  ✅ UPLOAD PARA CATBOX — fix "Media upload failed"
-// ═══════════════════════════════════════════════════════
-
-async function uploadParaCatbox(buffer,nome,mimeType){
-  const formData=new FormData();
-  formData.append("reqtype","fileupload");
-  formData.append("fileToUpload",buffer,{filename:nome,contentType:mimeType});
-  const{data}=await axios.post("https://catbox.moe/user/api.php",formData,{
-    headers:{...formData.getHeaders()},
-    timeout:180000,
-    httpsAgent,
-    maxContentLength:Infinity,
-    maxBodyLength:Infinity,
-  });
-  const url=String(data).trim();
-  if(!url.startsWith("http")) throw new Error("Catbox: "+url);
-  return url;
-}
-
-async function uploadParaTelegraph(buffer){
-  const formData=new FormData(); let mimeType="image/jpeg",ext="jpg"; if(buffer[0]===0x89&&buffer[1]===0x50){mimeType="image/png";ext="png";} formData.append("file",buffer,{filename:`img.${ext}`,contentType:mimeType}); const{data}=await axios.post("https://telegra.ph/upload",formData,{headers:{...formData.getHeaders()},timeout:30000,httpsAgent}); if(data?.[0]?.src) return `https://telegra.ph${data[0].src}`; throw new Error("Telegraph falhou");
-}
-
-// ═══════════════════════════════════════════════════════
-//  ✅ ENVIAR ÁUDIO — com catbox como fallback
-//     Resolve "Media upload failed on all hosts"
-// ═══════════════════════════════════════════════════════
-
-async function enviarAudio(sock,jid,filePath,msgCitada){
-  if(!fs.existsSync(filePath)) throw new Error("Ficheiro não encontrado: "+filePath);
-  const tam=fs.statSync(filePath).size;
-  console.log(`📤 Áudio: ${path.basename(filePath)} (${(tam/1024).toFixed(1)}KB)`);
-
-  // Converte para OGG/Opus
-  const oggPath=path.join("./downloads",`ogg_${Date.now()}.ogg`);
-  let converteu=false;
-  try{
-    await new Promise((res,rej)=>exec(
-      `ffmpeg -i "${filePath}" -c:a libopus -b:a 64k -ar 24000 -ac 1 -vn "${oggPath}" -y -loglevel error`,
-      {timeout:60000,env:{...process.env}},(err)=>err?rej(err):res()
-    ));
-    if(fs.existsSync(oggPath)&&fs.statSync(oggPath).size>500) converteu=true;
-  }catch{}
-
-  const usePath=converteu?oggPath:filePath;
-  const mime=converteu?"audio/ogg; codecs=opus":"audio/mpeg";
-  const buf=fs.readFileSync(usePath);
-  const cleanup=()=>{if(converteu&&fs.existsSync(oggPath)) try{fs.removeSync(oggPath);}catch{}};
-
-  // ─── Tentativa 1: buffer directo ───
-  try{
-    await sock.sendMessage(jid,{audio:buf,mimetype:mime,ptt:false},msgCitada?{quoted:msgCitada}:{});
-    cleanup(); console.log("✅ Áudio (buffer)"); return;
-  }catch(e){console.log("⚠️ áudio buffer:",e.message);}
-
-  // ─── Tentativa 2: upload catbox → URL ───
-  try{
-    console.log("⬆️ A fazer upload para catbox...");
-    const url=await uploadParaCatbox(buf,path.basename(usePath),mime);
-    console.log("✅ Catbox:",url);
-    await sock.sendMessage(jid,{audio:{url},mimetype:mime,ptt:false},msgCitada?{quoted:msgCitada}:{});
-    cleanup(); console.log("✅ Áudio (catbox URL)"); return;
-  }catch(e){console.log("⚠️ catbox áudio:",e.message);}
-
-  // ─── Tentativa 3: mp3 raw via catbox ───
-  if(converteu){
-    try{
-      const rawBuf=fs.readFileSync(filePath);
-      const url=await uploadParaCatbox(rawBuf,path.basename(filePath),"audio/mpeg");
-      await sock.sendMessage(jid,{audio:{url},mimetype:"audio/mpeg",ptt:false},msgCitada?{quoted:msgCitada}:{});
-      cleanup(); console.log("✅ Áudio (catbox raw URL)"); return;
-    }catch(e){console.log("⚠️ catbox raw:",e.message);}
-  }
-
-  // ─── Tentativa 4: como documento ───
-  try{
-    await sock.sendMessage(jid,{document:fs.readFileSync(filePath),mimetype:"audio/mpeg",fileName:path.basename(filePath)},msgCitada?{quoted:msgCitada}:{});
-    cleanup(); console.log("✅ Áudio (documento)"); return;
-  }catch(e){
-    cleanup();
-    console.log("❌ enviarAudio todas falharam:",e.message);
-    throw new Error("Falhou ao enviar áudio");
+    try { await sock.sendMessage(jid, { text: `BANNNN❌️\n\n🚨 @${sender.split("@")[0]} foi *BANIDO!*\n_Motivo: ${motivo}_`, mentions: [sender] }); } catch {}
+    await new Promise(r => setTimeout(r, 500));
+    try { await sock.groupParticipantsUpdate(jid, [sender], "remove"); } catch {}
+    try { await sock.sendMessage(jid, { text: `🔨 @${sender.split("@")[0]} *REMOVIDO!*\n✦ ─────────── ✦\nÉ por causa desta pessoa 🚶🏿‍♂️\n*BAZAAA...* 😂💨`, mentions: [sender] }); } catch {}
+  } finally {
+    setTimeout(() => banEmCurso.delete(banKey), 5000);
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  ✅ ENVIAR VÍDEO — com catbox como fallback
-// ═══════════════════════════════════════════════════════
-
-async function enviarVideo(sock,jid,filePath,caption,mentions,msgCitada){
-  if(!fs.existsSync(filePath)) throw new Error("Vídeo não encontrado: "+filePath);
-  const tam=fs.statSync(filePath).size;
-  console.log(`📤 Vídeo: ${path.basename(filePath)} (${(tam/1024/1024).toFixed(1)}MB)`);
-  const buf=fs.readFileSync(filePath);
-
-  // ─── Tentativa 1: buffer ───
-  try{
-    await sock.sendMessage(jid,{video:buf,caption,mentions},msgCitada?{quoted:msgCitada}:{});
-    console.log("✅ Vídeo (buffer)"); return;
-  }catch(e){console.log("⚠️ vídeo buffer:",e.message);}
-
-  // ─── Tentativa 2: catbox URL ───
-  try{
-    console.log("⬆️ A fazer upload vídeo para catbox...");
-    const url=await uploadParaCatbox(buf,path.basename(filePath),"video/mp4");
-    console.log("✅ Catbox vídeo:",url);
-    await sock.sendMessage(jid,{video:{url},caption,mentions},msgCitada?{quoted:msgCitada}:{});
-    console.log("✅ Vídeo (catbox URL)"); return;
-  }catch(e){console.log("⚠️ catbox vídeo:",e.message);}
-
-  // ─── Tentativa 3: documento ───
-  try{
-    await sock.sendMessage(jid,{document:buf,mimetype:"video/mp4",fileName:path.basename(filePath),caption},msgCitada?{quoted:msgCitada}:{});
-    console.log("✅ Vídeo (documento)"); return;
-  }catch(e){
-    console.log("❌ enviarVideo todas falharam:",e.message);
-    throw e;
-  }
-}
-
-// ═══════════════════════════════════════════════════════
-//  Funções auxiliares
-// ═══════════════════════════════════════════════════════
-
-function runCmd(cmd){
-  return new Promise((resolve,reject)=>{
-    exec(cmd,{timeout:180000,maxBuffer:150*1024*1024,env:{...process.env,TMPDIR:process.env.TMPDIR}},(err,stdout,stderr)=>{
-      if(err) reject(new Error(stderr||err.message));
-      else resolve(stdout.trim());
-    });
-  });
-}
-function encontrarArquivo(pasta,prefixo){try{const arqs=fs.readdirSync(pasta).filter(f=>f.startsWith(prefixo)&&!f.endsWith(".part")&&!f.endsWith(".ytdl")); if(!arqs.length) return null; const p=path.join(pasta,arqs[0]); return fs.statSync(p).size>3000?p:null;}catch{return null;}}
-
-async function chatIA(prompt,sistema="És um assistente simpático que responde sempre em português de Angola. Sê direto e objetivo."){
+async function chatIA(prompt, sistema="És um assistente simpático que responde sempre em português de Angola. Sê direto e objetivo.") {
   for(const modelo of ["llama-3.1-8b-instant","mixtral-8x7b-32768"]){
-    try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:modelo,messages:[{role:"system",content:sistema},{role:"user",content:prompt}],max_tokens:800,temperature:0.7},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:20000,httpsAgent}); const resp=data.choices?.[0]?.message?.content?.trim(); if(resp&&resp.length>2) return resp;}catch(e){console.log(`❌ Groq ${modelo}:`,e.message);}
+    try{ const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:modelo,messages:[{role:"system",content:sistema},{role:"user",content:prompt}],max_tokens:800,temperature:0.7},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:20000,httpsAgent}); const resp=data.choices?.[0]?.message?.content?.trim(); if(resp&&resp.length>2) return resp; }catch(e){console.log(`❌ Groq ${modelo}:`,e.message);}
   }
-  try{const{data}=await axios.get(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?system=${encodeURIComponent(sistema)}&model=openai-large`,{timeout:25000,responseType:"text",httpsAgent}); const resp=typeof data==="string"?data.trim():String(data).trim(); if(resp.length>5) return resp;}catch{}
+  try{ const{data}=await axios.get(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?system=${encodeURIComponent(sistema)}&model=openai-large`,{timeout:25000,responseType:"text",httpsAgent}); const resp=typeof data==="string"?data.trim():String(data).trim(); if(resp.length>5) return resp; }catch{}
   return "❌ IA temporariamente indisponível.";
 }
 
-async function gerarJogoIA(tipo,categoria=null,usadas=[]){
+async function gerarJogoIA(tipo, categoria=null, usadas=[]) {
   const sistema="És um gerador de jogos educativos. Responde SEMPRE com JSON válido puro. Sem markdown.";
   let prompt="";
   if(tipo==="quiz"){const ev=usadas.length>0?`Evita: ${usadas.slice(-6).join(" | ")}`:""; prompt=`Quiz em português ${categoria?`sobre:"${categoria}"`:"variado"}. ${ev} JSON: {"pergunta":"Capital de Angola?","resposta":"luanda"}.`;}
@@ -1891,70 +593,100 @@ async function gerarJogoIA(tipo,categoria=null,usadas=[]){
   if(tipo==="caca"){const ev=usadas.length>0?`Evita: ${usadas.slice(-4).join(", ")}`:""; prompt=`Palavra Caça ${categoria||"variado"}. ${ev} JSON: {"palavra":"ANGOLA","dica":"País"}. MAIÚSCULAS A-Z, 4-8 letras.`;}
   if(tipo==="guerra"){const ev=usadas.length>0?`Evita: ${usadas.slice(-4).join(", ")}`:""; prompt=`Palavra Forca ${categoria||"variado"}. ${ev} JSON: {"palavra":"FUTEBOL","dica":"Desporto"}. 5-9 letras MAIÚSCULAS.`;}
   if(tipo==="vof"){const ev=usadas.length>0?`Evita: ${usadas.slice(-4).join(" | ")}`:""; prompt=`Afirmação V/F português. ${ev} JSON: {"pergunta":"O sol é uma estrela.","resposta":"verdadeiro"}.`;}
-  try{const resp=await chatIA(prompt,sistema); const m=resp.match(/\{[^{}]+\}/); if(!m) throw new Error("no JSON"); const p=JSON.parse(m[0]); if(tipo==="quiz"&&p.pergunta&&p.resposta) return{p:p.pergunta,r:p.resposta.toLowerCase().trim()}; if(tipo==="completar"&&p.inicial&&p.completa) return{i:p.inicial,c:p.completa.toLowerCase().trim(),d:p.dica||"Completa"}; if(tipo==="caca"&&p.palavra) return{palavra:p.palavra.toUpperCase().replace(/[^A-Z]/g,""),dica:p.dica||"Encontra"}; if(tipo==="guerra"&&p.palavra) return{palavra:p.palavra.toUpperCase().replace(/[^A-Z]/g,""),dica:p.dica||"Palavra"}; if(tipo==="vof"&&p.pergunta&&p.resposta) return{p:p.pergunta,r:p.resposta.toLowerCase().trim()};}catch(e){console.log(`❌ gerarJogoIA(${tipo}):`,e.message);}
+  try{ const resp=await chatIA(prompt,sistema); const m=resp.match(/\{[^{}]+\}/); if(!m) throw new Error("no JSON"); const p=JSON.parse(m[0]); if(tipo==="quiz"&&p.pergunta&&p.resposta) return{p:p.pergunta,r:p.resposta.toLowerCase().trim()}; if(tipo==="completar"&&p.inicial&&p.completa) return{i:p.inicial,c:p.completa.toLowerCase().trim(),d:p.dica||"Completa"}; if(tipo==="caca"&&p.palavra) return{palavra:p.palavra.toUpperCase().replace(/[^A-Z]/g,""),dica:p.dica||"Encontra"}; if(tipo==="guerra"&&p.palavra) return{palavra:p.palavra.toUpperCase().replace(/[^A-Z]/g,""),dica:p.dica||"Palavra"}; if(tipo==="vof"&&p.pergunta&&p.resposta) return{p:p.pergunta,r:p.resposta.toLowerCase().trim()}; }catch(e){console.log(`❌ gerarJogoIA(${tipo}):`,e.message);}
   return null;
 }
 
-async function analisarImagem(imagemBuffer,instrucao){
-  let mimeType="image/jpeg"; if(imagemBuffer[0]===0x89&&imagemBuffer[1]===0x50) mimeType="image/png";
+async function analisarImagem(imagemBuffer, instrucao) {
+  let mimeType="image/jpeg"; if(imagemBuffer[0]===0x89&&imagemBuffer[1]===0x50) mimeType="image/png"; else if(imagemBuffer.slice(0,4).toString("ascii")==="RIFF") mimeType="image/webp";
   const base64=imagemBuffer.toString("base64");
   for(const modelo of ["meta-llama/llama-4-scout-17b-16e-instruct","meta-llama/llama-4-maverick-17b-128e-instruct"]){
-    try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:modelo,messages:[{role:"user",content:[{type:"image_url",image_url:{url:`data:${mimeType};base64,${base64}`}},{type:"text",text:instrucao}]}],max_tokens:1000,temperature:0.3},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:30000,httpsAgent}); const resp=data.choices?.[0]?.message?.content?.trim(); if(resp&&resp.length>2) return resp;}catch(e){console.log(`❌ ${modelo}:`,e.message);}
+    try{ const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:modelo,messages:[{role:"user",content:[{type:"image_url",image_url:{url:`data:${mimeType};base64,${base64}`}},{type:"text",text:instrucao}]}],max_tokens:1000,temperature:0.3},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:30000,httpsAgent}); const resp=data.choices?.[0]?.message?.content?.trim(); if(resp&&resp.length>2) return resp; }catch(e){console.log(`❌ ${modelo}:`,e.message);}
   }
   throw new Error("Modelos de visão falharam.");
 }
 
-async function downloadImagemDaMensagem(msg){
-  try{if(msg.message?.imageMessage) return await downloadMediaMessage(msg,"buffer",{});}catch{}
-  const ctx=msg.message?.extendedTextMessage?.contextInfo;
-  if(!ctx?.quotedMessage) return null;
-  if(ctx.quotedMessage.imageMessage){
-    try{const qm={key:{remoteJid:msg.key.remoteJid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:ctx.quotedMessage}; return await downloadMediaMessage(qm,"buffer",{});}catch{}
-  }
+async function downloadImagemDaMensagem(msg) {
+  if(msg.message?.imageMessage){try{return await downloadMediaMessage(msg,"buffer",{});}catch{}}
+  const ctx=msg.message?.extendedTextMessage?.contextInfo; if(!ctx?.quotedMessage) return null;
+  if(ctx.quotedMessage.imageMessage){try{const qm={key:{remoteJid:msg.key.remoteJid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:ctx.quotedMessage}; return await downloadMediaMessage(qm,"buffer",{});}catch{}}
   return null;
 }
 
-async function downloadAudioDaMensagem(msg){
+async function downloadAudioDaMensagem(msg) {
   const tipos=["audioMessage","pttMessage"];
   for(const tipo of tipos){if(msg.message?.[tipo]){try{return{buffer:await downloadMediaMessage(msg,"buffer",{})};}catch{}}}
-  const ctx=msg.message?.extendedTextMessage?.contextInfo;
-  if(!ctx?.quotedMessage) return null;
+  const ctx=msg.message?.extendedTextMessage?.contextInfo; if(!ctx?.quotedMessage) return null;
   for(const tipo of tipos){if(ctx.quotedMessage[tipo]){try{const qm={key:{remoteJid:msg.key.remoteJid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:ctx.quotedMessage}; return{buffer:await downloadMediaMessage(qm,"buffer",{})};}catch{}}}
   return null;
 }
 
-async function downloadQualquerMidia(msg){
-  const m=msg.message; if(!m) return null;
-  const tipos=[{chave:"imageMessage",mime:"image/jpeg",ext:"jpg"},{chave:"videoMessage",mime:"video/mp4",ext:"mp4"},{chave:"audioMessage",mime:"audio/ogg",ext:"ogg"},{chave:"pttMessage",mime:"audio/ogg",ext:"ogg"},{chave:"documentMessage",mime:"application/octet-stream",ext:"bin"},{chave:"stickerMessage",mime:"image/webp",ext:"webp"}];
-  for(const t of tipos){if(m[t.chave]){try{const buf=await downloadMediaMessage(msg,"buffer",{}); const mime=m[t.chave].mimetype||t.mime; const ext=mime.split("/")[1]?.split(";")[0]||t.ext; const nome=m[t.chave].fileName||`midia_${Date.now()}.${ext}`; return{buffer:buf,mime,nome};}catch{}}}
-  const ctx=m.extendedTextMessage?.contextInfo;
-  if(ctx?.quotedMessage){for(const t of tipos){if(ctx.quotedMessage[t.chave]){try{const qm={key:{remoteJid:msg.key.remoteJid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:ctx.quotedMessage}; const buf=await downloadMediaMessage(qm,"buffer",{}); const mime=ctx.quotedMessage[t.chave].mimetype||t.mime; const ext=mime.split("/")[1]?.split(";")[0]||t.ext; const nome=ctx.quotedMessage[t.chave].fileName||`midia_${Date.now()}.${ext}`; return{buffer:buf,mime,nome};}catch{}}}}
+async function downloadQualquerMidia(msg) {
+  const m = msg.message;
+  if (!m) return null;
+  const tipos = [
+    { chave:"imageMessage",   mime:"image/jpeg",       ext:"jpg" },
+    { chave:"videoMessage",   mime:"video/mp4",        ext:"mp4" },
+    { chave:"audioMessage",   mime:"audio/ogg",        ext:"ogg" },
+    { chave:"pttMessage",     mime:"audio/ogg",        ext:"ogg" },
+    { chave:"documentMessage",mime:"application/octet-stream", ext:"bin" },
+    { chave:"stickerMessage", mime:"image/webp",       ext:"webp" },
+  ];
+  for (const t of tipos) {
+    if (m[t.chave]) {
+      try { const buf = await downloadMediaMessage(msg, "buffer", {}); const mime = m[t.chave].mimetype || t.mime; const ext = mime.split("/")[1]?.split(";")[0] || t.ext; const nome = m[t.chave].fileName || `midia_${Date.now()}.${ext}`; return { buffer: buf, mime, nome }; } catch {}
+    }
+  }
+  const ctx = m.extendedTextMessage?.contextInfo;
+  if (ctx?.quotedMessage) {
+    for (const t of tipos) {
+      if (ctx.quotedMessage[t.chave]) {
+        try { const qm = { key:{ remoteJid:msg.key.remoteJid, id:ctx.stanzaId||"", participant:ctx.participant||"", fromMe:false }, message:ctx.quotedMessage }; const buf = await downloadMediaMessage(qm, "buffer", {}); const mime = ctx.quotedMessage[t.chave].mimetype || t.mime; const ext = mime.split("/")[1]?.split(";")[0] || t.ext; const nome = ctx.quotedMessage[t.chave].fileName || `midia_${Date.now()}.${ext}`; return { buffer: buf, mime, nome }; } catch {}
+      }
+    }
+  }
   return null;
 }
 
-async function transcreverComGroq(buffer){
+async function transcreverComGroq(buffer) {
   const formData=new FormData(); formData.append("file",buffer,{filename:"audio.ogg",contentType:"audio/ogg"}); formData.append("model","whisper-large-v3"); formData.append("response_format","json");
   const{data}=await axios.post("https://api.groq.com/openai/v1/audio/transcriptions",formData,{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,...formData.getHeaders()},timeout:60000,httpsAgent});
   const texto=data?.text?.trim(); if(!texto) throw new Error("Áudio não audível"); return texto;
 }
 
-async function textoParaFala(texto,voz=CONFIG.VOZ_TTS){
-  const tempId=Date.now(),tempTxt=`./downloads/tts_in_${tempId}.txt`,tempOut=`./downloads/tts_out_${tempId}.mp3`;
-  try{const textoLimpo=texto.replace(/[*_~`#]/g,"").replace(/\n+/g,". ").slice(0,1800); if(!textoLimpo.trim()) throw new Error("Texto vazio"); fs.writeFileSync(tempTxt,textoLimpo,"utf8"); await runCmd(`edge-tts --voice "${voz}" --file "${tempTxt}" --write-media "${tempOut}"`); if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<500) throw new Error("TTS inválido"); return tempOut;}finally{try{fs.removeSync(tempTxt);}catch{}}
+function runCmd(cmd) { return new Promise((resolve,reject)=>{exec(cmd,{timeout:180000,maxBuffer:100*1024*1024},(err,stdout,stderr)=>{if(err) reject(new Error(stderr||err.message)); else resolve(stdout.trim());});}); }
+function encontrarArquivo(pasta,prefixo) { try{const arqs=fs.readdirSync(pasta).filter(f=>f.startsWith(prefixo)&&!f.endsWith(".part")&&!f.endsWith(".ytdl")); if(!arqs.length) return null; const p=path.join(pasta,arqs[0]); return fs.statSync(p).size>3000?p:null;}catch{return null;} }
+
+async function textoParaFala(texto, voz=CONFIG.VOZ_TTS) {
+  const tempId=Date.now(), tempTxt=`./downloads/tts_in_${tempId}.txt`, tempOut=`./downloads/tts_out_${tempId}.mp3`;
+  try{ const textoLimpo=texto.replace(/[*_~`#]/g,"").replace(/\n+/g,". ").slice(0,1800); if(!textoLimpo.trim()) throw new Error("Texto vazio"); fs.writeFileSync(tempTxt,textoLimpo,"utf8"); await runCmd(`edge-tts --voice "${voz}" --file "${tempTxt}" --write-media "${tempOut}"`); if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<500) throw new Error("TTS inválido"); return tempOut; }finally{try{fs.removeSync(tempTxt);}catch{}}
 }
 
-async function reconhecerMusica(buf){
-  const formData=new FormData(); formData.append("file",buf,{filename:"audio.ogg",contentType:"audio/ogg"}); formData.append("api_token","test"); formData.append("return","apple_music,spotify");
-  const{data}=await axios.post("https://api.audd.io/",formData,{headers:{...formData.getHeaders()},timeout:30000,httpsAgent}); return data;
-}
+async function reconhecerMusica(buf) { const formData=new FormData(); formData.append("file",buf,{filename:"audio.ogg",contentType:"audio/ogg"}); formData.append("api_token","test"); formData.append("return","apple_music,spotify"); const{data}=await axios.post("https://api.audd.io/",formData,{headers:{...formData.getHeaders()},timeout:30000,httpsAgent}); return data; }
 
-async function buscarImagemInternet(query){
+async function buscarImagemInternet(query) {
+  const UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"; const headers={"User-Agent":UA};
   try{const{data}=await axios.get(`https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`,{timeout:8000,httpsAgent}); if(data?.originalimage?.source) return data.originalimage.source; if(data?.thumbnail?.source) return data.thumbnail.source;}catch{}
   try{const{data}=await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`,{timeout:8000,httpsAgent}); if(data?.originalimage?.source) return data.originalimage.source; if(data?.thumbnail?.source) return data.thumbnail.source;}catch{}
+  try{const{data}=await axios.get(`https://www.bing.com/images/search?q=${encodeURIComponent(query)}&first=1`,{headers,timeout:12000,httpsAgent}); for(const p of[/"murl":"(https?:\/\/[^"]+)"/,/mediaurl=(https?[^&"]+)/i]){const m=data.match(p); if(m?.[1]){const url=decodeURIComponent(m[1].split("&")[0]); if(url.startsWith("http")) return url;}}}catch{}
   return null;
 }
 
-async function downloadMusica(entrada,altaQualidade=false){
+async function uploadParaTelegraph(buffer) {
+  const formData=new FormData(); let mimeType="image/jpeg",ext="jpg"; if(buffer[0]===0x89&&buffer[1]===0x50){mimeType="image/png";ext="png";}else if(buffer.slice(0,4).toString("ascii")==="RIFF"){mimeType="image/webp";ext="webp";} formData.append("file",buffer,{filename:`img.${ext}`,contentType:mimeType}); const{data}=await axios.post("https://telegra.ph/upload",formData,{headers:{...formData.getHeaders()},timeout:30000,httpsAgent}); if(data?.[0]?.src) return `https://telegra.ph${data[0].src}`; throw new Error("Upload falhou");
+}
+
+async function uploadParaCatbox(buffer, nome="arquivo", mimeType="application/octet-stream") {
+  const formData = new FormData();
+  formData.append("reqtype", "fileupload");
+  formData.append("fileToUpload", buffer, { filename: nome, contentType: mimeType });
+  const { data } = await axios.post("https://catbox.moe/user/api.php", formData, { headers: { ...formData.getHeaders() }, timeout: 60000, httpsAgent });
+  const url = String(data).trim();
+  if (!url.startsWith("http")) throw new Error("Catbox falhou: " + url);
+  return url;
+}
+
+async function downloadMusica(entrada, altaQualidade=false) {
   const isUrl=entrada.startsWith("http"),nomeBase=`mus_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`,quality=altaQualidade?"0":"5",UA="Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 Chrome/112.0 Mobile Safari/537.36";
   const base=`yt-dlp --no-check-certificate -x --audio-format mp3 --audio-quality ${quality} --no-playlist --no-warnings --force-ipv4 --geo-bypass --extractor-args "youtube:player_client=android,ios,tv_embedded" --add-header "User-Agent:${UA}" -o "${saida}"`;
   const fontes=isUrl?[entrada]:[`scsearch1:${entrada}`,`ytsearch1:${entrada}`,`ytsearch1:${entrada.split(" ").slice(0,4).join(" ")} audio`];
@@ -1962,7 +694,7 @@ async function downloadMusica(entrada,altaQualidade=false){
   return null;
 }
 
-async function downloadVideo(entrada){
+async function downloadVideo(entrada) {
   const isUrl=entrada.startsWith("http"),nomeBase=`vid_${Date.now()}`,saidaAny=`./downloads/${nomeBase}.%(ext)s`,pesquisa=isUrl?entrada:`ytsearch1:${entrada}`;
   const UA_MOB="Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 Chrome/112.0 Mobile Safari/537.36",UA_DES="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36";
   const tentarSalvar=(arq)=>{if(!arq) return null; try{const tam=fs.statSync(arq).size; if(tam>10000&&tam<100*1024*1024) return arq; if(fs.existsSync(arq)) fs.removeSync(arq);}catch{} return null;};
@@ -1971,7 +703,7 @@ async function downloadVideo(entrada){
   return null;
 }
 
-async function downloadVideoHD(entrada,height=720){
+async function downloadVideoHD(entrada, height=720) {
   const isUrl=entrada.startsWith("http"),pesquisa=isUrl?entrada:`ytsearch1:${entrada}`,nomeBase=`vidhd_${Date.now()}`,saida=`./downloads/${nomeBase}.mp4`,UA="Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 Chrome/112.0 Mobile Safari/537.36",LIMITE=90*1024*1024,MAX_SIZE="90M",fmt=`bestvideo[height<=${height}]+bestaudio/best[height<=${height}]/bestvideo+bestaudio/best`;
   const tentarSalvar=(arq)=>{if(!arq) return null; try{const tam=fs.statSync(arq).size; if(tam>10000&&tam<=LIMITE) return arq; if(fs.existsSync(arq)) fs.removeSync(arq);}catch{} return null;};
   for(const player of ["android","ios","tv_embedded","web","default"]){try{await runCmd(`yt-dlp --no-check-certificate --no-playlist --no-warnings --force-ipv4 --geo-bypass --max-filesize ${MAX_SIZE} --extractor-args "youtube:player_client=${player}" --add-header "User-Agent:${UA}" -f "${fmt}" --merge-output-format mp4 -o "${saida}" "${pesquisa}"`); const r=tentarSalvar(saida)||tentarSalvar(encontrarArquivo("./downloads",nomeBase)); if(r) return{filePath:r,quality:`${height}p`,sizeMB:(fs.statSync(r).size/1024/1024).toFixed(1)};}catch{}}
@@ -1979,95 +711,109 @@ async function downloadVideoHD(entrada,height=720){
   throw new Error(`❌ Não consegui baixar em ${height}p.`);
 }
 
-async function dlTiktok(url){try{const{data}=await axios.post("https://www.tikwm.com/api/",`url=${encodeURIComponent(url)}&count=12&cursor=0&web=1&hd=1`,{headers:{"Content-Type":"application/x-www-form-urlencoded","User-Agent":"Mozilla/5.0"},timeout:30000,httpsAgent}); const d=data?.data; if(!d) throw new Error("Sem dados"); return{title:d.title||"TikTok",url:d.hdplay||d.play};}catch(e){throw new Error("TikTok: "+e.message);}}
-async function dlTwitter(url){const nomeBase=`tw_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`; try{await runCmd(`yt-dlp --no-check-certificate --no-playlist -f "best[ext=mp4]/best" -o "${saida}" "${url}"`); const arq=encontrarArquivo("./downloads",nomeBase); if(arq) return{filePath:arq};}catch{} throw new Error("Twitter: não consegui.");}
-async function dlInstagram(url){const nomeBase=`ig_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`; try{await runCmd(`yt-dlp --no-check-certificate --no-playlist -f "best[ext=mp4]/best" -o "${saida}" "${url}"`); const arq=encontrarArquivo("./downloads",nomeBase); if(arq) return{filePath:arq};}catch{} throw new Error("Instagram: não consegui.");}
-async function dlSpotify(query){const arq=await downloadMusica(query,true); if(arq) return{filePath:arq}; throw new Error("Spotify: não encontrei.");}
-async function dlSoundcloud(query){const isUrl=query.startsWith("http"),nomeBase=`sc_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`,fonte=isUrl?query:`scsearch1:${query}`; try{await runCmd(`yt-dlp --no-check-certificate -x --audio-format mp3 --audio-quality 0 --no-playlist --no-warnings -o "${saida}" "${fonte}"`); const arq=encontrarArquivo("./downloads",nomeBase); if(arq) return{filePath:arq};}catch{} const arqFb=await downloadMusica(query,true); if(arqFb) return{filePath:arqFb}; throw new Error("SoundCloud: não encontrei.");}
-async function dlPinterest(query){const isUrl=query.startsWith("http"); if(isUrl){try{const{data}=await axios.get(`https://api.siputzx.my.id/api/d/pinterest?url=${encodeURIComponent(query)}`,{timeout:15000,httpsAgent}); if(data?.data?.url) return{url:data.data.url};}catch{} throw new Error("Pinterest: não consegui.");} try{const{data}=await axios.get(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(query)}`,{timeout:15000,httpsAgent}); const arr=data?.data||data?.result||[]; if(Array.isArray(arr)&&arr.length){const url=typeof arr[0]==="string"?arr[0]:(arr[0].image_url||arr[0].url||arr[0].src); if(url) return{url};}}catch{} throw new Error("Pinterest: sem resultados.");}
-async function dlMediafire(url){try{const{data}=await axios.get(url,{headers:{"User-Agent":"Mozilla/5.0"},timeout:15000,httpsAgent}); const match=data.match(/href="(https:\/\/download\d+\.mediafire\.com\/[^"]+)"/); if(match) return{url:match[1],title:decodeURIComponent(match[1].split("/").pop().split("?")[0])||"file"}; throw new Error("Link não encontrado.");}catch(e){throw new Error("MediaFire: "+e.message);}}
-async function dlApk(query){try{const{data}=await axios.get(`https://liteapks.com/?s=${encodeURIComponent(query)}`,{headers:{"User-Agent":"Mozilla/5.0"},timeout:15000,httpsAgent}); const regex=/href="(https:\/\/liteapks\.com\/[a-z0-9-]+\.html)"/g; let m; const results=[]; while((m=regex.exec(data))!==null&&results.length<3){const u=m[1]; if(!u.includes("page/")&&!results.find(r=>r===u)) results.push(u);} if(!results.length) throw new Error("Não encontrei."); return{url:results[0],title:results[0].split("/").pop().replace(".html","").replace(/-/g," ")};}catch(e){throw new Error("APK: "+e.message);}}
+async function dlTiktok(url) { try{const{data}=await axios.post("https://www.tikwm.com/api/",`url=${encodeURIComponent(url)}&count=12&cursor=0&web=1&hd=1`,{headers:{"Content-Type":"application/x-www-form-urlencoded","User-Agent":"Mozilla/5.0"},timeout:30000,httpsAgent}); const d=data?.data; if(!d) throw new Error("Sem dados"); return{title:d.title||"TikTok",url:d.hdplay||d.play};}catch(e){throw new Error("TikTok: "+e.message);} }
+async function dlTwitter(url) { const nomeBase=`tw_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`; try{await runCmd(`yt-dlp --no-check-certificate --no-playlist -f "best[ext=mp4]/best" -o "${saida}" "${url}"`); const arq=encontrarArquivo("./downloads",nomeBase); if(arq) return{filePath:arq};}catch{} throw new Error("Twitter: não consegui."); }
+async function dlInstagram(url) { const nomeBase=`ig_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`; try{await runCmd(`yt-dlp --no-check-certificate --no-playlist -f "best[ext=mp4]/best" -o "${saida}" "${url}"`); const arq=encontrarArquivo("./downloads",nomeBase); if(arq) return{filePath:arq};}catch{} throw new Error("Instagram: não consegui."); }
+async function dlSpotify(query) { const arq=await downloadMusica(query,true); if(arq) return{filePath:arq}; throw new Error("Spotify: não encontrei."); }
+async function dlSoundcloud(query) { const isUrl=query.startsWith("http"),nomeBase=`sc_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`,fonte=isUrl?query:`scsearch1:${query}`; try{await runCmd(`yt-dlp --no-check-certificate -x --audio-format mp3 --audio-quality 0 --no-playlist --no-warnings -o "${saida}" "${fonte}"`); const arq=encontrarArquivo("./downloads",nomeBase); if(arq) return{filePath:arq};}catch{} const arqFb=await downloadMusica(query,true); if(arqFb) return{filePath:arqFb}; throw new Error("SoundCloud: não encontrei."); }
+async function dlPinterest(query) { const isUrl=query.startsWith("http"),UA="Mozilla/5.0"; if(isUrl){try{const{data}=await axios.get(`https://api.siputzx.my.id/api/d/pinterest?url=${encodeURIComponent(query)}`,{timeout:15000,httpsAgent}); if(data?.data?.url) return{url:data.data.url};}catch{} throw new Error("Pinterest: não consegui.");} try{const{data}=await axios.get(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(query)}`,{timeout:15000,httpsAgent}); const arr=data?.data||data?.result||[]; if(Array.isArray(arr)&&arr.length){const url=typeof arr[0]==="string"?arr[0]:(arr[0].image_url||arr[0].url||arr[0].src); if(url) return{url};}}catch{} throw new Error("Pinterest: sem resultados."); }
+async function dlMediafire(url) { try{const{data}=await axios.get(url,{headers:{"User-Agent":"Mozilla/5.0"},timeout:15000,httpsAgent}); const match=data.match(/href="(https:\/\/download\d+\.mediafire\.com\/[^"]+)"/); if(match) return{url:match[1],title:decodeURIComponent(match[1].split("/").pop().split("?")[0])||"file"}; throw new Error("Link não encontrado.");}catch(e){throw new Error("MediaFire: "+e.message);} }
+async function dlApk(query) { try{const{data}=await axios.get(`https://liteapks.com/?s=${encodeURIComponent(query)}`,{headers:{"User-Agent":"Mozilla/5.0"},timeout:15000,httpsAgent}); const regex=/href="(https:\/\/liteapks\.com\/[a-z0-9-]+\.html)"/g; let m; const results=[]; while((m=regex.exec(data))!==null&&results.length<3){const u=m[1]; if(!u.includes("page/")&&!results.find(r=>r===u)) results.push(u);} if(!results.length) throw new Error("Não encontrei."); return{url:results[0],title:results[0].split("/").pop().replace(".html","").replace(/-/g," ")};}catch(e){throw new Error("APK: "+e.message);} }
 
-async function criarSticker(imagemBuffer,isAnimated=false){
-  const tempId=Date.now(),tempIn=`./downloads/stk_in_${tempId}.tmp`,tempOut=`./downloads/stk_out_${tempId}.webp`;
-  try{fs.writeFileSync(tempIn,imagemBuffer); const cmd=isAnimated?`ffmpeg -i "${tempIn}" -t 5 -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=12" -c:v libwebp -quality 70 -preset default -loop 0 -an -vsync 0 "${tempOut}" -y -loglevel error`:`ffmpeg -i "${tempIn}" -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512" -c:v libwebp -quality 90 "${tempOut}" -y -loglevel error`; await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000,env:{...process.env}},(err)=>err?reject(err):resolve());}); if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100) throw new Error("WebP inválido"); return fs.readFileSync(tempOut);}finally{try{fs.removeSync(tempIn);}catch{} try{fs.removeSync(tempOut);}catch{}}
+async function enviarAudio(sock,jid,filePath,msgCitada) {
+  if(!fs.existsSync(filePath)) throw new Error("Ficheiro não encontrado");
+  const tamOriginal=fs.statSync(filePath).size,oggPath=filePath.replace(/\.[^.]+$/,`_${Date.now()}.ogg`); let converteu=false;
+  try{const bitrate=tamOriginal>3*1024*1024?"48k":"64k"; await new Promise((resolve,reject)=>{exec(`ffmpeg -i "${filePath}" -c:a libopus -b:a ${bitrate} -ar 24000 -ac 1 -vn "${oggPath}" -y -loglevel error`,{timeout:60000},(err)=>err?reject(err):resolve());}); if(fs.existsSync(oggPath)&&fs.statSync(oggPath).size>500) converteu=true;}catch{}
+  const audioPath=converteu?oggPath:filePath,mimetype=converteu?"audio/ogg; codecs=opus":"audio/mpeg",buffer=fs.readFileSync(audioPath);
+  const limpar=()=>{if(converteu&&fs.existsSync(oggPath)) try{fs.removeSync(oggPath);}catch{}};
+  try{await sock.sendMessage(jid,{audio:buffer,mimetype,ptt:false},msgCitada?{quoted:msgCitada}:{}); limpar(); return;}catch{}
+  try{await sock.sendMessage(jid,{audio:buffer,mimetype:"audio/ogg; codecs=opus",ptt:false},msgCitada?{quoted:msgCitada}:{}); limpar(); return;}catch{}
+  try{const b=fs.readFileSync(filePath); await sock.sendMessage(jid,{audio:b,mimetype:"audio/mpeg",ptt:false},msgCitada?{quoted:msgCitada}:{}); limpar();}catch{}
 }
-async function stickerParaFoto(buf,isAnimated=false){const tempId=Date.now(),tempIn=`./downloads/sf_in_${tempId}.webp`,tempOut=`./downloads/sf_out_${tempId}.${isAnimated?"mp4":"jpg"}`; try{fs.writeFileSync(tempIn,buf); const cmd=isAnimated?`ffmpeg -i "${tempIn}" -c:v libx264 -pix_fmt yuv420p -movflags faststart -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${tempOut}" -y -loglevel error`:`ffmpeg -i "${tempIn}" -frames:v 1 -q:v 2 "${tempOut}" -y -loglevel error`; await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000,env:{...process.env}},(err)=>err?reject(err):resolve());}); if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100) throw new Error("Conversão inválida"); return{buffer:fs.readFileSync(tempOut),isVideo:isAnimated};}catch(e){return{buffer:buf,isVideo:false,isWebP:true};}finally{try{fs.removeSync(tempIn);}catch{} try{fs.removeSync(tempOut);}catch{}}}
+async function enviarVideo(sock,jid,filePath,caption,mentions,msgCitada){ const buffer=fs.readFileSync(filePath); try{await sock.sendMessage(jid,{video:buffer,caption,mentions},msgCitada?{quoted:msgCitada}:{});}catch{await sock.sendMessage(jid,{document:buffer,mimetype:"video/mp4",fileName:path.basename(filePath),caption},msgCitada?{quoted:msgCitada}:{});} }
+
+async function criarSticker(imagemBuffer, isAnimated=false) {
+  const tempId=Date.now(),tempIn=`./downloads/stk_in_${tempId}.tmp`,tempOut=`./downloads/stk_out_${tempId}.webp`;
+  try{
+    fs.writeFileSync(tempIn,imagemBuffer);
+    const cmd=isAnimated
+      ?`ffmpeg -i "${tempIn}" -t 5 -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=12" -c:v libwebp -quality 70 -preset default -loop 0 -an -vsync 0 "${tempOut}" -y -loglevel error`
+      :`ffmpeg -i "${tempIn}" -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512" -c:v libwebp -quality 90 "${tempOut}" -y -loglevel error`;
+    await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000},(err)=>err?reject(err):resolve());});
+    if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100) throw new Error("WebP inválido");
+    return fs.readFileSync(tempOut);
+  }finally{
+    try{fs.removeSync(tempIn);}catch{}
+    try{fs.removeSync(tempOut);}catch{}
+  }
+}
+
+async function stickerParaFoto(buf,isAnimated=false) { const tempId=Date.now(),tempIn=`./downloads/sf_in_${tempId}.webp`,tempOut=`./downloads/sf_out_${tempId}.${isAnimated?"mp4":"jpg"}`; try{ fs.writeFileSync(tempIn,buf); const cmd=isAnimated?`ffmpeg -i "${tempIn}" -c:v libx264 -pix_fmt yuv420p -movflags faststart -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" "${tempOut}" -y -loglevel error`:`ffmpeg -i "${tempIn}" -frames:v 1 -q:v 2 "${tempOut}" -y -loglevel error`; await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000},(err)=>err?reject(err):resolve());}); if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100) throw new Error("Conversão inválida"); return{buffer:fs.readFileSync(tempOut),isVideo:isAnimated}; }catch(e){return{buffer:buf,isVideo:false,isWebP:true};}finally{try{fs.removeSync(tempIn);}catch{} try{fs.removeSync(tempOut);}catch{}} }
 
 function analisarArquivo(conteudo,nomeArq){
   const ext=nomeArq.split(".").pop()?.toLowerCase();
-  if(ext==="ehi"||ext==="npv"||ext==="hia"){try{let jsonStr=conteudo.trim(); if(!jsonStr.startsWith("{")&&!jsonStr.startsWith("[")){try{jsonStr=Buffer.from(jsonStr,"base64").toString("utf8");}catch{}} const jM=jsonStr.match(/\{[\s\S]+\}/); if(jM) jsonStr=jM[0]; const d=JSON.parse(jsonStr); const nome=d.name||d.configName||nomeArq,servidor=d.server||d.proxyServer||d.sshHost||d.host||"N/A",porta=d.port||d.proxyPort||d.sshPort||"N/A",usuario=d.sshUsername||d.username||d.user||"N/A",senha=d.sshPassword||d.password||"****",payload=d.payload||d.httpPayload||d.customPayload||"N/A",protocolo=d.connectionType||d.protocol||d.mode||(d.sshHost?"SSH":d.proxyServer?"HTTP Proxy":"N/A"),dns=d.dnsServer||d.dns||"N/A",udp=d.udpEnabled||d.udp||false,tls=d.tlsEnabled||d.tls||d.ssl||false,sni=d.sni||d.hostName||d.serverName||"N/A",payloadLimpo=String(payload).replace(/\r?\n/g,"\\n").slice(0,80); return `🔓 *DECRYPT!*\n✦ ─────────── ✦\n📄 *${nomeArq}*\n\n🌐 Host: *${servidor}* | Porta: *${porta}*\nProtocolo: *${protocolo}* | SNI: *${sni}*\n👤 User: *${usuario}* | Senha: *${senha}*\n🔒 TLS: *${tls?"✅":"❌"}* | UDP: *${udp?"✅":"❌"}* | DNS: *${dns}*\n📡 Payload: _${payloadLimpo!=="N/A"?payloadLimpo+"...":"N/A"}_`;}catch(e){return `🔓 *DECRYPT*\n📄 *${nomeArq}*\n${conteudo.slice(0,400)}`;}}
+  if(ext==="ehi"||ext==="npv"||ext==="hia"){try{let jsonStr=conteudo.trim(); if(!jsonStr.startsWith("{")&&!jsonStr.startsWith("[")){try{jsonStr=Buffer.from(jsonStr,"base64").toString("utf8");}catch{}} const jM=jsonStr.match(/\{[\s\S]+\}/); if(jM) jsonStr=jM[0]; const d=JSON.parse(jsonStr); const nome=d.name||d.configName||nomeArq,servidor=d.server||d.proxyServer||d.sshHost||d.host||"N/A",porta=d.port||d.proxyPort||d.sshPort||"N/A",usuario=d.sshUsername||d.username||d.user||"N/A",senha=d.sshPassword||d.password||"****",payload=d.payload||d.httpPayload||d.customPayload||"N/A",protocolo=d.connectionType||d.protocol||d.mode||(d.sshHost?"SSH":d.proxyServer?"HTTP Proxy":"N/A"),dns=d.dnsServer||d.dns||"N/A",udp=d.udpEnabled||d.udp||false,tls=d.tlsEnabled||d.tls||d.ssl||false,sni=d.sni||d.hostName||d.serverName||"N/A",payloadLimpo=String(payload).replace(/\r?\n/g,"\\n").slice(0,80); return `🔓 *DECRYPT!*\n✦ ─────────── ✦\n📄 *${nomeArq}* | *${nome}*\n\n🌐 Host: *${servidor}*\nPorta: *${porta}* | *${protocolo}*\nSNI: *${sni}*\n\n👤 User: *${usuario}* | Senha: *${senha}*\n\n🔒 TLS: *${tls?"✅":"❌"}* | UDP: *${udp?"✅":"❌"}* | DNS: *${dns}*\n\n📡 Payload: _${payloadLimpo!=="N/A"?payloadLimpo+"...":"N/A"}_`;}catch(e){return `🔓 *DECRYPT*\n📄 *${nomeArq}*\n${conteudo.slice(0,400)}`;}}
   const linhaProto=conteudo.trim().split("\n").find(l=>/^(vless|vmess|trojan|ss):\/\//i.test(l.trim()));
-  if(linhaProto){try{const url=new URL(linhaProto.trim()),proto=url.protocol.replace(":",""),params=Object.fromEntries(url.searchParams),nome=decodeURIComponent(url.hash?.slice(1)||"N/A"); return `🔓 *DECRYPT*\n✦ ─────────── ✦\n📄 *${nomeArq}*\n🌐 Host: *${url.hostname}* | Porta: *${url.port||"N/A"}*\nProtocolo: *${proto.toUpperCase()}* | SNI: *${params.sni||"N/A"}*\n🔒 TLS: *${params.security==="tls"||params.security==="reality"?"✅":"❌"}*`;}catch{}}
+  if(linhaProto){try{const url=new URL(linhaProto.trim()),proto=url.protocol.replace(":",""),params=Object.fromEntries(url.searchParams),nome=decodeURIComponent(url.hash?.slice(1)||"N/A"); return `🔓 *DECRYPT*\n✦ ─────────── ✦\n📄 *${nomeArq}* | Nome: *${nome}*\n\n🌐 Host: *${url.hostname}* | Porta: *${url.port||"N/A"}*\nProtocolo: *${proto.toUpperCase()}* | SNI: *${params.sni||"N/A"}*\n🔒 TLS: *${params.security==="tls"||params.security==="reality"?"✅":"❌"}*`;}catch{}}
   const linhas=conteudo.split("\n"),info={servidor:"N/A",porta:"N/A",protocolo:"N/A",cifra:"N/A",dns:[],tls:false};
   for(const linha of linhas){const l=linha.trim(),ll=l.toLowerCase(); if(ll.startsWith("remote ")){const p=l.split(/\s+/); info.servidor=p[1]||"N/A"; info.porta=p[2]||"N/A"; if(p[3]) info.protocolo=p[3].toUpperCase();} if(ll.startsWith("proto ")) info.protocolo=l.split(" ")[1]?.trim().toUpperCase()||info.protocolo; if(ll.startsWith("cipher ")) info.cifra=l.split(" ")[1]?.trim()||"N/A"; if(ll.startsWith("dhcp-option dns")) info.dns.push(l.split(/\s+/)[2]?.trim()); if(ll.includes("tls-auth")||ll.includes("tls-crypt")) info.tls=true;}
-  return `🔓 *DECRYPT*\n✦ ─────────── ✦\n📄 *${nomeArq}*\n🌐 Host: *${info.servidor}* | Porta: *${info.porta}*\nProtocolo: *${info.protocolo}* | Cifra: *${info.cifra}*\n🔒 TLS: *${info.tls?"✅":"❌"}* | DNS: *${info.dns.join(", ")||"N/A"}*`;
+  return `🔓 *DECRYPT*\n✦ ─────────── ✦\n📄 *${nomeArq}*\n🌐 Host: *${info.servidor}* | Porta: *${info.porta}*\nProtocolo: *${info.protocolo}*\n🔒 Cifra: *${info.cifra}* | TLS: *${info.tls?"✅":"❌"}*\n🌍 DNS: *${info.dns.join(", ")||"N/A"}*`;
 }
 
-async function verificarInativos(sock){try{const ativos=fs.readJsonSync(ARQUIVO_ATIVOS),agora=Date.now(),LIMITE=30*24*60*60*1000; for(const gJid of Object.keys(ativos)){try{const meta=await sock.groupMetadata(gJid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)); for(const m of meta.participants){const mId=extrairJid(m.id||m); if(admins.includes(mId)||ehDono(mId)) continue; const ultima=ativos[gJid]?.[mId]; if(!ultima||(agora-ultima)>LIMITE){try{await sock.groupParticipantsUpdate(gJid,[mId],"remove"); await sock.sendMessage(gJid,{text:`🚨 @${mId.split("@")[0]} removido por *inatividade*!`,mentions:[mId]});}catch{}}}}catch{}}}catch{}}
+async function verificarInativos(sock){ try{const ativos=fs.readJsonSync(ARQUIVO_ATIVOS),agora=Date.now(),LIMITE=CONFIG.DIAS_INATIVO*24*60*60*1000; for(const gJid of Object.keys(ativos)){try{const meta=await sock.groupMetadata(gJid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)); for(const m of meta.participants){const mId=extrairJid(m.id||m); if(admins.includes(mId)||ehDono(mId)) continue; const ultima=ativos[gJid]?.[mId]; if(!ultima||(agora-ultima)>LIMITE){try{await sock.groupParticipantsUpdate(gJid,[mId],"remove"); await sock.sendMessage(gJid,{text:`🚨 @${mId.split("@")[0]} removido por *inatividade*!`,mentions:[mId]});}catch{}}}}catch{}}}catch{} }
 
-async function encontrarGrupoPorArg(sock,ativos,args){
-  const idx=parseInt(args[0]); if(!isNaN(idx)&&idx>=1&&idx<=ativos.length) return{grupoJid:ativos[idx-1],mensagem:args.slice(1).join(" ")};
-  try{const grupos=await sock.groupFetchAllParticipating(); for(let len=args.length;len>=1;len--){const nomeTentativa=args.slice(0,len).join(" ").toLowerCase(); const encontrado=ativos.find(gJid=>(grupos[gJid]?.subject||"").toLowerCase().includes(nomeTentativa)); if(encontrado&&len<args.length) return{grupoJid:encontrado,mensagem:args.slice(len).join(" ")};}}catch{}
-  return{grupoJid:null,mensagem:""};
+async function encontrarGrupoPorArg(sock, ativos, args) {
+  const idx = parseInt(args[0]);
+  if (!isNaN(idx) && idx >= 1 && idx <= ativos.length) {
+    return { grupoJid: ativos[idx - 1], mensagem: args.slice(1).join(" ") };
+  }
+  try {
+    const grupos = await sock.groupFetchAllParticipating();
+    for (let len = args.length; len >= 1; len--) {
+      const nomeTentativa = args.slice(0, len).join(" ").toLowerCase();
+      const encontrado = ativos.find(gJid => {
+        const nome = (grupos[gJid]?.subject || "").toLowerCase();
+        return nome.includes(nomeTentativa);
+      });
+      if (encontrado && len < args.length) {
+        return { grupoJid: encontrado, mensagem: args.slice(len).join(" ") };
+      }
+    }
+  } catch {}
+  return { grupoJid: null, mensagem: "" };
 }
 
-async function varreduraGrupos(sock){
-  try{
+async function varreduraGrupos(sock, ehPrimeira=true) {
+  try {
     console.log("🔍 A fazer scan dos grupos...");
-    await new Promise(r=>setTimeout(r,4000));
-    const grupos=await sock.groupFetchAllParticipating();
-    let activados=0;
-    for(const [gJid,meta] of Object.entries(grupos)){
-      try{
-        const participantes=(meta.participants||[]).map(p=>extrairJid(p.id||p));
-        const donoNoGrupo=participantes.find(p=>ehDono(p));
-        if(donoNoGrupo){ gruposAtivados.add(gJid); activados++; await new Promise(r=>setTimeout(r,300)); }
-      }catch{}
+    await new Promise(r => setTimeout(r, 4000));
+    const grupos = await sock.groupFetchAllParticipating();
+    let activados = 0;
+    for (const [gJid, meta] of Object.entries(grupos)) {
+      try {
+        const participantes = (meta.participants || []).map(p => extrairJid(p.id || p));
+        const donoNoGrupo = participantes.find(p => ehDono(p));
+        if (donoNoGrupo) {
+          gruposAtivados.add(gJid);
+          activados++;
+          if (ehPrimeira) {
+            const gifOk = await enviarGif(sock, gJid, caption);
+            if (!gifOk) await enviarComFoto(sock, gJid, caption, ppBotUrl);
+          }
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      } catch {}
     }
     console.log(`✅ Scan: ${activados} grupo(s) activado(s).`);
-  }catch(e){console.log("❌ Auto-scan:",e.message);}
+  } catch(e) { console.log("❌ Auto-scan:", e.message); }
 }
 
-async function enviarGif(sock,jid,caption="",quotedMsg=null){
-  const tempOut=path.join("./downloads",`gif_${Date.now()}.mp4`);
-  const UA="Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 Chrome/112.0";
-  const pesquisas=["ytsearch1:solo leveling arise sung jinwoo shadow soldiers short clip","ytsearch1:solo leveling sung jin woo rise scene"];
-  for(const pesquisa of pesquisas){
-    try{
-      await runCmd(`yt-dlp --no-check-certificate --no-playlist --no-warnings --force-ipv4 --geo-bypass --match-filter "duration < 60" --extractor-args "youtube:player_client=android,ios" --add-header "User-Agent:${UA}" -f "best[height<=480][ext=mp4]/best[height<=480]/worst" --max-filesize 8M -o "${tempOut}" "${pesquisa}"`);
-      if(fs.existsSync(tempOut)&&fs.statSync(tempOut).size>5000){
-        const buf=fs.readFileSync(tempOut);
-        try{fs.removeSync(tempOut);}catch{}
-        await sock.sendMessage(jid,{video:buf,gifPlayback:true,caption,mimetype:"video/mp4"},quotedMsg?{quoted:quotedMsg}:{});
-        return true;
-      }
-    }catch(e){console.log(`❌ GIF: ${e.message.slice(0,60)}`);}
-    finally{try{if(fs.existsSync(tempOut)) fs.removeSync(tempOut);}catch{}}
-  }
-  return false;
-}
-
-async function banirComContagem(sock,jid,sender,msgKey,motivo="Infração das regras"){
-  const banKey=`${jid}_${sender}`;
-  if(banEmCurso.has(banKey)) return;
-  banEmCurso.add(banKey);
-  try{
-    try{await sock.sendMessage(jid,{delete:msgKey});}catch{}
-    for(let i=5;i>=0;i--){try{await sock.sendMessage(jid,{text:`⏳ *${i}...*`});}catch{} await new Promise(r=>setTimeout(r,900));}
-    try{await sock.sendMessage(jid,{text:`BANNNN❌️\n\n🚨 @${sender.split("@")[0]} foi *BANIDO!*\n_Motivo: ${motivo}_`,mentions:[sender]});}catch{}
-    await new Promise(r=>setTimeout(r,500));
-    try{await sock.groupParticipantsUpdate(jid,[sender],"remove");}catch{}
-    try{await sock.sendMessage(jid,{text:`🔨 @${sender.split("@")[0]} *REMOVIDO!*\n*BAZAAA...* 😂💨`,mentions:[sender]});}catch{}
-  }finally{setTimeout(()=>banEmCurso.delete(banKey),5000);}
-}
-
-async function proximaPergunta(sock,jid){
+async function proximaPergunta(sock, jid) {
   const loop=jogoLoop[jid]; if(!loop||!loop.activo) return;
   const{tipo,categoria,usadas=[]}=loop;
   let p=await gerarJogoIA(tipo,categoria,usadas);
-  if(!p){if(tipo==="quiz") p=selecionarSemRepetir(QUIZ_BANCO,usadas); if(tipo==="vof") p=selecionarSemRepetir(VOF_BANCO,usadas); if(tipo==="completar") p=selecionarSemRepetir(COMPLETAR_BANCO,usadas); if(tipo==="caca") p=selecionarSemRepetir(CACA_BANCO,usadas); if(tipo==="guerra") p=selecionarSemRepetir(GUERRA_BANCO,usadas);}
-  if(!p){loop.usadas=[]; if(tipo==="quiz") p=QUIZ_BANCO[Math.floor(Math.random()*QUIZ_BANCO.length)]; if(tipo==="vof") p=VOF_BANCO[Math.floor(Math.random()*VOF_BANCO.length)]; if(tipo==="completar") p=COMPLETAR_BANCO[Math.floor(Math.random()*COMPLETAR_BANCO.length)]; if(tipo==="caca") p=CACA_BANCO[Math.floor(Math.random()*CACA_BANCO.length)]; if(tipo==="guerra") p=GUERRA_BANCO[Math.floor(Math.random()*GUERRA_BANCO.length)]; await enviarSemFoto(sock,jid,`🔄 *Banco reiniciado!*`);}
+  if(!p){ if(tipo==="quiz") p=selecionarSemRepetir(QUIZ_BANCO,usadas); if(tipo==="vof") p=selecionarSemRepetir(VOF_BANCO,usadas); if(tipo==="completar") p=selecionarSemRepetir(COMPLETAR_BANCO,usadas); if(tipo==="caca") p=selecionarSemRepetir(CACA_BANCO,usadas); if(tipo==="guerra") p=selecionarSemRepetir(GUERRA_BANCO,usadas); }
+  if(!p){ loop.usadas=[]; if(tipo==="quiz") p=QUIZ_BANCO[Math.floor(Math.random()*QUIZ_BANCO.length)]; if(tipo==="vof") p=VOF_BANCO[Math.floor(Math.random()*VOF_BANCO.length)]; if(tipo==="completar") p=COMPLETAR_BANCO[Math.floor(Math.random()*COMPLETAR_BANCO.length)]; if(tipo==="caca") p=CACA_BANCO[Math.floor(Math.random()*CACA_BANCO.length)]; if(tipo==="guerra") p=GUERRA_BANCO[Math.floor(Math.random()*GUERRA_BANCO.length)]; await enviarSemFoto(sock,jid,`🔄 *Banco reiniciado!*`); }
   if(!p){delete jogoLoop[jid]; delete jogoAtivo[jid]; return;}
   const idP=p.p||p.palavra||p.c||p.i; loop.usadas=[...(loop.usadas||[]),idP]; loop.rodada=(loop.rodada||0)+1;
   const R=`Rodada *${loop.rodada}*`; const S=`\n🛑 *${CONFIG.PREFIXO}stop* para parar`;
@@ -2078,277 +824,57 @@ async function proximaPergunta(sock,jid){
   if(tipo==="guerra"){jogoAtivo[jid]={tipo:"guerra",palavra:p.palavra,dica:p.dica,letrasAcertadas:[],letrasErradas:[],maxErros:6}; loop.timeoutHandle=setTimeout(async()=>{if(jogoAtivo[jid]?.tipo==="guerra"&&jogoLoop[jid]?.activo){await enviarSemFoto(sock,jid,`⏰ *Tempo!*\nPalavra: *${p.palavra}*\n⏳ Próxima em 5s...`); delete jogoAtivo[jid]; setTimeout(()=>proximaPergunta(sock,jid),5000);}},90000); await enviarComFoto(sock,jid,`⚔️ *GUERRA* — ${R}\n✦ ─────────── ✦\n🔤 ${p.palavra.split("").map(()=>"_").join(" ")}\n💡 ${p.dica}\n❤️❤️❤️❤️❤️❤️\n\n⏰ 90s | 🏆 +80 XP${S}`,ppBotUrl);}
 }
 
-// ✅ Reconhece música (lógica partilhada entre !busca e !shazam)
-async function executarReconhecimentoMusica(sock,jid,msg,sender,comAnimacao){
-  const audioData=await downloadAudioDaMensagem(msg);
-  if(!audioData){
-    await enviarSemFoto(sock,jid,`┌─⊱ 『 🎵 RECONHECER MÚSICA 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}${comAnimacao?"shazam":"busca"}*\n    _↩️ responde nota de voz_\n    _↳ reconhece a música automaticamente_\n│\n└──────────────────────────────⊰`);
-    return;
-  }
-
-  if(comAnimacao){
-    // ✅ Animação ⚡ APENAS no !shazam
-    await reagir(sock,msg,"⚡");
-    await sock.sendMessage(jid,{text:"⚡"},{quoted:msg});
-    await new Promise(r=>setTimeout(r,400));
-    await sock.sendMessage(jid,{text:"⚡⚡"});
-    await new Promise(r=>setTimeout(r,400));
-    await sock.sendMessage(jid,{text:"⚡⚡⚡ *A reconhecer a música...*"});
-    await new Promise(r=>setTimeout(r,500));
-  }else{
-    // !busca — sem animação, apenas reagir
-    await reagir(sock,msg,"🎵");
-    await enviarSemFoto(sock,jid,`🎵 A reconhecer a música...\n⏳`);
-  }
-
-  try{
-    const resultado=await reconhecerMusica(audioData.buffer);
-    if(resultado.status==="success"&&resultado.result){
-      const r=resultado.result;
-      const spotify=r.spotify?.external_urls?.spotify||"";
-      const apple=r.apple_music?.url||"";
-      const coverUrl=r.spotify?.album?.images?.[0]?.url||null;
-      const textoMusica=`┌─⊱ 『 ⚡ MÚSICA RECONHECIDA! 』 ⊰─┐\n│\n◎ ─ 🎵 *${r.title}*\n◎ ─ 👤 ${r.artist}\n◎ ─ 💿 ${r.album||"N/A"}${spotify?`\n◎ ─ 🟢 ${spotify}`:""}${apple?`\n◎ ─ 🍎 ${apple}`:""}\n│\n└──────────────────────────────⊰`;
-      if(coverUrl) await sock.sendMessage(jid,{image:{url:coverUrl},caption:textoMusica},{quoted:msg});
-      else await enviarSemFoto(sock,jid,textoMusica,msg);
-      await reagir(sock,msg,"🎵"); addXP(sender,5);
-    }else{
-      await reagir(sock,msg,"❌");
-      await enviarSemFoto(sock,jid,`┌─⊱ 『 🎵 SHAZAM 』 ⊰─┐\n│\n◎ ─ ❌ Música não reconhecida.\n◎ ─ _Tenta com áudio mais claro._\n│\n└──────────────────────────────⊰`);
-    }
-  }catch(e){
-    await reagir(sock,msg,"❌");
-    await enviarSemFoto(sock,jid,`❌ Erro: ${e.message}`);
-  }
-}
-
 let tentativasReconexao=0;
 
-async function startBot(){
+async function startBot() {
   try{
-    addBotLog("Iniciando bot L1TTL3B0Y...", 'info');
-
-    // ===== RESTAURA SESSÃO COMPLETA DO MONGODB ANTES DE CRIAR AUTH STATE (Render Free) =====
-    // Isso garante sessão hospedada sobrevive a redeploys
-    if(mongoModule && CONFIG.MONGODB_URI){
-      try{
-        // Primeiro tenta restaurar sessão completa (vários arquivos)
-        const sessaoCompleta = await mongoModule.loadSessionFromMongo?.("sessao_completa");
-        if(sessaoCompleta && typeof sessaoCompleta === 'object'){
-          const precisaRestaurar = !fs.existsSync("./sessao/creds.json");
-          if(precisaRestaurar){
-            fs.ensureDirSync("./sessao");
-            let count=0;
-            for(const [fname, content] of Object.entries(sessaoCompleta)){
-              try{
-                const fpath = path.join("./sessao", fname);
-                // content pode ser string JSON ou objeto
-                if(typeof content === 'string'){
-                  // Tenta detectar se é JSON
-                  try{
-                    const parsed = JSON.parse(content);
-                    fs.writeJsonSync(fpath, parsed);
-                  }catch{
-                    fs.writeFileSync(fpath, content, 'utf8');
-                  }
-                }else{
-                  fs.writeJsonSync(fpath, content);
-                }
-                count++;
-              }catch(e){ console.log(`⚠️ Erro restaurar ${fname}:`, e.message); }
-            }
-            if(count>0){
-              console.log(`♻️ Sessão completa restaurada do MongoDB: ${count} arquivos - sessão hospedada!`);
-              addBotLog(`Sessão hospedada restaurada: ${count} arquivos do MongoDB`, 'success');
-            }
-          }
-        } else {
-          // Fallback: tenta restaurar só creds.json (compatibilidade antiga)
-          if(!fs.existsSync("./sessao/creds.json")){
-            const savedCreds = await mongoModule.loadSessionFromMongo?.("creds");
-            if(savedCreds){
-              fs.ensureDirSync("./sessao");
-              fs.writeJsonSync("./sessao/creds.json", savedCreds);
-              console.log("♻️ Sessão creds.json restaurada do MongoDB!");
-              addBotLog("Sessão creds restaurada do MongoDB", 'success');
-            }
-          }
-        }
-      }catch(e){ console.log("⚠️ Restore Mongo sessão:", e.message); }
-    }
-
     const{version}=await fetchLatestBaileysVersion();
     const{state,saveCreds}=await useMultiFileAuthState("./sessao");
-    const sock=makeWASocket({
-      version,auth:state,
-      printQRInTerminal:false,
-      getMessage:async()=>({conversation:""}),
-      generateHighQualityLinkPreview:false,
-      fetchAgent:httpsAgent,
-      logger:silentLogger,
-      connectTimeoutMs:60000,
-      keepAliveIntervalMs:10000,
-      retryRequestDelayMs:2000,
-      maxMsgRetryCount:3,
-      // ✅ Aumenta timeout para media upload
-      defaultQueryTimeoutMs:60000*3,
-    });
-    globalSock = sock;
-    connectionStatus = "connecting";
-    addBotLog("Socket Baileys criado, aguardando conexão... Conecte via dashboard /dashboard → Aba Conexão → Código será notificado no WhatsApp alvo", 'info');
-    sock.ev.on("creds.update",async ()=>{
-      await saveCreds();
-      // Backup completo da sessão para MongoDB - sessão hospedada sobrevive redeploy Render
-      try {
-        if (mongoModule && mongoConectado && mongoModule.saveSessionToMongo) {
-          // Salva pasta ./sessao inteira
-          if(fs.existsSync("./sessao")){
-            const files = fs.readdirSync("./sessao").filter(f=>!f.startsWith('.') && fs.statSync(path.join("./sessao",f)).isFile());
-            const sessaoData = {};
-            for(const fname of files){
-              try{
-                const fpath = path.join("./sessao", fname);
-                const content = fs.readFileSync(fpath, 'utf8');
-                sessaoData[fname] = content;
-              }catch{}
-            }
-            if(Object.keys(sessaoData).length>0){
-              await mongoModule.saveSessionToMongo("sessao_completa", sessaoData);
-              // Também salva creds separado para compatibilidade
-              const credsPath = "./sessao/creds.json";
-              if(fs.existsSync(credsPath)){
-                const credsData = fs.readJsonSync(credsPath);
-                await mongoModule.saveSessionToMongo("creds", credsData);
-              }
-              addBotLog(`Backup sessão hospedada: ${Object.keys(sessaoData).length} arquivos salvos no MongoDB`, 'info');
-            }
-          }
-        }
-      } catch(e) { console.log("⚠️ Backup Mongo sessão hospedada:", e.message); }
-    });
+    const sock=makeWASocket({version,auth:state,printQRInTerminal:false,getMessage:async()=>({conversation:""}),generateHighQualityLinkPreview:false,fetchAgent:httpsAgent,logger:silentLogger,connectTimeoutMs:60000,keepAliveIntervalMs:10000,retryRequestDelayMs:2000,maxMsgRetryCount:3});
+    sock.ev.on("creds.update",saveCreds);
     setInterval(()=>verificarInativos(sock),24*60*60*1000);
-    // Backup periódico a cada 5 minutos da sessão completa - sessão hospedada
-    setInterval(async()=>{
-      try{
-        if(mongoModule && mongoConectado && fs.existsSync("./sessao/creds.json")){
-          const files = fs.readdirSync("./sessao").filter(f=>fs.statSync(path.join("./sessao",f)).isFile());
-          const sessaoData = {};
-          for(const fname of files){
-            try{ sessaoData[fname] = fs.readFileSync(path.join("./sessao", fname), 'utf8'); }catch{}
-          }
-          if(Object.keys(sessaoData).length>0){
-            await mongoModule.saveSessionToMongo("sessao_completa", sessaoData);
-          }
-        }
-      }catch{}
-    }, 5*60*1000);
 
-    sock.ev.on("connection.update",async({connection,lastDisconnect, qr})=>{
-      // Captura QR Code para dashboard - Pair Code e QR Code devem funcionar, essencial Pair Code
-      // Tamanho correto 280x280 para canvas, site operacional
-      if(qr){
+    if(!sock.authState.creds.registered){
+      const phoneNumber=CONFIG.NUMERO_BOT.replace(/\D/g,"");
+      console.log("⏳ A aguardar ligação estável...");
+      await new Promise(r=>setTimeout(r,8000));
+      if(!sock.authState.creds.registered){
         try{
-          const QRCode = require('qrcode');
-          // Gera dataURL base64 com tamanho correto 280x280 para canvas não esticar
-          const dataUrl = await QRCode.toDataURL(qr, {width:280, margin:1, color:{dark:'#000000', light:'#FFFFFF'}});
-          if(dataUrl){
-            currentQR = dataUrl; // base64 data URL para canvas tamanho correto
-            addBotLog(`QR Code gerado base64 280x280 para dashboard canvas tamanho correto`, 'info');
-          }else{
-            currentQR = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qr)}`;
-            addBotLog(`QR Code gerado via qrserver 280x280`, 'info');
-          }
-        }catch(e){
-          // Fallback qrserver com tamanho correto
-          currentQR = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qr)}`;
-          addBotLog(`QR Code gerado fallback qrserver 280x280: ${e.message}`, 'info');
-        }
-        connectionStatus = "qr";
+          const code=await sock.requestPairingCode(phoneNumber);
+          const codeFmt=code?.match(/.{1,4}/g)?.join("-")||code;
+          console.log("\n╔══════════════════════════════════════════╗");
+          console.log("║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║");
+          console.log("╠══════════════════════════════════════════╣");
+          console.log(`║           ➤  ${codeFmt}  ◄             ║`);
+          console.log("╠══════════════════════════════════════════╣");
+          console.log(`║  📞 Número: +${phoneNumber}             ║`);
+          console.log("║  ⏰ Tens 30 segundos!                    ║");
+          console.log("╚══════════════════════════════════════════╝\n");
+        }catch(e){console.error("❌ Erro ao solicitar código:",e.message); process.exit(1);}
       }
+    }
 
-      if(connection){
-        connectionStatus = connection;
-        addBotLog(`Conexão status: ${connection}`, connection==="open"?'success':connection==="close"?'error':'info');
-      }
-
+    sock.ev.on("connection.update",async({connection,lastDisconnect})=>{
       if(connection==="close"){
         const codigo=lastDisconnect?.error?.output?.statusCode,motivo=lastDisconnect?.error?.message||"desconhecido";
         console.log(`\n❌ Desconectado | Código: ${codigo} | Motivo: ${motivo}`);
-        addBotLog(`Desconectado Código ${codigo}: ${motivo}`, 'error');
-        connectionStatus = "close";
         if(codigo===DisconnectReason.loggedOut||codigo===401){
-          if(motivo.includes("conflict")){
-            console.log("\n⚠️ CONFLITO — reconectando em 15s...\n");
-            addBotLog("Conflito de sessão, reconectando em 15s...", 'error');
-            setTimeout(()=>startBot(),15000); return;
-          }
-          console.log("\n⚠️ Sessão expirada!\n   rm -rf sessao/ && node index.js\n");
-          addBotLog("Sessão expirada! Apague ./sessao e pareie novamente via dashboard", 'error');
-          connectionNumber = null;
-          currentPairingCode = null;
-          currentQR = null;
-          // Não sai do processo no Render, tenta reconectar para gerar novo código
-          tentativasReconexao++;
-          setTimeout(()=>startBot(),5000);
-          return;
+          if(motivo.includes("conflict")){console.log("\n⚠️ CONFLITO — reconectando em 15s...\n"); setTimeout(()=>startBot(),15000); return;}
+          console.log("\n⚠️ Sessão expirada!\n   rm -rf sessao/ && node index.js\n"); process.exit(0);
         }
         tentativasReconexao++;
         setTimeout(()=>startBot(),Math.min(5000*tentativasReconexao,60000));
       }
       if(connection==="open"){
         tentativasReconexao=0;
-        connectionStatus = "open";
         console.log(`\n✅ Bot conectado! +${CONFIG.NUMERO_BOT}`);
         console.log(`📅 ${new Date().toLocaleString("pt-AO",{timeZone:"Africa/Luanda"})}\n`);
-        addBotLog(`Bot conectado com sucesso! +${CONFIG.NUMERO_BOT}`, 'success');
-        try{
-          connectionNumber = sock.user?.id?.split(':')[0] || sock.user?.id || CONFIG.NUMERO_BOT;
-          ppBotUrl=await sock.profilePictureUrl(sock.user.id,"image");
-        }catch{ppBotUrl=null;}
-        currentPairingCode = null;
-        currentQR = null;
-        setTimeout(()=>varreduraGrupos(sock),5000);
+        try{ppBotUrl=await sock.profilePictureUrl(sock.user.id,"image");}catch{ppBotUrl=null;}
+        const ehPrimeira = primeiraConexao;
+        if(primeiraConexao) primeiraConexao = false;
+        setTimeout(()=>varreduraGrupos(sock, ehPrimeira), 5000);
       }
     });
-
-
-
-
-    // Sistema Pair Code e QR Code via dashboard - alvo recebe notificação pedindo código
-    // Dashboard funcional: campo número bot + botão gerar Pair Code ou QR Code (essencial Pair)
-    // Todas variáveis no Render: BOT_NUMBER, MONGODB_URI, etc
-    if(!sock.authState.creds.registered){
-      const phoneNumber=CONFIG.NUMERO_BOT.replace(/\D/g,"");
-      console.log("⏳ Bot aguardando conexão via dashboard...");
-      addBotLog(`Bot aguardando conexão via dashboard /dashboard → Conectar → Gere Pair Code ou QR Code. Número: +${phoneNumber}. Todas variáveis no Render. Dashboard sabe on/offline, se offline gera novo código automaticamente. Sessão hospedada MongoDB.`, 'info');
-      
-      // Só gera automaticamente se AUTO_PAIR_CODE=true, senão aguarda dashboard gerar (mais funcional)
-      const shouldAutoGenerate = process.env.AUTO_PAIR_CODE === "true" || process.env.AUTO_PAIR_CODE === "1";
-      if(shouldAutoGenerate){
-        console.log("🔑 AUTO_PAIR_CODE=true - Gerando código automaticamente + notificação para alvo...");
-        await new Promise(r=>setTimeout(r,8000));
-        if(!sock.authState.creds.registered){
-          try{
-            const code=await sock.requestPairingCode(phoneNumber);
-            currentPairingCode = code;
-            const codeFmt=code?.match(/.{1,4}/g)?.join("-")||code;
-            console.log("\n╔══════════════════════════════════════════╗");
-            console.log("║        🔑 CÓDIGO DE PAREAMENTO 🔑        ║");
-            console.log("╠══════════════════════════════════════════╣");
-            console.log(`║           ➤  ${codeFmt}  ◄             ║`);
-            console.log(`║  📞 Número: +${phoneNumber}             ║`);
-            console.log("║  🔔 Alvo receberá notificação WhatsApp   ║");
-            console.log("╚══════════════════════════════════════════╝\n");
-            addBotLog(`Código Pair gerado auto: ${codeFmt} para +${phoneNumber} - WhatsApp alvo receberá notificação pedindo código. Dashboard operacional tamanho correto.`, 'success');
-          }catch(e){
-            console.error("❌ Erro código auto:",e.message);
-            addBotLog(`Erro código auto: ${e.message} - Use dashboard Pair Code, alvo recebe notificação`, 'error');
-          }
-        }
-      } else {
-        addBotLog(`Aguardando Pair Code ser gerado via dashboard /dashboard → Conectar. O WhatsApp alvo +${phoneNumber} receberá notificação pedindo código quando gerar. Todas variáveis no Render. Tamanho canvas 280x280 correto. Site operacional.`, 'info');
-      }
-    }
 
     sock.ev.on("group-participants.update",async(update)=>{
       try{
@@ -2396,218 +922,39 @@ async function startBot(){
         const isDono=ehDono(sender),texto=getTexto(msg);
         const mencoes=msg.message?.extendedTextMessage?.contextInfo?.mentionedJid||[];
 
-        if(isGrupo&&!msg.key.fromMe){
+        if(isGrupo && !msg.key.fromMe){
           if(!historyMsgs[jid]) historyMsgs[jid]=[];
-          historyMsgs[jid].push({key:msg.key,sender,texto:getTexto(msg)||"",timestamp:Date.now()});
-          if(historyMsgs[jid].length>MAX_HISTORY) historyMsgs[jid].shift();
+          historyMsgs[jid].push({ key: msg.key, sender, texto: getTexto(msg)||"", timestamp: Date.now() });
+          if(historyMsgs[jid].length > MAX_HISTORY) historyMsgs[jid].shift();
         }
+
         if(isGrupo){addXP(sender,2); registarAtividade(sender,jid); salvarNoBuffer(jid,{sender,texto,mencoes,timestamp:Date.now()});}
 
-        // ✅ HANDLER: ButtonV2 clicado
-        const btnResp=msg.message?.buttonsResponseMessage;
-        if(btnResp){
-          const btnId=btnResp.selectedButtonId||btnResp.body||"";
-          if(isGrupo&&!isDono&&!gruposAtivados.has(jid)) return;
-          if(chatsDesativados.has(jid)&&!isDono) return;
-
-          // Botão MENU → categorias
-          if(btnId==="btn_abrir_menu"){
-            await reagir(sock,msg,"✅");
-            await enviarCategoriasBotoes(sock,jid,msg,isDono);
-            return;
-          }
-
-          // Botão ISAÍAS PEDRO → info do dono
-          if(btnId==="btn_dono_info"){
-            await reagir(sock,msg,"👑");
-            let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}
-            const tD=`┌─⊱ 『 👑 CRIADOR DO BOT 』 ⊰─┐\n│\n◎ ─ 🏷️ *${CONFIG.DONO_NOME}*\n◎ ─ 📞 *${CONFIG.DONO_NUM}*\n│\n◎ ─ 🤖 Bot: *LORDE LÁ DJUM v3.5*\n◎ ─ 💰 *${CONFIG.PREFIXO}alugar* para alugar\n│\n└──────────────────────────────⊰`;
-            if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg});
-            else await enviarSemFoto(sock,jid,tD,msg);
-            return;
-          }
-
-          // ✅ Botões de !play — play_audio / play_video / play_hd
-          if(["play_audio","play_video","play_hd"].includes(btnId)){
-            const chavePlay=`${jid}_${sender}`;
-            const pending=playPending.get(chavePlay);
-            if(!pending||(Date.now()-pending.timestamp)>300000){
-              await enviarSemFoto(sock,jid,"❌ Pedido expirado. Usa *!play* novamente."); return;
-            }
-            playPending.delete(chavePlay);
-            const{entrada}=pending;
-
-            if(btnId==="play_audio"){
-              await reagir(sock,msg,"⬇️");
-              await enviarSemFoto(sock,jid,`⬇️ A baixar áudio...\n⏳`);
-              let arq=null; try{arq=await downloadMusica(entrada,false);}catch{}
-              if(!arq){await enviarSemFoto(sock,jid,"❌ Não encontrei."); await reagir(sock,msg,"❌"); return;}
-              try{await enviarAudio(sock,jid,arq,msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
-              setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
-            }else if(btnId==="play_video"){
-              await reagir(sock,msg,"⬇️");
-              await enviarSemFoto(sock,jid,`⬇️ A baixar vídeo 480p...\n⏳`);
-              let saida=null; try{saida=await downloadVideo(entrada);}catch{}
-              if(!saida){await enviarSemFoto(sock,jid,"❌ Não consegui."); await reagir(sock,msg,"❌"); return;}
-              try{await enviarVideo(sock,jid,saida,`🎬 ${pending.titulo||entrada}\n_© LORDE LÁ DJUM_`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
-              setTimeout(()=>{try{fs.removeSync(saida);}catch{}},15000);
-            }else if(btnId==="play_hd"){
-              await reagir(sock,msg,"⬇️");
-              await enviarSemFoto(sock,jid,`⬇️ A baixar vídeo 720p...\n⏳`);
-              try{
-                const result=await downloadVideoHD(entrada,720);
-                await enviarVideo(sock,jid,result.filePath,`📹 ${pending.titulo||entrada}\n🎬 ${result.quality} | 💾 ${result.sizeMB}MB\n_© LORDE LÁ DJUM_`,[sender],msg);
-                await reagir(sock,msg,"✅"); addXP(sender,5);
-                setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);
-              }catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`); await reagir(sock,msg,"❌");}
-            }
-            return;
-          }
-
-          // Categoria clicada
-          if(btnId&&btnId.startsWith("cat_")){
-            await enviarSubmenu(sock,jid,msg,btnId); return;
-          }
-        }
-
-        // ✅ HANDLER: interactiveResponseMessage
-        const interResp=msg.message?.interactiveResponseMessage;
-        if(interResp){
-          let btnId=null;
-          try{const nf=interResp.nativeFlowResponseMessage; if(nf?.paramsJson){const params=JSON.parse(nf.paramsJson); btnId=params.id||params.selectedId||null;}}catch{}
-          if(!btnId) btnId=interResp.body||null;
-          if(btnId){
-            if(btnId==="btn_abrir_menu"){await reagir(sock,msg,"✅"); await enviarCategoriasBotoes(sock,jid,msg,isDono); return;}
-            if(btnId==="btn_dono_info"){await reagir(sock,msg,"👑"); let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{} const tD=`┌─⊱ 『 👑 CRIADOR DO BOT 』 ⊰─┐\n│\n◎ ─ 🏷️ *${CONFIG.DONO_NOME}*\n◎ ─ 📞 *${CONFIG.DONO_NUM}*\n│\n└──────────────────────────────⊰`; if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg}); else await enviarSemFoto(sock,jid,tD,msg); return;}
-            if(["play_audio","play_video","play_hd"].includes(btnId)){
-              const fakeMsg={...msg,message:{buttonsResponseMessage:{selectedButtonId:btnId}}};
-              // Redireciona para o handler de buttonsResponse
-              const chavePlay=`${jid}_${sender}`;
-              const pending=playPending.get(chavePlay);
-              if(!pending){await enviarSemFoto(sock,jid,"❌ Pedido expirado. Usa *!play* novamente."); return;}
-              playPending.delete(chavePlay);
-              const{entrada}=pending;
-              if(btnId==="play_audio"){await reagir(sock,msg,"⬇️"); await enviarSemFoto(sock,jid,`⬇️ A baixar áudio...\n⏳`); let arq=null; try{arq=await downloadMusica(entrada,false);}catch{} if(!arq){await enviarSemFoto(sock,jid,"❌ Não encontrei."); return;} try{await enviarAudio(sock,jid,arq,msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);}
-              else if(btnId==="play_video"){await reagir(sock,msg,"⬇️"); await enviarSemFoto(sock,jid,`⬇️ A baixar vídeo...\n⏳`); let saida=null; try{saida=await downloadVideo(entrada);}catch{} if(!saida){await enviarSemFoto(sock,jid,"❌ Não consegui."); return;} try{await enviarVideo(sock,jid,saida,`🎬 ${pending.titulo||entrada}`,[ sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} setTimeout(()=>{try{fs.removeSync(saida);}catch{}},15000);}
-              else if(btnId==="play_hd"){await reagir(sock,msg,"⬇️"); await enviarSemFoto(sock,jid,`⬇️ A baixar vídeo HD...\n⏳`); try{const result=await downloadVideoHD(entrada,720); await enviarVideo(sock,jid,result.filePath,`📹 ${pending.titulo||entrada} | ${result.quality}`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}}
-              return;
-            }
-            if(btnId.startsWith("cat_")){await enviarSubmenu(sock,jid,msg,btnId); return;}
-          }
-        }
-
-        // ✅ HANDLER: listResponseMessage (single_select do menu carousel)
-        const listResp=msg.message?.listResponseMessage;
-        if(listResp){
-          const selectedId=listResp.singleSelectReply?.selectedRowId;
-          if(selectedId){
+        // ✅ HANDLER: Resposta de lista interativa (selecção de categoria)
+        const listResp = msg.message?.listResponseMessage;
+        if (listResp) {
+          const catId = listResp.singleSelectReply?.selectedRowId;
+          if (catId && catId.startsWith("cat_")) {
             if(isGrupo&&!isDono&&!gruposAtivados.has(jid)) return;
             if(chatsDesativados.has(jid)&&!isDono) return;
-
-            if(selectedId.startsWith("cat_")){
-              await enviarSubmenu(sock,jid,msg,selectedId); return;
+            let isAdminL=isDono;
+            if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)); isAdminL=admins.includes(sender);}catch{}}
+            if(!isDono&&!senhasAprovadas.has(sender)){
+              if(isGrupo&&isAdminL){senhasAprovadas.add(sender);}else{return;}
             }
-
-            // Novo menu: ids como !menup, !down, etc
-            let cmd = selectedId.trim();
-            // remove prefixo se tiver
-            if(cmd.startsWith(CONFIG.PREFIXO)) cmd = cmd.slice(CONFIG.PREFIXO.length);
-            cmd = cmd.toLowerCase();
-            console.log(`📋 Menu selecionado: ${selectedId} -> ${cmd}`);
-
-            // Redireciona para handler de comandos via mensagem fake
-            // Simula chamada direta
-            if(TODOS_COMANDOS.has(cmd)){
-              // cria um loop local simples para executar
-              const fakeArgs = [];
-              // injetar no fluxo de comandos
-              // Usar mesmo lógica de comando manual
-              if(cmd==="menup"){
-                await enviarSubmenu(sock,jid,msg,"cat_musica");
-                await new Promise(r=>setTimeout(r,400));
-                await enviarSubmenu(sock,jid,msg,"cat_util");
-                return;
-              }
-              if(cmd==="down"){
-                await enviarSubmenu(sock,jid,msg,"cat_musica");
-                await new Promise(r=>setTimeout(r,300));
-                await enviarSubmenu(sock,jid,msg,"cat_social");
-                return;
-              }
-              if(cmd==="menufigurinhas"){
-                const txt = `┌─⊱ 『 🌀 FIGURINHAS 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}sticker* ↩️ img/vid → sticker\n◎ ─ *${CONFIG.PREFIXO}sf* ↩️ sticker → foto/vídeo\n│\n└──────────────────────────────⊰`;
-                await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
-                return;
-              }
-              if(["brincadeiras","menucoins","alteradores","menulogos","menu18","menuadm","menudono","criador","perfil","donos","alugar"].includes(cmd)){
-                // permite que o fluxo principal de comandos trate, mas aqui fazemos shortcut
-                if(cmd==="brincadeiras") await enviarSubmenu(sock,jid,msg,"cat_jogos");
-                else if(cmd==="menucoins"){
-                  await enviarSubmenu(sock,jid,msg,"cat_jogos");
-                  await new Promise(r=>setTimeout(r,300));
-                  await enviarComFoto(sock,jid,`┌─⊱ 『 🪙 COINS 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}rank* / *${CONFIG.PREFIXO}toprank*\n│\n└──────────────────────────────⊰`,ppBotUrl);
-                }
-                else if(cmd==="alteradores") await enviarComFoto(sock,jid,`┌─⊱ 『 🎧 ALTERADORES 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}vz* / *${CONFIG.PREFIXO}transcrever*\n│\n└──────────────────────────────⊰`,ppBotUrl);
-                else if(cmd==="menulogos") await enviarComFoto(sock,jid,`┌─⊱ 『 🎨 LOGOS 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}editar* / *${CONFIG.PREFIXO}qr*\n│\n└──────────────────────────────⊰`,ppBotUrl);
-                else if(cmd==="menuadm") await enviarSubmenu(sock,jid,msg,"cat_adm");
-                else if(cmd==="menudono"){
-                  if(!isDono){ await enviarSemFoto(sock,jid,`🔒 Apenas dono!`); return; }
-                  await enviarSubmenu(sock,jid,msg,"cat_dono");
-                }
-                else if(cmd==="criador"){
-                  let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}
-                  const canal = await obterChannelLink();
-                  const tD=`┌─⊱ 『 👑 CRIADOR 』 ⊰─┐\n│\n◎ ─ 🏷️ *${CONFIG.DONO_NOME}*\n◎ ─ 📞 *${CONFIG.DONO_NUM}*\n◎ ─ 📢 ${canal}\n│\n└──────────────────────────────⊰`;
-                  if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg});
-                  else await enviarComFoto(sock,jid,tD,ppBotUrl,msg);
-                }
-                else if(cmd==="donos"){
-                  const lista = CONFIG.NUMEROS_ADM.map((n,i)=>`◎ ─ ${i===0?"👑":"👮"} +${n}`).join("\n");
-                  await enviarComFoto(sock,jid,`┌─⊱ 『 👑 DONOS 』 ⊰─┐\n│\n${lista}\n│\n└──────────────────────────────⊰`,ppBotUrl);
-                }
-                else if(cmd==="alugar"){
-                  await enviarComFoto(sock,jid,`┌─⊱ 『 💰 ALUGAR 』 ⊰─┐\n│\n◎ ─ Contacto: *${CONFIG.DONO_NUM}*\n◎ ─ *${CONFIG.PREFIXO}alugar* para ver dados\n│\n└──────────────────────────────⊰`,ppBotUrl);
-                }
-                return;
-              }
-            }
-          }
-        }
-
-        // ✅ HANDLER: interactiveResponseMessage para single_select (novo formato Baileys)
-        const interResp2 = msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage;
-        if(interResp2){
-          try{
-            const params = JSON.parse(interResp2.paramsJson || "{}");
-            const selId = params.id || params.selectedId || "";
-            if(selId){
-              console.log(`🔘 interactiveResponse: ${selId}`);
-              if(selId.startsWith("cat_")){
-                await enviarSubmenu(sock,jid,msg,selId); return;
-              }
-              let cmd2 = selId.trim();
-              if(cmd2.startsWith(CONFIG.PREFIXO)) cmd2 = cmd2.slice(CONFIG.PREFIXO.length);
-              cmd2 = cmd2.toLowerCase();
-              if(TODOS_COMANDOS.has(cmd2)){
-                // shortcut igual ao listResponse
-                if(cmd2==="menup"){ await enviarSubmenu(sock,jid,msg,"cat_musica"); return; }
-                if(cmd2==="down"){ await enviarSubmenu(sock,jid,msg,"cat_musica"); return; }
-              }
-            }
-          }catch(e){ console.log("⚠️ interResp parse:", e.message); }
-        }
-
-        // !ergue-se - MULTIPREFIXO
-        {
-          const ergue = extrairComandoComPrefixo(texto);
-          if(ergue && ergue.comando === 'ergue-se' && isDono && isGrupo){
-            gruposAtivados.add(jid);
-            const caption=`✅ *ERGUE-TE!* 🤴🏽\n✦ ─────────── ✦\n\nAs tuas Ordens meu senhor! ✨️👑\n\n🔒 Anti-link: *ACTIVO*\n🚫 Anti-menção: *ACTIVO*\n⛔ Anti-status: *ACTIVO*\n\n_Usa *${CONFIG.PREFIXO}menu*_ (prefixos: ${CONFIG.PREFIXOS.join(' ')})!`;
-            await reagir(sock,msg,"✅");
-            const gifOk=await enviarGif(sock,jid,caption);
-            if(!gifOk) await enviarComFoto(sock,jid,caption,ppBotUrl);
+            await enviarSubmenu(sock, jid, msg, catId);
             return;
           }
+        }
+
+        // !ergue-se
+        if(isDono&&isGrupo&&texto===`${CONFIG.PREFIXO}ergue-se`){
+          gruposAtivados.add(jid);
+          const caption=`✅ *ERGUE-TE!* 🤴🏽\n✦ ─────────── ✦\n\nAs tuas Ordens meu senhor! ✨️👑\n\n🔒 Anti-link: *ACTIVO*\n🚫 Anti-menção: *ACTIVO*\n⛔ Anti-status: *ACTIVO*\n\n_Usa *${CONFIG.PREFIXO}menu*!_`;
+          await reagir(sock,msg,"✅");
+          const gifOk = await enviarGif(sock, jid, caption);
+          if(!gifOk) await enviarComFoto(sock,jid,caption,ppBotUrl);
+          return;
         }
 
         if(isGrupo&&!isDono&&!gruposAtivados.has(jid)) return;
@@ -2652,58 +999,18 @@ async function startBot(){
           return;
         }
 
-        // Gate senha + menu numerado - SISTEMA PREFIXO ÚNICO UNIVERSAL + POR GRUPO
-        const prefixoDetectadoRaw = detectarPrefixoUsado(texto, jid);
-        // Se não detectou prefixo e não é palavra "prefixo", trata como possível senha ou menu numerado
-        if(!prefixoDetectadoRaw){
-          if(/^[0-9]$/.test(texto.trim())){
-            const chaveMenu=`${jid}_${sender}`;
-            const estadoMenu=menuEsperandoResposta.get(chaveMenu);
-            if(estadoMenu&&(Date.now()-estadoMenu.timestamp)<120000){
-              const catId=MENU_NUMEROS[texto.trim()];
-              if(catId){
-                if((catId==="cat_grup"||catId==="cat_dono")&&!estadoMenu.isDono){await enviarSemFoto(sock,jid,`🔒 _Apenas o dono tem acesso._`); return;}
-                menuEsperandoResposta.delete(chaveMenu);
-                await enviarSubmenu(sock,jid,msg,catId);
-                return;
-              }
-            }
-          }
+        // Gate senha
+        if(!texto.startsWith(CONFIG.PREFIXO)){
           if(!isDono&&!senhasAprovadas.has(sender)){
             if(isGrupo&&isAdmin){senhasAprovadas.add(sender);}
-            else if(texto.trim()===CONFIG.SENHA_BOT){
-              const prefAtual = getPrefixoDoGrupo(jid);
-              senhasAprovadas.add(sender); 
-              await enviarSemFoto(sock,jid,`✅ *Acesso permitido!* 🎉\nEscreve *${prefAtual}menu* para começar.`,msg);
-            }
+            else if(texto.trim()===CONFIG.SENHA_BOT){senhasAprovadas.add(sender); await enviarSemFoto(sock,jid,`✅ *Acesso permitido!* 🎉\nEscreve *${CONFIG.PREFIXO}menu* para começar.`,msg);}
           }
           return;
         }
 
         if(!isDono&&!verificarRateLimit(sender)){await reagir(sock,msg,"⏳"); return;}
-
-        // PREFIXO ÚNICO: extrai comando corretamente com jid
-        const parsed = extrairComandoComPrefixo(texto, jid);
-        if(!parsed){
-          // Fallback: tenta sem prefixo se ALLOW_NO_PREFIX
-          if(CONFIG.PREFIXOS.includes('') || process.env.ALLOW_NO_PREFIX==='true'){
-            const tmp = texto.trim().split(/\s+/);
-            const cmdTmp = (tmp.shift()||'').toLowerCase();
-            if(TODOS_COMANDOS.has(cmdTmp)){
-              var args = tmp;
-              var comando = cmdTmp;
-            }else{
-              return;
-            }
-          }else{
-            return;
-          }
-        } else {
-          var args = parsed.args;
-          var comando = parsed.comando;
-          // Atualiza PREFIXO usado para mostrar no menu? Mantém principal
-          // Se quiser, pode salvar prefixo usado: const prefixoUsado = parsed.prefixo;
-        }
+        const args=texto.slice(CONFIG.PREFIXO.length).trim().split(/\s+/);
+        const comando=args.shift().toLowerCase();
 
         if(!isDono&&!senhasAprovadas.has(sender)){
           if(isGrupo&&isAdmin){senhasAprovadas.add(sender);}
@@ -2723,170 +1030,19 @@ async function startBot(){
           await reagir(sock,msg,"❌"); return;
         }
 
-        const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","bot","link","sorteio","verifica","silenciar","dessilenciar","silenciados","decrypt","arqadd","arqdelete","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai"];
+        const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","bot","link","sorteio","verifica","silenciar","dessilenciar","silenciados","decrypt","arqadd","arqdelete","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink"];
         if(CMDS_ADMIN.includes(comando)&&!isAdmin){await enviarSemFoto(sock,jid,`🔒 *Apenas administradores.*`); await reagir(sock,msg,"🚫"); return;}
-        const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto","setcanal","setchannel"];
+        const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms"];
         if(CMDS_DONO.includes(comando)&&!isDono){await enviarSemFoto(sock,jid,`🔒 *Apenas o dono do bot.*`); await reagir(sock,msg,"🚫"); return;}
 
-        // ══════════════════════════════════════════
-        //              TODOS OS COMANDOS
-        // ══════════════════════════════════════════
+        // ═══════════════════════════════════════════
+        //              COMANDOS
+        // ═══════════════════════════════════════════
 
-        if(comando==="setfoto"){
-          const imgBuf=await downloadImagemDaMensagem(msg);
-          if(!imgBuf){await enviarSemFoto(sock,jid,`┌─⊱ 『 📸 FOTO DO BOT 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}setfoto*\n    _↩️ responde uma imagem_\n│\n◎ ─ Actual: ${botFotoBuffer?"✅ Personalizada":"📷 Foto de perfil WA"}\n│\n└──────────────────────────────⊰`); return;}
-          botFotoBuffer=imgBuf;
-          fs.writeFileSync(BOT_FOTO_PATH,imgBuf);
-          await sock.sendMessage(jid,{image:imgBuf,caption:`✅ *Foto do bot actualizada!*\n✦ ─────────── ✦\n_Esta foto será usada em TODAS as mensagens._`},{quoted:msg});
-          await reagir(sock,msg,"✅"); return;
-        }
-
-        if(comando==="alugar"){
-          const textoAlugar=
-`┌─⊱ 『 💰 ALUGAR O BOT 』 ⊰─┐
-│
-◎ ─ 🤖 *LORDE LÁ DJUM v3.5*
-│
-◎ ─ 🏦 *BANCO ATLÂNTICO*
-│
-◎ ─ 📑 IBAN:
-   _005500005715752310104_
-│
-◎ ─ 👤 NOME DA CONTA:
-   _DOMINGOS ISAÍAS VICENTE PEDRO_
-│
-◎ ─ ─────────────────────
-│
-◎ ─ 📱 *EXPRESS:*
-   _926 612 801_
-│
-◎ ─ 💳 *PAYPAY:*
-   _926 612 801_
-│
-◎ ─ 💛 *UNITEL MONEY:*
-   _926 612 801_
-│
-◎ ─ ─────────────────────
-│
-◎ ─ 📞 Contacto: *+244 ${CONFIG.DONO_NUM}*
-│
-└──────────────────────────────⊰
-_Após pagamento, envia comprovativo!_ 🧾`;
-          await enviarComFoto(sock,jid,textoAlugar,ppBotUrl,msg);
-          await reagir(sock,msg,"💰"); return;
-        }
-
-        if(comando==="addai"){
-          if(!isGrupo){await enviarSemFoto(sock,jid,"❌ Só funciona em grupos."); return;}
-          await enviarSemFoto(sock,jid,`🤖 A adicionar Meta AI ao grupo...\n⏳`);
-          try{
-            await sock.groupParticipantsUpdate(jid,["867051314767696@bot"],"add");
-            await enviarComFoto(sock,jid,`┌─⊱ 『 🤖 META AI 』 ⊰─┐\n│\n◎ ─ ✅ Meta AI adicionada!\n◎ ─ Usa _@Meta AI_ para invocar.\n│\n└──────────────────────────────⊰`,ppBotUrl,msg);
-            await reagir(sock,msg,"✅");
-          }catch(e){
-            await enviarSemFoto(sock,jid,`❌ Não foi possível adicionar a Meta AI.\n_${e.message.slice(0,80)}_`);
-            await reagir(sock,msg,"❌");
-          }
-          return;
-        }
-
-        if(comando==="set"){const novaSenha=args.join(" ").replace(/['"]/g,"").trim(); if(!novaSenha){await enviarSemFoto(sock,jid,`🔑 *${CONFIG.PREFIXO}set [nova_senha]*`); return;} CONFIG.SENHA_BOT=novaSenha; senhasAprovadas.clear(); await enviarSemFoto(sock,jid,`✅ *Senha alterada:* *${novaSenha}*`); await reagir(sock,msg,"🔑"); return;}
+        if(comando==="set"){const novaSenha=args.join(" ").replace(/['"]/g,"").trim(); if(!novaSenha){await enviarSemFoto(sock,jid,`🔑 *${CONFIG.PREFIXO}set [nova_senha]*\nActual: *${CONFIG.SENHA_BOT}*`); return;} CONFIG.SENHA_BOT=novaSenha; senhasAprovadas.clear(); await enviarSemFoto(sock,jid,`✅ *Senha alterada!*\n🔑 *${novaSenha}*`); await reagir(sock,msg,"🔑"); return;}
         if(comando==="id"){const numExtraido=sender.split("@")[0].split(":")[0]; await enviarSemFoto(sock,jid,`📱 *JID*\n✦ ─────────── ✦\n_${sender}_\nNúmero: _${numExtraido}_\n👑 Dono: ${isDono?"✅":"❌"} | 👮 Admin: ${isAdmin?"✅":"❌"}`); await reagir(sock,msg,"📱"); return;}
         if(comando==="out"){if(!isGrupo){await enviarSemFoto(sock,jid,"❌ Só em grupos."); return;} try{await sock.sendMessage(jid,{text:`👋 *Bot a sair...*`}); await new Promise(r=>setTimeout(r,1000)); await sock.groupLeave(jid);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}; return;}
-        if(comando==="prefixo"||comando==="prefixos"){
-          const prefixoAtualGlobal = getPrefixoGlobal();
-          const prefixoAtualGrupo = getPrefixoDoGrupo(jid);
-          const isGroupWithCustom = jid.endsWith("@g.us") && prefixoAtualGrupo !== prefixoAtualGlobal;
-
-          // Sem argumento: mostra prefixo atual com botão copiar (seu pedido)
-          if(!args[0]){
-            const prefMostrar = isGroupWithCustom ? prefixoAtualGrupo : prefixoAtualGlobal;
-            const tipo = isGroupWithCustom ? "deste grupo" : "global (universal)";
-            const textoPrefixo = `┌─⊱ 『 ⚙️ PREFIXO ATUAL 』 ⊰─┐\n│\n◎ ─ O prefixo ${tipo} é: *${prefMostrar}*\n│\n◎ ─ Global: *${prefixoAtualGlobal}*${isGroupWithCustom ? `\n◎ ─ Este grupo: *${prefixoAtualGrupo}*` : ''}\n│\n◎ ─ Use: *${prefMostrar}menu* para ver comandos\n│\n◎ ─ Para trocar:\n│   • Grupo (admin): *${prefMostrar}prefixo [novo]*\n│   • Global (dono): *${prefMostrar}prefixo [novo] global*\n│\n└──────────────────────────────⊰`;
-
-            // Tenta enviar com botão copiar
-            try{
-              const copyButton = {
-                name: "cta_copy",
-                buttonParamsJson: JSON.stringify({
-                  display_text: "📋 Copiar prefixo",
-                  copy_code: prefMostrar
-                })
-              };
-              const quickButton = {
-                name: "quick_reply",
-                buttonParamsJson: JSON.stringify({
-                  display_text: "🔄 Trocar prefixo",
-                  id: `${prefMostrar}prefixo`
-                })
-              };
-              // Usa interactiveMessage com copy button
-              const msgContent = {
-                interactiveMessage: {
-                  body: { text: textoPrefixo },
-                  footer: { text: "🌀 L1TTL3B0Y • Prefixo Universal" },
-                  nativeFlowMessage: { buttons: [copyButton, quickButton] }
-                }
-              };
-              const msgW = generateWAMessageFromContent(jid, msgContent, {});
-              await sock.relayMessage(jid, msgW.message, { messageId: msgW.key.id });
-            }catch(e){
-              // Fallback sem botão copiar
-              await enviarComFoto(sock, jid, textoPrefixo, ppBotUrl, msg);
-            }
-            await reagir(sock,msg,"⚙️");
-            return;
-          }
-
-          // Com argumento: trocar prefixo
-          let novoPrefixo = args[0].trim();
-          // Validação: 1 caractere, não pode ser letra/número? Permite símbolos comuns
-          if(novoPrefixo.length > 3){
-            await enviarComFoto(sock,jid,`❌ Prefixo muito longo! Use 1 caractere: ! . / # $ % etc\nEx: *${prefixoAtualGrupo}prefixo !*`,ppBotUrl);
-            return;
-          }
-          if(!novoPrefixo){
-            await enviarComFoto(sock,jid,`❌ Prefixo inválido!`,ppBotUrl);
-            return;
-          }
-
-          const isGlobalRequest = args[1]?.toLowerCase() === 'global' || args[1]?.toLowerCase() === 'geral' || !isGrupo;
-
-          if(isGlobalRequest){
-            if(!isDono){
-              await enviarComFoto(sock,jid,`🔒 Apenas o dono pode trocar o prefixo global!`,ppBotUrl);
-              return;
-            }
-            const antigoGlobal = getPrefixoGlobal();
-            setPrefixoGlobal(novoPrefixo);
-            // Salva no Mongo se conectado
-            if(mongoModule && mongoConectado){
-              try{ await mongoModule.setConfig("PREFIXO_GLOBAL", novoPrefixo, true); }catch{}
-            }
-            await enviarComFoto(sock,jid,`✅ *Prefixo global trocado!*\n\n◎ ─ Antigo: *${antigoGlobal}*\n◎ ─ Novo: *${novoPrefixo}*\n\n_Todos os grupos sem prefixo custom agora usarão *${novoPrefixo}*_\n_Use *${novoPrefixo}menu*`,ppBotUrl);
-            await reagir(sock,msg,"✅");
-            addBotLog(`Prefixo global trocado ${antigoGlobal} → ${novoPrefixo} por ${sender}`, 'info');
-          }else{
-            // Troca prefixo do grupo
-            if(!isGrupo){
-              await enviarComFoto(sock,jid,`❌ Este comando de grupo só funciona em grupos! Para global use *${prefixoAtualGlobal}prefixo ${novoPrefixo} global*`,ppBotUrl);
-              return;
-            }
-            if(!isAdmin && !isDono){
-              await enviarComFoto(sock,jid,`🔒 Apenas admins podem trocar o prefixo deste grupo!`,ppBotUrl);
-              return;
-            }
-            const antigoGrupo = getPrefixoDoGrupo(jid);
-            setPrefixoGrupo(jid, novoPrefixo);
-            if(mongoModule && mongoConectado){
-              try{ await mongoModule.setConfig(`PREFIXO_GRUPO_${jid}`, novoPrefixo, true); }catch{}
-            }
-            await enviarComFoto(sock,jid,`✅ *Prefixo deste grupo trocado!*\n\n◎ ─ Antigo: *${antigoGrupo}*\n◎ ─ Novo: *${novoPrefixo}*\n◎ ─ Global: *${prefixoAtualGlobal}* (continua igual)\n\n_Neste grupo use: *${novoPrefixo}menu*_\n_Para voltar ao global, use *${novoPrefixo}prefixo ${prefixoAtualGlobal}*`,ppBotUrl);
-            await reagir(sock,msg,"✅");
-            addBotLog(`Prefixo grupo ${jid} trocado ${antigoGrupo} → ${novoPrefixo} por ${sender}`, 'info');
-          }
-          return;
-        }
+        if(comando==="prefixo"||comando==="prefixos"){if(!args[0]){await enviarComFoto(sock,jid,`⚙️ Prefixo: *${CONFIG.PREFIXO}*`,ppBotUrl); return;} const antigoP=CONFIG.PREFIXO; CONFIG.PREFIXO=args[0].trim().charAt(0); await enviarComFoto(sock,jid,`✅ Prefixo: *${antigoP}* → *${CONFIG.PREFIXO}*`,ppBotUrl); return;}
         if(comando==="bloq"){comandosBloqueados.add(jid); await enviarComFoto(sock,jid,`🔒 *Comandos bloqueados!*`,ppBotUrl); await reagir(sock,msg,"🔒"); return;}
         if(comando==="desbloq"){comandosBloqueados.delete(jid); await enviarComFoto(sock,jid,`🔓 *Comandos desbloqueados!*`,ppBotUrl); await reagir(sock,msg,"🔓"); return;}
         if(comando==="add"&&isGrupo){if(!args[0]){await enviarComFoto(sock,jid,`📱 *${CONFIG.PREFIXO}add [número]*`,ppBotUrl); return;} let numero=args[0].replace(/[^\d]/g,""); if(numero.startsWith("00")) numero=numero.slice(2); if(numero.startsWith("244")&&numero.length===12){}else if(numero.length===9) numero=`244${numero}`; else if(numero.startsWith("0")&&numero.length===10) numero=`244${numero.slice(1)}`; await enviarSemFoto(sock,jid,`📱 A adicionar *+${numero}*...\n⏳`); try{const result=await sock.groupParticipantsUpdate(jid,[`${numero}@s.whatsapp.net`],"add"); const status=result?.[0]?.status; if(status===200){await enviarComFoto(sock,jid,`✅ *+${numero}* adicionado!`,ppBotUrl); await reagir(sock,msg,"✅");}else if(status===408){await enviarSemFoto(sock,jid,`❌ Sem WhatsApp.`);}else if(status===403){await enviarSemFoto(sock,jid,`⚠️ Não permite adição.`);}else{await reagir(sock,msg,"✅");}}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
@@ -2897,240 +1053,254 @@ _Após pagamento, envia comprovativo!_ 🧾`;
         if(comando==="silenciados"&&isGrupo){const lista=membrosSilenciados[jid]||[]; if(!lista.length) await enviarComFoto(sock,jid,`🔊 Nenhum silenciado.`,ppBotUrl); else await enviarComFoto(sock,jid,`🔇 *Silenciados:*\n${lista.map((m,i)=>`${i+1}. @${m.split("@")[0]}`).join("\n")}`,ppBotUrl); return;}
         if(comando==="vozbot"){const op=args[0]?.toLowerCase(); if(op==="off"){vozBotDesativado.add(jid); await enviarComFoto(sock,jid,`🔇 *Voz desactivada!*`,ppBotUrl);}else if(op==="on"){vozBotDesativado.delete(jid); await enviarComFoto(sock,jid,`🎙️ *Voz activada!*`,ppBotUrl);}else{await enviarComFoto(sock,jid,`🎙️ ${vozBotDesativado.has(jid)?"🔇 OFF":"🟢 ON"}\n*${CONFIG.PREFIXO}vozbot on/off*`,ppBotUrl);} await reagir(sock,msg,"✅"); return;}
         if(comando==="nomegrupo"&&isGrupo){const novoNome=args.join(" ").trim(); if(!novoNome){await enviarComFoto(sock,jid,`✏️ *${CONFIG.PREFIXO}nomegrupo [nome]*`,ppBotUrl); return;} try{await sock.groupUpdateSubject(jid,novoNome); await enviarComFoto(sock,jid,`✅ *Nome alterado:*\n_${novoNome}_`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-        if(comando==="descgrupo"&&isGrupo){const novaDesc=args.join(" ").trim(); if(!novaDesc){await enviarComFoto(sock,jid,`✏️ *${CONFIG.PREFIXO}descgrupo [desc]*`,ppBotUrl); return;} try{await sock.groupUpdateDescription(jid,novaDesc); await enviarComFoto(sock,jid,`✅ *Descrição actualizada!*`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+        if(comando==="descgrupo"&&isGrupo){const novaDesc=args.join(" ").trim(); if(!novaDesc){await enviarComFoto(sock,jid,`✏️ *${CONFIG.PREFIXO}descgrupo [descrição]*`,ppBotUrl); return;} try{await sock.groupUpdateDescription(jid,novaDesc); await enviarComFoto(sock,jid,`✅ *Descrição actualizada!*`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="fotogrupo"&&isGrupo){const imgBuf=await downloadImagemDaMensagem(msg); if(!imgBuf){await enviarComFoto(sock,jid,`📷 Responde imagem com *${CONFIG.PREFIXO}fotogrupo*`,ppBotUrl); return;} try{await sock.updateProfilePicture(jid,imgBuf); await enviarComFoto(sock,jid,`✅ *Foto do grupo actualizada!*`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
 
-        // ✅ MENU
+        // ✅ MENU — lista interativa principal
         if(comando==="menu"||comando==="ajuda"){
-          const sub=args[0]?.toLowerCase();
-          const catMap={musica:"cat_musica",social:"cat_social",ia:"cat_ia",jogos:"cat_jogos",util:"cat_util",extra:"cat_extra",arq:"cat_arq",adm:"cat_adm",admin:"cat_adm",grup:"cat_grup",dono:"cat_dono"};
-          if(sub&&catMap[sub]){await enviarSubmenu(sock,jid,msg,catMap[sub]);}
-          else{await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin);}
-          return;
+          const sub = args[0]?.toLowerCase();
+          // Texto directo para submenu (compatibilidade)
+          if(sub && ["musica","social","ia","jogos","util","extra","arq","adm","admin","grup","dono"].includes(sub)){
+            const catMap = { musica:"cat_musica", social:"cat_social", ia:"cat_ia", jogos:"cat_jogos", util:"cat_util", extra:"cat_extra", arq:"cat_arq", adm:"cat_adm", admin:"cat_adm", grup:"cat_grup", dono:"cat_dono" };
+            await enviarSubmenu(sock, jid, msg, catMap[sub]);
+          } else {
+            // Abre menu principal como lista interativa
+            await enviarMenuPrincipal(sock, jid, msg, isDono);
+          }
+          await reagir(sock,msg,"✅"); return;
         }
 
-        // ===== NOVOS COMANDOS DO MENU CARROSSEL L1TTL3B0Y =====
-        if(comando==="menup"){
-          await enviarSubmenu(sock,jid,msg,"cat_musica");
-          await new Promise(r=>setTimeout(r,400));
-          await enviarSubmenu(sock,jid,msg,"cat_util");
-          await new Promise(r=>setTimeout(r,400));
-          await enviarSubmenu(sock,jid,msg,"cat_ia");
-          return;
-        }
-        if(comando==="down"){
-          await enviarSubmenu(sock,jid,msg,"cat_musica");
-          await new Promise(r=>setTimeout(r,300));
-          await enviarSubmenu(sock,jid,msg,"cat_social");
-          return;
-        }
-        if(comando==="menufigurinhas"){
-          const txt = `┌─⊱ 『 🌀 FIGURINHAS 』 ⊰─┐
+        if(comando==="sobre"){await enviarComFoto(sock,jid,
+`┌─⊱ 『 🤖 SOBRE O BOT 』 ⊰─┐
 │
-◎ ─ *${CONFIG.PREFIXO}sticker* ↩️ img/vid → sticker
-◎ ─ *${CONFIG.PREFIXO}sf* ↩️ sticker → foto/vídeo
-◎ ─ *${CONFIG.PREFIXO}tourl* ↩️ mídia → link
+◎ ─ *LORDE LÁ DJUM v3.5* 🤴🏽
+◎ ─ 👑 Criado por: *ISAÍAS PEDRO*
 │
-└──────────────────────────────⊰`;
-          await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
-          return;
-        }
-        if(comando==="brincadeiras"){
-          await enviarSubmenu(sock,jid,msg,"cat_jogos");
-          return;
-        }
-        if(comando==="menucoins"){
-          await enviarSubmenu(sock,jid,msg,"cat_jogos");
-          await new Promise(r=>setTimeout(r,300));
-          await enviarComFoto(sock,jid,`┌─⊱ 『 🪙 COINS & RANK 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}rank* → seu nível\n◎ ─ *${CONFIG.PREFIXO}toprank* → top 10\n◎ ─ *${CONFIG.PREFIXO}perfil* @user → perfil zoeira/elogio\n│\n└──────────────────────────────⊰`,ppBotUrl);
-          return;
-        }
-        if(comando==="alteradores"){
-          const txt=`┌─⊱ 『 🎧 ALTERADORES 』 ⊰─┐
+◎ ─ ✅ Menu interativo por lista
+◎ ─ ✅ Editor IA 🎨
+◎ ─ ✅ Placar ao vivo ⚽
+◎ ─ ✅ Mídia para link 🔗
+◎ ─ ✅ Sticker puro ffmpeg
+◎ ─ ✅ GIF Solo Leveling
+◎ ─ ✅ Ban com contagem 5→0
+◎ ─ ✅ Arquivos / VPN
+◎ ─ ✅ SMS / GSMS / ScanLink
+◎ ─ ✅ Reconexão silenciosa
+◎ ─ ✅ Jogos em loop ♾️
 │
-◎ ─ *${CONFIG.PREFIXO}vz* [texto] → voz TTS
-◎ ─ *${CONFIG.PREFIXO}transcrever* ↩️ áudio → texto
-◎ ─ *${CONFIG.PREFIXO}resumiraudio* / *traduziraudio*
-◎ ─ *${CONFIG.PREFIXO}audioparaia* ↩️ áudio → resposta IA
+└──────────────────────────────⊰
+_© LORDE LÁ DJUM v3.5 — 24/7_ 🟢`,ppBotUrl); return;}
+
+        // EDITAR
+        if(comando==="editar"){
+          const instrucao = args.join(" ").trim();
+          if(!instrucao){
+            await enviarComFoto(sock,jid,
+`┌─⊱ 『 🎨 EDITOR IA 』 ⊰─┐
 │
-└──────────────────────────────⊰`;
-          await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
-          return;
-        }
-        if(comando==="menulogos"){
-          const txt=`┌─⊱ 『 🎨 LOGOS 』 ⊰─┐
+◎ ─ *${CONFIG.PREFIXO}editar* [instrução]
+    _↩️ responde uma imagem_
 │
-◎ ─ *${CONFIG.PREFIXO}editar* [instrução] ↩️ img → editada IA
-◎ ─ *${CONFIG.PREFIXO}qr* [texto] → gera QR
-◎ ─ *${CONFIG.PREFIXO}mostre* [nome] → busca imagem
+◎ ─ _Exemplos:_
+   _adiciona óculos escuros_
+   _muda o fundo para praia_
+   _coloca chapéu vermelho_
 │
-└──────────────────────────────⊰`;
-          await enviarComFoto(sock,jid,txt,ppBotUrl,msg);
-          return;
-        }
-        if(comando==="menu18"){
-          if(!isDono){
-            await enviarSemFoto(sock,jid,`🔞 Apenas VIPs! Fale com *${CONFIG.DONO_NOME}* para liberar.\n💰 *${CONFIG.PREFIXO}alugar*`);
+└──────────────────────────────⊰`,ppBotUrl);
             return;
           }
-          await enviarComFoto(sock,jid,`┌─⊱ 『 🔞 MENU 18+ VIP 』 ⊰─┐\n│\n◎ ─ _Em construção para VIPs_\n│\n└──────────────────────────────⊰`,ppBotUrl);
-          return;
-        }
-        if(comando==="menuadm"){
-          await enviarSubmenu(sock,jid,msg,"cat_adm");
-          return;
-        }
-        if(comando==="menudono"){
-          if(!isDono){ await enviarSemFoto(sock,jid,`🔒 Apenas dono!`); return; }
-          await enviarSubmenu(sock,jid,msg,"cat_dono");
-          await new Promise(r=>setTimeout(r,400));
-          await enviarSubmenu(sock,jid,msg,"cat_grup");
-          return;
-        }
-        if(comando==="criador"){
-          let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}
-          const canal = await obterChannelLink();
-          const tD=`┌─⊱ 『 👑 CRIADOR 』 ⊰─┐
-│
-◎ ─ 🏷️ *${CONFIG.DONO_NOME}*
-◎ ─ 📞 *${CONFIG.DONO_NUM}*
-◎ ─ 🤖 *LORDE LÁ DJUM v3.5 RENDER*
-│
-◎ ─ 📢 Canal: ${canal}
-◎ ─ 💰 *${CONFIG.PREFIXO}alugar* para alugar bot
-◎ ─ 🍃 MongoDB: *${mongoConectado?"✅ Conectado":"❌ Desconectado"}*
-◎ ─ 🌐 Render Free + Uptime
-│
-└──────────────────────────────⊰`;
-          if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg});
-          else await enviarComFoto(sock,jid,tD,ppBotUrl,msg);
-          return;
-        }
-        if(comando==="donos"){
-          const lista = CONFIG.NUMEROS_ADM.map((n,i)=>`◎ ─ ${i===0?"👑":"👮"} +${n}`).join("\n");
-          await enviarComFoto(sock,jid,`┌─⊱ 『 👑 DONOS 』 ⊰─┐\n│\n${lista}\n│\n└──────────────────────────────⊰`,ppBotUrl);
-          return;
-        }
-
-        // ===== COMANDOS DE CANAL CONFIGURÁVEL PELO DONO =====
-        if(comando==="setcanal"||comando==="setchannel"){
-          if(!isDono){ await enviarSemFoto(sock,jid,`🔒 Apenas dono pode configurar canal!`); return; }
-          const novoLink = args[0]?.trim();
-          if(!novoLink || !novoLink.includes("whatsapp.com/channel")){
-            await enviarComFoto(sock,jid,`┌─⊱ 『 📢 SETAR CANAL 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}setcanal* [link]\n│\n◎ ─ Exemplo:\n   ${CONFIG.PREFIXO}setcanal https://whatsapp.com/channel/XXXX\n│\n◎ ─ Atual: ${CHANNEL_LINK_DINAMICO}\n│\n└──────────────────────────────⊰`,ppBotUrl);
-            return;
-          }
-          CHANNEL_LINK_DINAMICO = novoLink;
-          if (mongoModule && mongoConectado) {
-            await mongoModule.setConfig("CHANNEL_LINK", novoLink);
-          }
-          await enviarComFoto(sock,jid,`✅ *Canal atualizado!*\n📢 ${novoLink}\n\n_O menu agora usará esse link._`,ppBotUrl);
-          await reagir(sock,msg,"✅");
-          return;
-        }
-        if(comando==="canal"||comando==="channel"){
-          const canal = await obterChannelLink();
-          await enviarComFoto(sock,jid,`┌─⊱ 『 📢 CANAL OFICIAL 』 ⊰─┐\n│\n◎ ─ ${canal}\n│\n└──────────────────────────────⊰\n\n_Siga nosso canal!_`,ppBotUrl,msg);
-          return;
-        }
-        if(comando==="render"||comando==="uptime"){
-          const up = Math.floor(process.uptime());
-          const h = Math.floor(up/3600);
-          const m = Math.floor((up%3600)/60);
-          await enviarComFoto(sock,jid,`┌─⊱ 『 🌐 RENDER FREE STATUS 』 ⊰─┐\n│\n◎ ─ ⏱️ Uptime: *${h}h ${m}m*\n◎ ─ 🍃 MongoDB: *${mongoConectado?"✅ Conectado":"❌ Offline (JSON)"}*\n◎ ─ 📢 Canal: ${CHANNEL_LINK_DINAMICO}\n◎ ─ 🔗 Health: *${CONFIG.RENDER_URL || "localhost"}/health*\n◎ ─ 💾 RAM: *${(process.memoryUsage().heapUsed/1024/1024).toFixed(1)}MB*\n│\n◎ ─ _Render Free dorme 15min sem tráfego, mas nosso auto-ping a cada 14min mantém vivo! Use UptimeRobot pingando /health_\n│\n└──────────────────────────────⊰`,ppBotUrl);
-          return;
-        }
-        if(comando==="mongodb"){
-          await enviarComFoto(sock,jid,`┌─⊱ 『 🍃 MONGODB 』 ⊰─┐\n│\n◎ ─ Status: *${mongoConectado?"✅ Conectado":"❌ Desconectado"}*\n◎ ─ URI: *${CONFIG.MONGODB_URI ? "✅ Configurado" : "❌ Não configurado"}*\n│\n◎ ─ _Para configurar: Vá no Render Dashboard > Environment > MONGODB_URI_\n│\n└──────────────────────────────⊰`,ppBotUrl);
-          return;
-        }
-
-        if(comando==="sobre"){await enviarComFoto(sock,jid,`┌─⊱ 『 🤖 SOBRE O BOT 』 ⊰─┐\n│\n◎ ─ *LORDE LÁ DJUM v3.5* 🤴🏽\n◎ ─ 👑 Criado por: *ISAÍAS PEDRO*\n│\n◎ ─ ✅ ButtonV2 + catbox upload fix\n◎ ─ ✅ !play com botões Áudio/Vídeo\n◎ ─ ✅ !shazam com ⚡ animação\n◎ ─ ✅ !busca sem animação\n◎ ─ ✅ !alugar / !addai\n◎ ─ ✅ Ban automático 5→0\n◎ ─ ✅ Jogos em loop ♾️\n│\n└──────────────────────────────⊰\n_© LORDE LÁ DJUM v3.5 — 24/7_ 🟢`,ppBotUrl); return;}
-
-        // ✅ PLAY — mostra card + botões (Áudio / Vídeo / HD)
-        if(comando==="play"){
-          if(!args.length){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}play* [música/link]`,ppBotUrl); return;}
-          const entrada=args.join(" ");
-          await reagir(sock,msg,"🔍");
-          await enviarSemFoto(sock,jid,`🔍 A procurar: _${entrada}_\n⏳`);
-
-          const info=await buscarInfoMusica(entrada);
-
-          // Guarda o pedido pendente (5 min)
-          const chavePlay=`${jid}_${sender}`;
-          playPending.set(chavePlay,{entrada,titulo:info?.titulo,timestamp:Date.now()});
-          setTimeout(()=>playPending.delete(chavePlay),300000);
-
-          // Envia card de info
-          if(info){ await enviarCardMusica(sock,jid,msg,info,sender,"play"); await new Promise(r=>setTimeout(r,600)); }
-
-          // Envia botões de seleção
-          await enviarPlayBotoes(sock,jid,msg,entrada,info);
-          return;
-        }
-
-        // ✅ MP3 HD — directo
-        if(comando==="mp3"&&args.length>0){
-          const entrada=args.join(" ");
-          await reagir(sock,msg,"🔍");
-          await enviarSemFoto(sock,jid,`🔍 A procurar: _${entrada}_\n⏳`);
-          const info=await buscarInfoMusica(entrada);
-          if(info){await enviarCardMusica(sock,jid,msg,info,sender,"mp3"); await new Promise(r=>setTimeout(r,800));}
-          await enviarSemFoto(sock,jid,`⬇️ A baixar MP3 HD...\n⏳`);
-          let arqFinal=null; try{arqFinal=await downloadMusica(entrada,true);}catch(e){console.log("❌ downloadMusica:",e.message);}
-          if(!arqFinal||!fs.existsSync(arqFinal)){await enviarSemFoto(sock,jid,`❌ Não encontrei.`); await reagir(sock,msg,"❌"); return;}
-          try{await enviarAudio(sock,jid,arqFinal,msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
-          setTimeout(()=>{try{fs.removeSync(arqFinal);}catch{}},15000);
-          return;
-        }
-
-        // ✅ MP4 480p
-        if(comando==="mp4"&&args.length>0){
-          const entrada=args.join(" ");
-          await reagir(sock,msg,"🔍");
-          await enviarSemFoto(sock,jid,`🔍 A procurar: _${entrada}_\n⏳`);
-          const info=await buscarInfoMusica(entrada);
-          if(info){await enviarCardMusica(sock,jid,msg,info,sender,"mp4"); await new Promise(r=>setTimeout(r,800));}
-          await enviarSemFoto(sock,jid,`⬇️ A baixar vídeo 480p...\n⏳`);
-          let saida=null; try{saida=await downloadVideo(entrada);}catch(e){console.log("❌ downloadVideo:",e.message);}
-          if(!saida||!fs.existsSync(saida)){await enviarSemFoto(sock,jid,`❌ Não consegui.`); await reagir(sock,msg,"❌"); return;}
-          try{await enviarVideo(sock,jid,saida,`🎬 *${info?.titulo||entrada}*\n_© LORDE LÁ DJUM_`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
-          setTimeout(()=>{try{fs.removeSync(saida);}catch{}},15000);
-          return;
-        }
-
-        // ✅ MP4HD 720p
-        if(comando==="mp4hd"&&args.length>0){
-          const entrada=args.join(" ");
-          await reagir(sock,msg,"🔍");
-          await enviarSemFoto(sock,jid,`🔍 A procurar: _${entrada}_\n⏳`);
-          const info=await buscarInfoMusica(entrada);
-          if(info){await enviarCardMusica(sock,jid,msg,info,sender,"mp4hd"); await new Promise(r=>setTimeout(r,800));}
-          await enviarSemFoto(sock,jid,`⬇️ A baixar vídeo 720p...\n⏳`);
+          const imgBuf = await downloadImagemDaMensagem(msg);
+          if(!imgBuf){ await enviarSemFoto(sock,jid,`↩️ Responde uma *imagem* com *${CONFIG.PREFIXO}editar [instrução]*`); return; }
+          await enviarSemFoto(sock,jid,`🎨 A editar com IA...\n💡 _${instrucao}_\n⏳ Aguarda (pode demorar 1 min)`);
           try{
-            const result=await downloadVideoHD(entrada,720);
-            await enviarVideo(sock,jid,result.filePath,`📹 *${info?.titulo||entrada}*\n🎬 ${result.quality} | 💾 ${result.sizeMB}MB\n_© LORDE LÁ DJUM_`,[sender],msg);
+            const form = new FormData();
+            form.append("image", imgBuf, { filename: "imagem.jpg", contentType: "image/jpeg" });
+            form.append("prompt", instrucao);
+            form.append("apikey", CONFIG.SYSTEMZONE_KEY);
+            const { data } = await axios.post("https://systemzone.store/api/v2/edit/deepai", form, { headers: { ...form.getHeaders() }, timeout: 90000, httpsAgent });
+            const urlResultado = data?.imagem || data?.result || data?.download_url || data?.url;
+            if(!urlResultado) throw new Error("API sem imagem");
+            await sock.sendMessage(jid, { image: { url: urlResultado.replace("http://","https://") }, caption: `✨ *Imagem editada!*\n✦ ─────────── ✦\n💡 _${instrucao}_\n\n_© LORDE LÁ DJUM v3.5_` }, { quoted: msg });
             await reagir(sock,msg,"✅"); addXP(sender,5);
-            setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);
-          }catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`); await reagir(sock,msg,"❌");}
+          }catch(e){ console.log("❌ editar:",e.message); await enviarSemFoto(sock,jid,`❌ Erro ao editar: ${e.message.slice(0,100)}`); await reagir(sock,msg,"❌"); }
           return;
         }
 
-        if(comando==="tiktok"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}tiktok* [link]`); return;} await enviarSemFoto(sock,jid,`📱 A baixar...\n⏳`); try{const result=await dlTiktok(url); await sock.sendMessage(jid,{video:{url:result.url},caption:`🎵 *${result.title||"TikTok"}*`},{quoted:msg}); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-        if(comando==="instagram"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}instagram* [link]`); return;} await enviarSemFoto(sock,jid,`📸 A baixar...\n⏳`); try{const result=await dlInstagram(url); await enviarVideo(sock,jid,result.filePath,`📸 Instagram`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-        if(comando==="twitter"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}twitter* [link]`); return;} await enviarSemFoto(sock,jid,`🐦 A baixar...\n⏳`); try{const result=await dlTwitter(url); await enviarVideo(sock,jid,result.filePath,`🐦 Twitter/X`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+        // PLACAR
+        if(comando==="placar"){
+          const busca = args.join(" ").trim();
+          if(!busca){ await enviarComFoto(sock,jid,`┌─⊱ 『 ⚽ PLACAR AO VIVO 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}placar* [jogo/equipa]\n│\n◎ ─ _Exemplos:_\n   _${CONFIG.PREFIXO}placar Brasil_\n   _${CONFIG.PREFIXO}placar Real Madrid_\n│\n└──────────────────────────────⊰`,ppBotUrl); return; }
+          await enviarSemFoto(sock,jid,`⚽ A buscar placar de _${busca}_...\n⏳`);
+          try{
+            const { data } = await axios.get(`https://systemzone.store/api/placar?search=${encodeURIComponent(busca)}`, { timeout: 15000, httpsAgent });
+            if(!data?.status || !data?.result) throw new Error("Sem resultado");
+            const res=data.result, casa=res.times?.casa||"?", fora=res.times?.fora||"?", pC=res.placar?.casa??"?", pF=res.placar?.fora??"?", st=res.status||"N/D";
+            const aoVivo=st.toLowerCase().includes("andamento")||st.toLowerCase().includes("vivo");
+            let txt=`┌─⊱ 『 ${aoVivo?"🔴 AO VIVO":"⚽ PLACAR"} 』 ⊰─┐\n│\n◎ ─ *${casa}*  ${pC} × ${pF}  *${fora}*\n◎ ─ 📊 _${st}_\n│\n◎ ─ ⚡ *LANCES:*`;
+            if(res.cronologia?.length){
+              const agrupado={};
+              res.cronologia.forEach(l=>{const p=l.periodo||"Geral"; if(!agrupado[p]) agrupado[p]=[]; agrupado[p].push(l);});
+              for(const [periodo,lances] of Object.entries(agrupado)){
+                txt+=`\n│\n◎ ─ *${periodo.toUpperCase()}*`;
+                lances.forEach(l=>{const min=(l.minuto||"").replace(/39;/g,"'"); const det=l.detalhe?` _(${l.detalhe})_`:""; txt+=`\n   [${min}] ${l.time} — ${l.tipo}: *${l.jogador}*${det}`;});
+              }
+            } else { txt+="\n   _Nenhum lance registado._"; }
+            txt+="\n│\n└──────────────────────────────⊰";
+            await enviarComFoto(sock,jid,txt,ppBotUrl); await reagir(sock,msg,"⚽");
+          }catch(e){ console.log("❌ placar:",e.message); await enviarSemFoto(sock,jid,`❌ Não encontrei placar para *${busca}*.\n_Tenta: ${CONFIG.PREFIXO}placar Brasil_`); }
+          return;
+        }
+
+        // TOURL
+        if(comando==="tourl"){
+          const midia = await downloadQualquerMidia(msg);
+          if(!midia){ await enviarSemFoto(sock,jid,`┌─⊱ 『 🔗 MÍDIA → LINK 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}tourl*\n    _↩️ responde qualquer mídia_\n│\n◎ ─ 🖼️ Imagem | 🎥 Vídeo\n◎ ─ 🎙️ Áudio | 📄 Documento\n◎ ─ 🎭 Sticker\n│\n└──────────────────────────────⊰`); return; }
+          await enviarSemFoto(sock,jid,`🔗 A gerar link para: _${midia.nome}_\n⏳`);
+          try{
+            let url;
+            if(midia.mime.startsWith("image/")&&!midia.mime.includes("webp")){ try{url=await uploadParaTelegraph(midia.buffer);}catch{url=await uploadParaCatbox(midia.buffer,midia.nome,midia.mime);} } else { url=await uploadParaCatbox(midia.buffer,midia.nome,midia.mime); }
+            const tam=(midia.buffer.length/1024).toFixed(1);
+            await enviarComFoto(sock,jid,`┌─⊱ 『 🔗 LINK GERADO! 』 ⊰─┐\n│\n◎ ─ 📎 *${midia.nome}*\n◎ ─ 💾 *${tam} KB* | _${midia.mime}_\n│\n◎ ─ 🌐 ${url}\n│\n└──────────────────────────────⊰`,ppBotUrl);
+            await reagir(sock,msg,"✅"); addXP(sender,3);
+          }catch(e){ console.log("❌ tourl:",e.message); await enviarSemFoto(sock,jid,`❌ Erro ao gerar link: ${e.message.slice(0,80)}`); }
+          return;
+        }
+
+        // SCANLINK
+        if(comando==="scanlink"){
+          if(!isGrupo){await enviarSemFoto(sock,jid,"❌ Só funciona em grupos."); return;}
+          const historico = historyMsgs[jid] || [];
+          if(!historico.length){ await enviarComFoto(sock,jid,`┌─⊱ 『 🔍 SCAN DE LINKS 』 ⊰─┐\n│\n◎ ─ 📭 Sem histórico ainda.\n◎ ─ O bot acumula mensagens\n   desde que está activo.\n│\n└──────────────────────────────⊰`,ppBotUrl); return; }
+          await enviarComFoto(sock,jid,`┌─⊱ 『 🔍 A VARRER CHAT 』 ⊰─┐\n│\n◎ ─ 📊 Msgs em cache: *${historico.length}*\n◎ ─ 🔗 A procurar links...\n◎ ─ ⏳ Aguarda...\n│\n└──────────────────────────────⊰`,ppBotUrl);
+          try{
+            const meta=await sock.groupMetadata(jid);
+            const admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));
+            const membrosActuais=new Set(meta.participants.map(p=>extrairJid(p.id||p)));
+            let deletados=0,banidos=0;
+            const banidosSet=new Set();
+            const linksEncontrados=[];
+            for(const h of historico){ if(!h.texto||!LINK_RX.test(h.texto)) continue; if(admins.includes(h.sender)||ehDono(h.sender)) continue; linksEncontrados.push(h); }
+            if(!linksEncontrados.length){ await enviarComFoto(sock,jid,`┌─⊱ 『 ✅ SCAN CONCLUÍDO! 』 ⊰─┐\n│\n◎ ─ 🔍 Verificadas: *${historico.length}* msgs\n◎ ─ ✅ Nenhum link!\n◎ ─ 🎉 Chat LIMPO!\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅"); return; }
+            for(const h of linksEncontrados){ try{await sock.sendMessage(jid,{delete:h.key}); deletados++;}catch{} await new Promise(r=>setTimeout(r,300)); }
+            for(const h of linksEncontrados){ if(banidosSet.has(h.sender)) continue; if(!membrosActuais.has(h.sender)) continue; try{await sock.groupParticipantsUpdate(jid,[h.sender],"remove"); await sock.sendMessage(jid,{text:`🚨 *BAN!* @${h.sender.split("@")[0].split(":")[0]}\n_Motivo: Link no scan_`,mentions:[h.sender]}); banidosSet.add(h.sender); banidos++;}catch{} await new Promise(r=>setTimeout(r,500)); }
+            historyMsgs[jid]=[];
+            const listaLinks=linksEncontrados.slice(0,5).map((h,i)=>`   ${i+1}. @${h.sender.split("@")[0].split(":")[0]} — _${h.texto.slice(0,35)}_`).join("\n");
+            const extra=linksEncontrados.length>5?`\n   _...e mais ${linksEncontrados.length-5}_`:"";
+            await enviarComFoto(sock,jid,
+`┌─⊱ 『 ✅ SCAN CONCLUÍDO! 』 ⊰─┐
+│
+◎ ─ 📊 Verificadas: *${historico.length}* msgs
+◎ ─ 🔗 Links: *${linksEncontrados.length}*
+◎ ─ 🗑️ Eliminadas: *${deletados}*
+◎ ─ 🔨 Banidos: *${banidos}*
+│
+◎ ─ 📋 *Infractores:*
+${listaLinks}${extra}
+│
+◎ ─ 🧹 _Histórico limpo!_
+│
+└──────────────────────────────⊰`,ppBotUrl);
+            await reagir(sock,msg,"🔨");
+          }catch(e){await enviarSemFoto(sock,jid,`❌ Erro no scan: ${e.message}`);}
+          return;
+        }
+
+        // CHATON
+        if(comando==="chaton"){
+          const ativos=[...gruposAtivados];
+          if(!ativos.length){await enviarComFoto(sock,jid,`┌─⊱ 『 🏘️ GRUPOS ACTIVOS 』 ⊰─┐\n│\n◎ ─ 🔴 Nenhum grupo activo.\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
+          try{
+            const grupos=await sock.groupFetchAllParticipating();
+            const linhas=ativos.map((gJid,i)=>{const nome=grupos[gJid]?.subject||gJid; const membros=grupos[gJid]?.participants?.length||"?"; return `◎ ─ *${i+1}.* 🟢 *${nome}*\n   👥 ${membros} membros`;}).join("\n│\n");
+            await enviarComFoto(sock,jid,
+`┌─⊱ 『 🏘️ GRUPOS ACTIVOS (${ativos.length}) 』 ⊰─┐
+│
+${linhas}
+│
+◎ ─ 📢 *${CONFIG.PREFIXO}sms [nº] [msg]* → privado
+◎ ─ 📣 *${CONFIG.PREFIXO}gsms [nº] [msg]* → grupo
+│
+└──────────────────────────────⊰`,ppBotUrl);
+          }catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
+          return;
+        }
+
+        // SMS
+        if(comando==="sms"){
+          const ativos=[...gruposAtivados];
+          if(!ativos.length){await enviarComFoto(sock,jid,`❌ Nenhum grupo activo.`,ppBotUrl); return;}
+          if(!args.length){
+            try{const grupos=await sock.groupFetchAllParticipating(); const lista=ativos.map((gJid,i)=>`◎ ─ *${i+1}.* ${grupos[gJid]?.subject||gJid}`).join("\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 📢 ENVIAR SMS PRIVADA 』 ⊰─┐\n│\n${lista}\n│\n◎ ─ *${CONFIG.PREFIXO}sms [número] [mensagem]*\n   _Ex: ${CONFIG.PREFIXO}sms 1 Olá!_\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
+            return;
+          }
+          const{grupoJid,mensagem}=await encontrarGrupoPorArg(sock,[...gruposAtivados],args);
+          if(!grupoJid){await enviarComFoto(sock,jid,`❌ Grupo não encontrado.\nUsa *${CONFIG.PREFIXO}chaton*`,ppBotUrl); return;}
+          if(!mensagem.trim()){await enviarComFoto(sock,jid,`❌ Escreve a mensagem!`,ppBotUrl); return;}
+          try{
+            const grupos=await sock.groupFetchAllParticipating(); const nomeGrupo=grupos[grupoJid]?.subject||"Grupo";
+            const meta=await sock.groupMetadata(grupoJid); const membros=meta.participants.map(p=>extrairJid(p.id||p));
+            await enviarSemFoto(sock,jid,`📤 A enviar para *${membros.length}* membros de *${nomeGrupo}*...\n⏳`);
+            let enviados=0,erros=0;
+            for(const membro of membros){ if(ehDono(membro)) continue; try{await sock.sendMessage(membro,{text:`📢 *Mensagem Privada*\n✦ ─────────── ✦\n\n${mensagem}\n\n✦ ─────────── ✦\n_Enviado por: ${CONFIG.DONO_NOME}_\n_Grupo: ${nomeGrupo}_`}); enviados++; await new Promise(r=>setTimeout(r,600));}catch{erros++;} }
+            await enviarComFoto(sock,jid,`┌─⊱ 『 ✅ SMS ENVIADA! 』 ⊰─┐\n│\n◎ ─ 📊 Enviada: *${enviados}*\n◎ ─ ❌ Erros: *${erros}*\n◎ ─ 👥 Grupo: *${nomeGrupo}*\n│\n└──────────────────────────────⊰`,ppBotUrl);
+            await reagir(sock,msg,"📢");
+          }catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
+          return;
+        }
+
+        // GSMS
+        if(comando==="gsms"){
+          const ativos=[...gruposAtivados];
+          if(!ativos.length){await enviarComFoto(sock,jid,`❌ Nenhum grupo activo.`,ppBotUrl); return;}
+          if(!args.length){
+            try{const grupos=await sock.groupFetchAllParticipating(); const lista=ativos.map((gJid,i)=>`◎ ─ *${i+1}.* ${grupos[gJid]?.subject||gJid}`).join("\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 📣 AVISO NO GRUPO 』 ⊰─┐\n│\n${lista}\n│\n◎ ─ *${CONFIG.PREFIXO}gsms [número] [mensagem]*\n   _Ex: ${CONFIG.PREFIXO}gsms 1 Atenção!_\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);}
+            return;
+          }
+          const{grupoJid,mensagem}=await encontrarGrupoPorArg(sock,[...gruposAtivados],args);
+          if(!grupoJid){await enviarComFoto(sock,jid,`❌ Grupo não encontrado.\nUsa *${CONFIG.PREFIXO}chaton*`,ppBotUrl); return;}
+          if(!mensagem.trim()){await enviarComFoto(sock,jid,`❌ Escreve a mensagem!`,ppBotUrl); return;}
+          try{
+            const grupos=await sock.groupFetchAllParticipating(); const nomeGrupo=grupos[grupoJid]?.subject||"Grupo";
+            const meta=await sock.groupMetadata(grupoJid); const todos=meta.participants.map(p=>extrairJid(p.id||p));
+            await sock.sendMessage(grupoJid,{text:`📣 *AVISO IMPORTANTE!*\n✦ ─────────── ✦\n\n${mensagem}\n\n✦ ─────────── ✦\n${todos.map(()=>"\u200B").join("")}`,mentions:todos});
+            await enviarComFoto(sock,jid,`┌─⊱ 『 ✅ AVISO ENVIADO! 』 ⊰─┐\n│\n◎ ─ 📣 Grupo: *${nomeGrupo}*\n◎ ─ 👥 Mencionados: *${todos.length}*\n│\n└──────────────────────────────⊰`,ppBotUrl);
+            await reagir(sock,msg,"📣");
+          }catch(e){await enviarSemFoto(sock,jid,`❌ Erro: ${e.message}`);}
+          return;
+        }
+
+        if(comando==="apagadas"){if(!isGrupo){await enviarSemFoto(sock,jid,"❌ Só em grupos."); return;} const lista=msgApagadas[jid]||[]; if(!lista.length){await enviarComFoto(sock,jid,`┌─⊱ 『 🕵️ MSGS APAGADAS 』 ⊰─┐\n│\n◎ ─ 📭 Nenhuma detectada ainda.\n│\n└──────────────────────────────⊰`,ppBotUrl); return;} const ultimas=lista.slice(-10).reverse(); const textoLista=ultimas.map((m,i)=>{const hora=new Date(m.apagadoEm).toLocaleTimeString("pt-AO",{timeZone:"Africa/Luanda",hour:"2-digit",minute:"2-digit"}); const conteudo=m.texto?`_"${m.texto.slice(0,60)}"_`:`_(${m.tipo})_`; return `◎ ─ +${m.sender?.split("@")[0]||"?"} 🕐 ${hora}\n   ${conteudo}`;}).join("\n│\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 🕵️ MSGS APAGADAS (${ultimas.length}) 』 ⊰─┐\n│\n${textoLista}\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
+        if(comando==="stop"){if(jogoLoop[jid]&&jogoLoop[jid].activo){if(jogoLoop[jid].timeoutHandle) clearTimeout(jogoLoop[jid].timeoutHandle); const rodadas=jogoLoop[jid].rodada||0; delete jogoLoop[jid]; delete jogoAtivo[jid]; await enviarComFoto(sock,jid,`┌─⊱ 『 🛑 JOGO PARADO! 』 ⊰─┐\n│\n◎ ─ 📊 Rodadas: *${rodadas}*\n◎ ─ Obrigado! 🎮\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"🛑");}else{await enviarSemFoto(sock,jid,`❌ Não há jogo activo.`);} return;}
+
+        if(comando==="ver"){
+          const ctx=msg.message?.extendedTextMessage?.contextInfo; const stanzaId=ctx?.stanzaId;
+          if(!ctx||!stanzaId){await enviarSemFoto(sock,jid,`👁️ Responde uma view-once com *${CONFIG.PREFIXO}ver*`); await reagir(sock,msg,"❌"); return;}
+          const quemEnviou=ctx.participant?`@${ctx.participant.split("@")[0].split(":")[0]}`:"alguém"; const mentions=ctx.participant?[ctx.participant]:[];
+          const cached=cacheViewOnce[jid]?.[stanzaId];
+          if(cached){await enviarSemFoto(sock,jid,`🔓 A desbloquear...\n⏳`); try{if(cached.tipo==="video") await sock.sendMessage(jid,{video:cached.buf,caption:`🔓 *Vídeo!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); else if(cached.tipo==="audio"){await sock.sendMessage(jid,{audio:cached.buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:msg});}else await sock.sendMessage(jid,{image:cached.buf,caption:`🔓 *Imagem!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); await reagir(sock,msg,"🔓"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+          const qMsg=ctx.quotedMessage; if(qMsg){let innerMsg=null; for(const key of["viewOnceMessage","viewOnceMessageV2","viewOnceMessageV2Extension"]){if(qMsg[key]?.message){innerMsg=qMsg[key].message; break;}} if(innerMsg){await enviarSemFoto(sock,jid,`🔓 A desbloquear...\n⏳`); try{const fakeMsg={key:{remoteJid:jid,id:stanzaId,participant:ctx.participant||"",fromMe:false},message:innerMsg}; const buf=await downloadMediaMessage(fakeMsg,"buffer",{}); if(innerMsg.imageMessage) await sock.sendMessage(jid,{image:buf,caption:`🔓 *Imagem!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); else if(innerMsg.videoMessage) await sock.sendMessage(jid,{video:buf,caption:`🔓 *Vídeo!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); else if(innerMsg.audioMessage||innerMsg.pttMessage) await sock.sendMessage(jid,{audio:buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:msg}); await reagir(sock,msg,"🔓"); addXP(sender,5);}catch{await enviarSemFoto(sock,jid,`❌ Expirada.`); await reagir(sock,msg,"❌");} return;}}
+          await enviarSemFoto(sock,jid,`❌ Não encontrei no cache.`); await reagir(sock,msg,"❌"); return;
+        }
+
+        if(comando==="play"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`🎵 A procurar: _${entrada}_\n⏳`); let arqFinal=null; try{arqFinal=await downloadMusica(entrada,false);}catch{} if(!arqFinal||!fs.existsSync(arqFinal)){await enviarSemFoto(sock,jid,`❌ Não encontrei.`); await reagir(sock,msg,"❌"); return;} try{await enviarAudio(sock,jid,arqFinal,msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} setTimeout(()=>{try{fs.removeSync(arqFinal);}catch{}},15000); return;}
+        if(comando==="mp3"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`🎵 HD: _${entrada}_\n⏳`); let arqFinal=null; try{arqFinal=await downloadMusica(entrada,true);}catch{} if(!arqFinal||!fs.existsSync(arqFinal)){await enviarSemFoto(sock,jid,`❌ Não encontrei.`); await reagir(sock,msg,"❌"); return;} try{await enviarAudio(sock,jid,arqFinal,msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} setTimeout(()=>{try{fs.removeSync(arqFinal);}catch{}},15000); return;}
+        if(comando==="mp4"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`🎬 A procurar: _${entrada}_\n⏳`); let saida=null; try{saida=await downloadVideo(entrada);}catch{} if(!saida||!fs.existsSync(saida)){await enviarSemFoto(sock,jid,`❌ Não consegui.`); await reagir(sock,msg,"❌"); return;} try{await enviarVideo(sock,jid,saida,`✅ *${entrada}*\n_© LORDE LÁ DJUM_`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5);}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} setTimeout(()=>{try{fs.removeSync(saida);}catch{}},15000); return;}
+        if(comando==="mp4hd"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`🎬 720p: _${entrada}_\n⏳`); try{const result=await downloadVideoHD(entrada,720); await enviarVideo(sock,jid,result.filePath,`🎬 ${result.quality} | 💾 ${result.sizeMB}MB\n_© LORDE LÁ DJUM_`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`); await reagir(sock,msg,"❌");} return;}
+        if(comando==="tiktok"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}tiktok* [link]`); return;} await enviarSemFoto(sock,jid,`📱 A baixar...\n⏳`); try{const result=await dlTiktok(url); await sock.sendMessage(jid,{video:{url:result.url},caption:`🎵 *${result.title||"TikTok"}*\n_© LORDE LÁ DJUM_`},{quoted:msg}); await reagir(sock,msg,"✅"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+        if(comando==="instagram"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}instagram* [link]`); return;} await enviarSemFoto(sock,jid,`📸 A baixar...\n⏳`); try{const result=await dlInstagram(url); await enviarVideo(sock,jid,result.filePath,`📸 Instagram\n_© LORDE LÁ DJUM_`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+        if(comando==="twitter"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}twitter* [link]`); return;} await enviarSemFoto(sock,jid,`🐦 A baixar...\n⏳`); try{const result=await dlTwitter(url); await enviarVideo(sock,jid,result.filePath,`🐦 Twitter/X\n_© LORDE LÁ DJUM_`,[sender],msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="spotify"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`🟢 A procurar: _${entrada}_\n⏳`); try{const result=await dlSpotify(entrada); await enviarAudio(sock,jid,result.filePath,msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="soundcloud"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`🔶 A procurar: _${entrada}_\n⏳`); try{const result=await dlSoundcloud(entrada); await enviarAudio(sock,jid,result.filePath,msg); await reagir(sock,msg,"✅"); addXP(sender,5); setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-        if(comando==="pinterest"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`📌 A procurar...\n⏳`); try{const result=await dlPinterest(entrada); await sock.sendMessage(jid,{image:{url:result.url},caption:`📌 Pinterest`},{quoted:msg}); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+        if(comando==="pinterest"&&args.length>0){const entrada=args.join(" "); await enviarSemFoto(sock,jid,`📌 A procurar...\n⏳`); try{const result=await dlPinterest(entrada); await sock.sendMessage(jid,{image:{url:result.url},caption:`📌 Pinterest\n_© LORDE LÁ DJUM_`},{quoted:msg}); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="mediafire"&&args.length>0){const url=args[0]; if(!url.includes("mediafire.com")){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}mediafire* [link]`); return;} await enviarSemFoto(sock,jid,`📦 A processar...\n⏳`); try{const result=await dlMediafire(url); await sock.sendMessage(jid,{document:{url:result.url},fileName:result.title,mimetype:"application/octet-stream",caption:`📦 *${result.title}*`},{quoted:msg}); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="apk"&&args.length>0){const query=args.join(" "); await enviarSemFoto(sock,jid,`📲 A procurar: _${query}_\n⏳`); try{const result=await dlApk(query); await enviarComFoto(sock,jid,`┌─⊱ 『 📲 APK 』 ⊰─┐\n│\n◎ ─ 🏷️ *${result.title}*\n◎ ─ 🔗 ${result.url}\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
 
         if(comando==="qr"){const ctx=msg.message?.extendedTextMessage?.contextInfo,quotedMsg=ctx?.quotedMessage,imageMsg=quotedMsg?.imageMessage||msg.message?.imageMessage; if(imageMsg){try{let buf; if(msg.message?.imageMessage) buf=await downloadMediaMessage(msg,"buffer",{}); else{const qm={key:{remoteJid:jid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:quotedMsg}; buf=await downloadMediaMessage(qm,"buffer",{});} const imageUrl=await uploadParaTelegraph(buf); const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encodeURIComponent(imageUrl)}&qzone=2&ecc=M`; await sock.sendMessage(jid,{image:{url:qrUrl},caption:`🔲 *QR CODE!*`},{quoted:msg}); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;} const dado=args.join(" "); if(!dado){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}qr* [texto/url]`,ppBotUrl); return;} try{const qrUrl=`https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encodeURIComponent(dado)}&qzone=2&ecc=M`; await sock.sendMessage(jid,{image:{url:qrUrl},caption:`🔲 *QR CODE*`},{quoted:msg}); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="sf"){const ctx=msg.message?.extendedTextMessage?.contextInfo,quotedMsg=ctx?.quotedMessage,stickerMsgD=msg.message?.stickerMessage,stickerMsgQ=quotedMsg?.stickerMessage,stickerMsg=stickerMsgD||stickerMsgQ; if(!stickerMsg){await enviarSemFoto(sock,jid,`↩️ Responde sticker com *${CONFIG.PREFIXO}sf*`); return;} const isAnimated=stickerMsg.isAnimated||false; try{let buf; if(stickerMsgD) buf=await downloadMediaMessage(msg,"buffer",{}); else{const qm={key:{remoteJid:jid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:quotedMsg}; buf=await downloadMediaMessage(qm,"buffer",{});} if(!buf||buf.length<100) throw new Error("Sticker inválido"); const resultado=await stickerParaFoto(buf,isAnimated); if(resultado.isVideo) await sock.sendMessage(jid,{video:resultado.buffer,mimetype:"video/mp4",caption:`🎥 Convertido!`},{quoted:msg}); else await sock.sendMessage(jid,{image:resultado.buffer,caption:`🖼️ Convertido!`},{quoted:msg}); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="vz"){const ctxVz=msg.message?.extendedTextMessage?.contextInfo,quotedVz=ctxVz?.quotedMessage; let textoParaFalar=""; if(quotedVz) textoParaFalar=quotedVz.conversation||quotedVz.extendedTextMessage?.text||""; if(!textoParaFalar&&args.length>0) textoParaFalar=args.join(" "); if(!textoParaFalar){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}vz* [texto]`,ppBotUrl); return;} await enviarSemFoto(sock,jid,`🔊 A converter...\n⏳`,msg); try{const audioPath=await textoParaFala(textoParaFalar); await enviarAudio(sock,jid,audioPath,msg); try{fs.removeSync(audioPath);}catch{} await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-        if(comando==="calc"){const expr=args.join(" "); if(!expr){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}calc* [expressão]`,ppBotUrl); return;} try{const resultado=calcularSeguro(expr); await enviarComFoto(sock,jid,`┌─⊱ 『 🔢 CALC 』 ⊰─┐\n│\n◎ ─ *${expr}* = *${resultado}*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅");}catch{await enviarSemFoto(sock,jid,`❌ Expressão inválida!`);} return;}
-        if(comando==="encurtar"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}encurtar* [url]`,ppBotUrl); return;} try{const{data}=await axios.get(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,{timeout:10000,httpsAgent}); const urlE=String(data).trim(); if(!urlE.startsWith("http")) throw new Error("Falha"); await enviarComFoto(sock,jid,`🔗 ${urlE}`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-        if(comando==="cotacao"){await enviarSemFoto(sock,jid,`💱 A buscar...\n⏳`); try{const resp=await chatIA("Cotações actuais Kwanza (AOA) para USD, EUR, BRL. Formato curto.","Sê direto."); await enviarComFoto(sock,jid,`┌─⊱ 『 💱 COTAÇÕES KWANZA 』 ⊰─┐\n│\n${resp.split("\n").map(l=>`◎ ─ ${l}`).join("\n")}\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} return;}
+        if(comando==="calc"){const expr=args.join(" "); if(!expr){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}calc* [expressão]`,ppBotUrl); return;} try{const resultado=calcularSeguro(expr); await enviarComFoto(sock,jid,`┌─⊱ 『 🔢 CALC 』 ⊰─┐\n│\n◎ ─ *${expr}*\n◎ ─ = *${resultado}*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅");}catch{await enviarSemFoto(sock,jid,`❌ Expressão inválida!`);} return;}
+        if(comando==="encurtar"){const url=args[0]; if(!url||!url.startsWith("http")){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}encurtar* [url]`,ppBotUrl); return;} try{const{data}=await axios.get(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,{timeout:10000,httpsAgent}); const urlE=String(data).trim(); if(!urlE.startsWith("http")) throw new Error("Falha"); await enviarComFoto(sock,jid,`┌─⊱ 『 🔗 LINK CURTO 』 ⊰─┐\n│\n◎ ─ ${urlE}\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+        if(comando==="cotacao"){await enviarSemFoto(sock,jid,`💱 A buscar cotações...\n⏳`); try{const resp=await chatIA("Cotações actuais Kwanza (AOA) para USD, EUR, BRL. Formato curto.","Sê direto."); await enviarComFoto(sock,jid,`┌─⊱ 『 💱 COTAÇÕES KWANZA 』 ⊰─┐\n│\n${resp.split("\n").map(l=>`◎ ─ ${l}`).join("\n")}\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} return;}
         if(comando==="poema"){const tema=args.join(" ")||"Angola"; await enviarSemFoto(sock,jid,`✍️ A compor...\n⏳`); try{const p=await chatIA(`Poema sobre: "${tema}". 4-8 versos.`,"Poeta angolano."); await enviarComFoto(sock,jid,`┌─⊱ 『 ✍️ POEMA 』 ⊰─┐\n│ _${tema}_\n│\n${p}\n│\n└──────────────────────────────⊰`,ppBotUrl); addXP(sender,5);}catch{await enviarSemFoto(sock,jid,"❌ Erro.");} return;}
         if(comando==="historia"){const tema=args.join(" ")||"Angola"; await enviarSemFoto(sock,jid,`📖 A criar...\n⏳`); try{const h=await chatIA(`História curta sobre: "${tema}". Máx 200 palavras.`,"Escritor angolano."); await enviarComFoto(sock,jid,`┌─⊱ 『 📖 HISTÓRIA 』 ⊰─┐\n│\n${h}\n│\n└──────────────────────────────⊰`,ppBotUrl); addXP(sender,5);}catch{await enviarSemFoto(sock,jid,"❌ Erro.");} return;}
 
@@ -3140,63 +1310,23 @@ _Após pagamento, envia comprovativo!_ 🧾`;
           if(!iM&&!vM){await enviarSemFoto(sock,jid,`↩️ Responde imagem/vídeo com *${CONFIG.PREFIXO}sticker*`); return;}
           const isAnim=!!vM;
           await enviarSemFoto(sock,jid,isAnim?`🎭 A criar sticker animado...\n⏳`:`🎭 A criar sticker...\n⏳`);
-          try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{}); const webpBuf=await criarSticker(buf,isAnim); await sock.sendMessage(jid,{sticker:webpBuf},{quoted:msg}); await reagir(sock,msg,"✅");}
-          catch{try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{}); await sock.sendMessage(jid,{sticker:buf},{quoted:msg}); await reagir(sock,msg,"✅");}catch{await enviarSemFoto(sock,jid,"❌ Erro."); await reagir(sock,msg,"❌");}}
+          try{
+            const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            const webpBuf=await criarSticker(buf,isAnim);
+            await sock.sendMessage(jid,{sticker:webpBuf},{quoted:msg});
+            await reagir(sock,msg,"✅");
+          }catch{
+            try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{}); await sock.sendMessage(jid,{sticker:buf},{quoted:msg}); await reagir(sock,msg,"✅");}
+            catch{await enviarSemFoto(sock,jid,"❌ Erro."); await reagir(sock,msg,"❌");}
+          }
           return;
         }
 
         if(comando==="foto"&&args[0]){try{await sock.sendMessage(jid,{image:{url:args.join("")},caption:"📷"},{quoted:msg}); await reagir(sock,msg,"✅");}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} return;}
         if(comando==="doc"&&args[0]){try{const url=args.join(""),nome=decodeURIComponent(url.split("/").pop().split("?")[0])||"documento"; await sock.sendMessage(jid,{document:{url},fileName:nome,mimetype:"application/octet-stream",caption:"📄"},{quoted:msg}); await reagir(sock,msg,"✅");}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} return;}
         if(comando==="mostre"&&args.length>0){const query=args.join(" "); await enviarSemFoto(sock,jid,`🔍 A buscar: _${query}_\n⏳`); try{const imageUrl=await buscarImagemInternet(query); if(!imageUrl){await enviarSemFoto(sock,jid,`❌ Não encontrei.`); return;} await sock.sendMessage(jid,{image:{url:imageUrl},caption:`🖼️ *${query}*`},{quoted:msg}); await reagir(sock,msg,"✅");}catch{await enviarSemFoto(sock,jid,`❌ Não encontrei.`);} return;}
-        if(comando==="dono"){let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{} const tD=`┌─⊱ 『 👑 CRIADOR DO BOT 』 ⊰─┐\n│\n◎ ─ 🏷️ *${CONFIG.DONO_NOME}*\n◎ ─ 📞 *${CONFIG.DONO_NUM}*\n│\n◎ ─ 💰 *${CONFIG.PREFIXO}alugar* → alugar bot\n│\n└──────────────────────────────⊰`; if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg}); else await enviarSemFoto(sock,jid,tD,msg); await reagir(sock,msg,"👑"); return;}
-
-        // ✅ SHAZAM — com animação ⚡⚡⚡
-        if(comando==="shazam"){
-          await executarReconhecimentoMusica(sock,jid,msg,sender,true);
-          return;
-        }
-
-        // ✅ BUSCA — sem animação ⚡
-        if(comando==="busca"){
-          await executarReconhecimentoMusica(sock,jid,msg,sender,false);
-          return;
-        }
-
-        // EDITAR
-        if(comando==="editar"){
-          const instrucao=args.join(" ").trim();
-          if(!instrucao){await enviarComFoto(sock,jid,`┌─⊱ 『 🎨 EDITOR IA 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}editar* [instrução]\n    _↩️ responde uma imagem_\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
-          const imgBuf=await downloadImagemDaMensagem(msg);
-          if(!imgBuf){await enviarSemFoto(sock,jid,`↩️ Responde uma *imagem* com *${CONFIG.PREFIXO}editar [instrução]*`); return;}
-          await enviarSemFoto(sock,jid,`🎨 A editar com IA...\n💡 _${instrucao}_\n⏳`);
-          try{
-            const form=new FormData(); form.append("image",imgBuf,{filename:"imagem.jpg",contentType:"image/jpeg"}); form.append("prompt",instrucao); form.append("apikey",CONFIG.SYSTEMZONE_KEY);
-            const{data}=await axios.post("https://systemzone.store/api/v2/edit/deepai",form,{headers:{...form.getHeaders()},timeout:90000,httpsAgent});
-            const urlResultado=data?.imagem||data?.result||data?.download_url||data?.url;
-            if(!urlResultado) throw new Error("API sem imagem");
-            await sock.sendMessage(jid,{image:{url:urlResultado.replace("http://","https://")},caption:`✨ *Imagem editada!*\n💡 _${instrucao}_`},{quoted:msg});
-            await reagir(sock,msg,"✅"); addXP(sender,5);
-          }catch(e){await enviarSemFoto(sock,jid,`❌ Erro: ${e.message.slice(0,100)}`); await reagir(sock,msg,"❌");}
-          return;
-        }
-
-        if(comando==="placar"){const busca=args.join(" ").trim(); if(!busca){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}placar* [jogo/equipa]`,ppBotUrl); return;} await enviarSemFoto(sock,jid,`⚽ A buscar placar de _${busca}_...\n⏳`); try{const{data}=await axios.get(`https://systemzone.store/api/placar?search=${encodeURIComponent(busca)}`,{timeout:15000,httpsAgent}); if(!data?.status||!data?.result) throw new Error("Sem resultado"); const res=data.result,casa=res.times?.casa||"?",fora=res.times?.fora||"?",pC=res.placar?.casa??"?",pF=res.placar?.fora??"?",st=res.status||"N/D"; const aoVivo=st.toLowerCase().includes("andamento")||st.toLowerCase().includes("vivo"); await enviarComFoto(sock,jid,`┌─⊱ 『 ${aoVivo?"🔴 AO VIVO":"⚽ PLACAR"} 』 ⊰─┐\n│\n◎ ─ *${casa}*  ${pC} × ${pF}  *${fora}*\n◎ ─ 📊 _${st}_\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"⚽");}catch(e){await enviarSemFoto(sock,jid,`❌ Não encontrei placar para *${busca}*.`);} return;}
-
-        if(comando==="tourl"){const midia=await downloadQualquerMidia(msg); if(!midia){await enviarSemFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}tourl* ↩️ responde mídia`); return;} await enviarSemFoto(sock,jid,`🔗 A gerar link para: _${midia.nome}_\n⏳`); try{let url; if(midia.mime.startsWith("image/")&&!midia.mime.includes("webp")){try{url=await uploadParaTelegraph(midia.buffer);}catch{url=await uploadParaCatbox(midia.buffer,midia.nome,midia.mime);}}else{url=await uploadParaCatbox(midia.buffer,midia.nome,midia.mime);} const tam=(midia.buffer.length/1024).toFixed(1); await enviarComFoto(sock,jid,`┌─⊱ 『 🔗 LINK GERADO! 』 ⊰─┐\n│\n◎ ─ 📎 *${midia.nome}*\n◎ ─ 💾 *${tam} KB*\n│\n◎ ─ 🌐 ${url}\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅"); addXP(sender,3);}catch(e){await enviarSemFoto(sock,jid,`❌ Erro: ${e.message.slice(0,80)}`);} return;}
-
-        if(comando==="scanlink"){if(!isGrupo){await enviarSemFoto(sock,jid,"❌ Só funciona em grupos."); return;} const historico=historyMsgs[jid]||[]; if(!historico.length){await enviarComFoto(sock,jid,`📭 Sem histórico ainda.`,ppBotUrl); return;} await enviarComFoto(sock,jid,`🔍 A varrer ${historico.length} mensagens...\n⏳`,ppBotUrl); try{const meta=await sock.groupMetadata(jid); const admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)); const membrosActuais=new Set(meta.participants.map(p=>extrairJid(p.id||p))); let deletados=0,banidos=0; const banidosSet=new Set(); const linksEncontrados=[]; for(const h of historico){if(!h.texto||!LINK_RX.test(h.texto)) continue; if(admins.includes(h.sender)||ehDono(h.sender)) continue; linksEncontrados.push(h);} if(!linksEncontrados.length){await enviarComFoto(sock,jid,`✅ *Nenhum link!* Chat LIMPO! 🎉`,ppBotUrl); await reagir(sock,msg,"✅"); return;} for(const h of linksEncontrados){try{await sock.sendMessage(jid,{delete:h.key}); deletados++;}catch{} await new Promise(r=>setTimeout(r,300));} for(const h of linksEncontrados){if(banidosSet.has(h.sender)||!membrosActuais.has(h.sender)) continue; try{await sock.groupParticipantsUpdate(jid,[h.sender],"remove"); await sock.sendMessage(jid,{text:`🚨 @${h.sender.split("@")[0].split(":")[0]} — *BAN!*`,mentions:[h.sender]}); banidosSet.add(h.sender); banidos++;}catch{} await new Promise(r=>setTimeout(r,500));} historyMsgs[jid]=[]; await enviarComFoto(sock,jid,`┌─⊱ 『 ✅ SCAN CONCLUÍDO! 』 ⊰─┐\n│\n◎ ─ 📊 Verificadas: *${historico.length}*\n◎ ─ 🔗 Links: *${linksEncontrados.length}*\n◎ ─ 🗑️ Eliminadas: *${deletados}*\n◎ ─ 🔨 Banidos: *${banidos}*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"🔨");}catch(e){await enviarSemFoto(sock,jid,`❌ Erro: ${e.message}`);} return;}
-
-        if(comando==="chaton"){const ativos=[...gruposAtivados]; if(!ativos.length){await enviarComFoto(sock,jid,`📭 Nenhum grupo activo.`,ppBotUrl); return;} try{const grupos=await sock.groupFetchAllParticipating(); const linhas=ativos.map((gJid,i)=>{const nome=grupos[gJid]?.subject||gJid; const membros=grupos[gJid]?.participants?.length||"?"; return `◎ ─ *${i+1}.* 🟢 *${nome}*\n   👥 ${membros} membros`;}).join("\n│\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 🏘️ GRUPOS ACTIVOS (${ativos.length}) 』 ⊰─┐\n│\n${linhas}\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-
-        if(comando==="sms"){const ativos=[...gruposAtivados]; if(!ativos.length){await enviarComFoto(sock,jid,`❌ Nenhum grupo activo.`,ppBotUrl); return;} if(!args.length){try{const grupos=await sock.groupFetchAllParticipating(); const lista=ativos.map((gJid,i)=>`◎ ─ *${i+1}.* ${grupos[gJid]?.subject||gJid}`).join("\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 📢 SMS PRIVADA 』 ⊰─┐\n│\n${lista}\n│\n◎ ─ *${CONFIG.PREFIXO}sms [nº] [msg]*\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;} const{grupoJid,mensagem}=await encontrarGrupoPorArg(sock,[...gruposAtivados],args); if(!grupoJid){await enviarComFoto(sock,jid,`❌ Grupo não encontrado.`,ppBotUrl); return;} if(!mensagem.trim()){await enviarComFoto(sock,jid,`❌ Escreve a mensagem!`,ppBotUrl); return;} try{const grupos=await sock.groupFetchAllParticipating(); const nomeGrupo=grupos[grupoJid]?.subject||"Grupo"; const meta=await sock.groupMetadata(grupoJid); const membros=meta.participants.map(p=>extrairJid(p.id||p)); await enviarSemFoto(sock,jid,`📤 A enviar para *${membros.length}* membros...\n⏳`); let enviados=0,erros=0; for(const membro of membros){if(ehDono(membro)) continue; try{await sock.sendMessage(membro,{text:`📢 *Mensagem Privada*\n✦ ─────────── ✦\n\n${mensagem}\n\n✦ ─────────── ✦\n_Enviado por: ${CONFIG.DONO_NOME}_\n_Grupo: ${nomeGrupo}_`}); enviados++; await new Promise(r=>setTimeout(r,600));}catch{erros++;}} await enviarComFoto(sock,jid,`✅ SMS enviada!\n📊 ${enviados} | ❌ ${erros}`,ppBotUrl); await reagir(sock,msg,"📢");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-
-        if(comando==="gsms"){const ativos=[...gruposAtivados]; if(!ativos.length){await enviarComFoto(sock,jid,`❌ Nenhum grupo activo.`,ppBotUrl); return;} if(!args.length){try{const grupos=await sock.groupFetchAllParticipating(); const lista=ativos.map((gJid,i)=>`◎ ─ *${i+1}.* ${grupos[gJid]?.subject||gJid}`).join("\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 📣 AVISO NO GRUPO 』 ⊰─┐\n│\n${lista}\n│\n◎ ─ *${CONFIG.PREFIXO}gsms [nº] [msg]*\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;} const{grupoJid,mensagem}=await encontrarGrupoPorArg(sock,[...gruposAtivados],args); if(!grupoJid){await enviarComFoto(sock,jid,`❌ Grupo não encontrado.`,ppBotUrl); return;} if(!mensagem.trim()){await enviarComFoto(sock,jid,`❌ Escreve a mensagem!`,ppBotUrl); return;} try{const grupos=await sock.groupFetchAllParticipating(); const nomeGrupo=grupos[grupoJid]?.subject||"Grupo"; const meta=await sock.groupMetadata(grupoJid); const todos=meta.participants.map(p=>extrairJid(p.id||p)); await sock.sendMessage(grupoJid,{text:`📣 *AVISO IMPORTANTE!*\n✦ ─────────── ✦\n\n${mensagem}\n\n✦ ─────────── ✦\n${todos.map(()=>"\u200B").join("")}`,mentions:todos}); await enviarComFoto(sock,jid,`✅ Aviso enviado em *${nomeGrupo}*!\n👥 ${todos.length} mencionados`,ppBotUrl); await reagir(sock,msg,"📣");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-
-        if(comando==="apagadas"){if(!isGrupo){await enviarSemFoto(sock,jid,"❌ Só em grupos."); return;} const lista=msgApagadas[jid]||[]; if(!lista.length){await enviarComFoto(sock,jid,`📭 Nenhuma msg apagada detectada.`,ppBotUrl); return;} const ultimas=lista.slice(-10).reverse(); const textoLista=ultimas.map((m,i)=>{const hora=new Date(m.apagadoEm).toLocaleTimeString("pt-AO",{timeZone:"Africa/Luanda",hour:"2-digit",minute:"2-digit"}); const conteudo=m.texto?`_"${m.texto.slice(0,60)}"_`:`_(${m.tipo})_`; return `◎ ─ +${m.sender?.split("@")[0]||"?"} 🕐 ${hora}\n   ${conteudo}`;}).join("\n│\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 🕵️ MSGS APAGADAS (${ultimas.length}) 』 ⊰─┐\n│\n${textoLista}\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
-        if(comando==="stop"){if(jogoLoop[jid]&&jogoLoop[jid].activo){if(jogoLoop[jid].timeoutHandle) clearTimeout(jogoLoop[jid].timeoutHandle); const rodadas=jogoLoop[jid].rodada||0; delete jogoLoop[jid]; delete jogoAtivo[jid]; await enviarComFoto(sock,jid,`🛑 *Jogo parado!*\n📊 Rodadas: *${rodadas}*`,ppBotUrl); await reagir(sock,msg,"🛑");}else{await enviarSemFoto(sock,jid,`❌ Não há jogo activo.`);} return;}
-
-        if(comando==="ver"){const ctx=msg.message?.extendedTextMessage?.contextInfo; const stanzaId=ctx?.stanzaId; if(!ctx||!stanzaId){await enviarSemFoto(sock,jid,`👁️ Responde uma view-once com *${CONFIG.PREFIXO}ver*`); await reagir(sock,msg,"❌"); return;} const quemEnviou=ctx.participant?`@${ctx.participant.split("@")[0].split(":")[0]}`:"alguém"; const mentions=ctx.participant?[ctx.participant]:[]; const cached=cacheViewOnce[jid]?.[stanzaId]; if(cached){await enviarSemFoto(sock,jid,`🔓 A desbloquear...\n⏳`); try{if(cached.tipo==="video") await sock.sendMessage(jid,{video:cached.buf,caption:`🔓 *Vídeo!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); else if(cached.tipo==="audio"){await sock.sendMessage(jid,{audio:cached.buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:msg});}else await sock.sendMessage(jid,{image:cached.buf,caption:`🔓 *Imagem!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); await reagir(sock,msg,"🔓"); addXP(sender,5);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;} const qMsg=ctx.quotedMessage; if(qMsg){let innerMsg=null; for(const key of["viewOnceMessage","viewOnceMessageV2","viewOnceMessageV2Extension"]){if(qMsg[key]?.message){innerMsg=qMsg[key].message; break;}} if(innerMsg){await enviarSemFoto(sock,jid,`🔓 A desbloquear...\n⏳`); try{const fakeMsg={key:{remoteJid:jid,id:stanzaId,participant:ctx.participant||"",fromMe:false},message:innerMsg}; const buf=await downloadMediaMessage(fakeMsg,"buffer",{}); if(innerMsg.imageMessage) await sock.sendMessage(jid,{image:buf,caption:`🔓 *Imagem!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); else if(innerMsg.videoMessage) await sock.sendMessage(jid,{video:buf,caption:`🔓 *Vídeo!*\n📩 De: ${quemEnviou}`,mentions},{quoted:msg}); else if(innerMsg.audioMessage||innerMsg.pttMessage) await sock.sendMessage(jid,{audio:buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:msg}); await reagir(sock,msg,"🔓"); addXP(sender,5);}catch{await enviarSemFoto(sock,jid,`❌ Expirada.`); await reagir(sock,msg,"❌");} return;}} await enviarSemFoto(sock,jid,`❌ Não encontrei no cache.`); await reagir(sock,msg,"❌"); return;}
-
+        if(comando==="dono"){let ppD=null; try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{} const tD=`┌─⊱ 『 👑 CRIADOR DO BOT 』 ⊰─┐\n│\n◎ ─ 🏷️ *${CONFIG.DONO_NOME}*\n◎ ─ 📞 *${CONFIG.DONO_NUM}*\n│\n└──────────────────────────────⊰`; if(ppD) await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:msg}); else await enviarSemFoto(sock,jid,tD,msg); await reagir(sock,msg,"👑"); return;}
+        if(comando==="busca"){const audioData=await downloadAudioDaMensagem(msg); if(!audioData){await enviarSemFoto(sock,jid,`↩️ Responde nota de voz com *${CONFIG.PREFIXO}busca*`); return;} try{const resultado=await reconhecerMusica(audioData.buffer); if(resultado.status==="success"&&resultado.result){const r=resultado.result; const spotify=r.spotify?.external_urls?.spotify||"",apple=r.apple_music?.url||"",coverUrl=r.spotify?.album?.images?.[0]?.url||null; const textoMusica=`┌─⊱ 『 🎵 MÚSICA RECONHECIDA 』 ⊰─┐\n│\n◎ ─ 🎵 *${r.title}* — ${r.artist}\n◎ ─ 💿 ${r.album||"N/A"}${spotify?`\n◎ ─ 🟢 ${spotify}`:""}${apple?`\n◎ ─ 🍎 ${apple}`:""}\n│\n└──────────────────────────────⊰`; if(coverUrl) await sock.sendMessage(jid,{image:{url:coverUrl},caption:textoMusica},{quoted:msg}); else await enviarSemFoto(sock,jid,textoMusica,msg); await reagir(sock,msg,"🎵"); addXP(sender,5);}else{await enviarSemFoto(sock,jid,`❌ Não reconhecida.`);}}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="fotocopia"){const imgBuf=await downloadImagemDaMensagem(msg); if(!imgBuf){await enviarSemFoto(sock,jid,`↩️ Responde imagem com *${CONFIG.PREFIXO}fotocopia*`); return;} await enviarSemFoto(sock,jid,`🖼️ A processar...\n⏳`); try{const t=await analisarImagem(imgBuf,"Lê e transcreve TODO o texto em português."); await enviarSemFoto(sock,jid,`┌─⊱ 『 📄 TEXTO EXTRAÍDO 』 ⊰─┐\n│\n${t}\n│\n└──────────────────────────────⊰`); await reagir(sock,msg,"✅");}catch{await enviarSemFoto(sock,jid,`❌ Erro.`);} return;}
         if(comando==="fotoparaia"){const imgBuf=await downloadImagemDaMensagem(msg); if(!imgBuf){await enviarSemFoto(sock,jid,`↩️ Responde imagem com *${CONFIG.PREFIXO}fotoparaia*`); return;} await enviarSemFoto(sock,jid,`🖼️ A analisar...\n⏳`); try{const instrucao=args.join(" ")?`Responde: "${args.join(" ")}". Português.`:"Descreve detalhadamente. Português."; const resp=await analisarImagem(imgBuf,instrucao); await enviarSemFoto(sock,jid,`┌─⊱ 『 🧠 IA + IMAGEM 』 ⊰─┐\n│\n${resp}\n│\n└──────────────────────────────⊰`); await reagir(sock,msg,"🧠");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="resumirfoto"){const imgBuf=await downloadImagemDaMensagem(msg); if(!imgBuf){await enviarSemFoto(sock,jid,`↩️ Responde imagem com *${CONFIG.PREFIXO}resumirfoto*`); return;} try{const resumo=await analisarImagem(imgBuf,"Resumo objetivo. Português."); await enviarSemFoto(sock,jid,`┌─⊱ 『 📝 RESUMO DA IMAGEM 』 ⊰─┐\n│\n${resumo}\n│\n└──────────────────────────────⊰`); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
@@ -3211,16 +1341,46 @@ _Após pagamento, envia comprovativo!_ 🧾`;
         if(comando==="traduziraudio"){const idioma=args[0]||"português"; const d=await downloadAudioDaMensagem(msg); if(!d){await enviarSemFoto(sock,jid,`↩️ Responde áudio com *${CONFIG.PREFIXO}traduziraudio [idioma]*`); return;} try{const t=await transcreverComGroq(d.buffer); const tr=await chatIA(`Traduz para ${idioma}: "${t}"`); await enviarSemFoto(sock,jid,`┌─⊱ 『 🌍 TRADUÇÃO DO ÁUDIO 』 ⊰─┐\n│\n${tr}\n│\n└──────────────────────────────⊰`); await reagir(sock,msg,"✅");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="audioparaia"){const d=await downloadAudioDaMensagem(msg); if(!d){await enviarSemFoto(sock,jid,`↩️ Responde áudio com *${CONFIG.PREFIXO}audioparaia*`); return;} try{const t=await transcreverComGroq(d.buffer); const r=await chatIA(t); await enviarSemFoto(sock,jid,`┌─⊱ 『 🧠 IA + ÁUDIO 』 ⊰─┐\n│\n${r}\n│\n└──────────────────────────────⊰`); await reagir(sock,msg,"🧠");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="ping"){const ini=Date.now(); await sock.sendMessage(jid,{text:"⏳"}); await enviarComFoto(sock,jid,`┌─⊱ 『 🏓 PONG! 』 ⊰─┐\n│\n◎ ─ 📶 *${Date.now()-ini}ms*\n◎ ─ ⏱️ Uptime: *${Math.floor(process.uptime()/60)} min*\n◎ ─ 💾 RAM: *${(process.memoryUsage().heapUsed/1024/1024).toFixed(1)}MB*\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
-        if(comando==="regras"){await enviarComFoto(sock,jid,`┌─⊱ 『 📋 REGRAS 』 ⊰─┐\n│\n◎ ─ ❌ Sem links\n◎ ─ ❌ Sem spam\n◎ ─ ❌ Sem pornografia\n◎ ─ ❌ Sem ofensas\n◎ ─ ❌ Sem status\n◎ ─ ✅ Respeita todos\n│\n◎ ─ ⚡ Ban automático 5→0!\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
+        if(comando==="regras"){await enviarComFoto(sock,jid,`┌─⊱ 『 📋 REGRAS DO GRUPO 』 ⊰─┐\n│\n◎ ─ ❌ Sem links\n◎ ─ ❌ Sem spam\n◎ ─ ❌ Sem pornografia\n◎ ─ ❌ Sem ofensas\n◎ ─ ❌ Sem status\n◎ ─ ✅ Respeita todos\n│\n◎ ─ ⚡ Ban automático 5→0!\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
         if(comando==="stats"){const s=fs.readJsonSync(ARQUIVO_STATS); const top=Object.entries(s.comandos||{}).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([c,n],i)=>`◎ ─ ${i+1}. *${CONFIG.PREFIXO}${c}* — ${n}x`).join("\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 📊 ESTATÍSTICAS 』 ⊰─┐\n│\n◎ ─ 🔢 Total: *${s.total||0}*\n│\n◎ ─ 📈 *Top 5:*\n${top}\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
-        if(comando==="tempo"){if(!args[0]){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}tempo* [local]`,ppBotUrl); return;} const local=args.join(" "); try{const res=await axios.get(`https://wttr.in/${encodeURIComponent(local)}?format=j1`,{timeout:10000,httpsAgent}); const cur=res.data.current_condition[0]; await enviarComFoto(sock,jid,`┌─⊱ 『 🌤️ ${local.toUpperCase()} 』 ⊰─┐\n│\n◎ ─ 🌡️ *${cur.temp_C}°C*\n◎ ─ ☁️ ${cur.weatherDesc[0].value}\n◎ ─ 💧 ${cur.humidity}%\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch{await enviarComFoto(sock,jid,`❌ Não encontrei.`,ppBotUrl);} return;}
+        if(comando==="tempo"){if(!args[0]){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}tempo* [local]\n   _Ex: ${CONFIG.PREFIXO}tempo Angola_`,ppBotUrl); return;} const local=args.join(" "); try{const res=await axios.get(`https://wttr.in/${encodeURIComponent(local)}?format=j1`,{timeout:10000,httpsAgent}); const cur=res.data.current_condition[0]; await enviarComFoto(sock,jid,`┌─⊱ 『 🌤️ TEMPO — ${local.toUpperCase()} 』 ⊰─┐\n│\n◎ ─ 🌡️ *${cur.temp_C}°C*\n◎ ─ ☁️ ${cur.weatherDesc[0].value}\n◎ ─ 💧 Humidade: ${cur.humidity}%\n│\n└──────────────────────────────⊰`,ppBotUrl);}catch{await enviarComFoto(sock,jid,`❌ Não encontrei.`,ppBotUrl);} return;}
         if(comando==="horario"){const agora=new Date(); const opc=(tz)=>({timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false}); await enviarComFoto(sock,jid,`┌─⊱ 『 🕐 HORÁRIO MUNDIAL 』 ⊰─┐\n│\n◎ ─ 🇦🇴 Angola: *${agora.toLocaleTimeString("pt-AO",opc("Africa/Luanda"))}*\n◎ ─ 🇧🇷 Brasil: *${agora.toLocaleTimeString("pt-BR",opc("America/Sao_Paulo"))}*\n◎ ─ 🇵🇹 Portugal: *${agora.toLocaleTimeString("pt-PT",opc("Europe/Lisbon"))}*\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
         if(comando==="info"){await enviarComFoto(sock,jid,`◎ ─ Usa *${CONFIG.PREFIXO}menu* para ver os comandos.`,ppBotUrl); return;}
 
-        if(comando==="arquivo"){const fichs=fs.readdirSync("./vpn"); if(!args[0]){await enviarComFoto(sock,jid,`┌─⊱ 『 📁 FICHEIROS (${fichs.length}) 』 ⊰─┐\n│\n${fichs.length>0?fichs.map((f,i)=>`◎ ─ ${i+1}. ${f}`).join("\n"):"◎ ─ _Sem ficheiros_"}\n│\n└──────────────────────────────⊰`,ppBotUrl); return;} const enc=fichs.find(f=>f.toLowerCase().includes(args.join(" ").toLowerCase())); if(!enc){await enviarComFoto(sock,jid,`❌ Não encontrado.`,ppBotUrl); return;} await sock.sendMessage(jid,{document:fs.readFileSync(path.join("./vpn",enc)),fileName:enc,mimetype:"application/octet-stream"},{quoted:msg}); await reagir(sock,msg,"✅"); return;}
-        if(comando==="arqadd"){const docDireto=msg.message?.documentMessage; const docCitado=msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.documentMessage; const docMsg=docDireto||docCitado; if(!docMsg){await enviarComFoto(sock,jid,`◎ ─ 1️⃣ Envia o ficheiro\n◎ ─ 2️⃣ Legenda: *${CONFIG.PREFIXO}arqadd*`,ppBotUrl); return;} try{let buffer; if(docDireto){buffer=await downloadMediaMessage(msg,"buffer",{});}else{const ctx3=msg.message?.extendedTextMessage?.contextInfo; const qm={key:{remoteJid:jid,id:ctx3?.stanzaId||"",participant:ctx3?.participant||"",fromMe:false},message:ctx3?.quotedMessage}; buffer=await downloadMediaMessage(qm,"buffer",{});} let nomeArq=docMsg.fileName||`arq_${Date.now()}.ehi`; const extActual=path.extname(nomeArq).toLowerCase(); if(!ARQ_EXTS.includes(extActual)) nomeArq=nomeArq+".ehi"; let destPath=path.join("./vpn",nomeArq); if(fs.existsSync(destPath)){const base=path.basename(nomeArq,path.extname(nomeArq));
-        const ext=path.extname(nomeArq); nomeArq=`${base}_${Date.now()}${ext}`; destPath=path.join("./vpn",nomeArq);} fs.writeFileSync(destPath,buffer); const tam=(buffer.length/1024).toFixed(1); await enviarComFoto(sock,jid,`✅ *${nomeArq}* adicionado!\n💾 ${tam} KB`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarComFoto(sock,jid,`❌ Erro: ${e.message}`,ppBotUrl);} return;}
-        if(comando==="arqdelete"){const fichs=fs.readdirSync("./vpn"); if(!args[0]){await enviarComFoto(sock,jid,`┌─⊱ 『 🗑️ ELIMINAR 』 ⊰─┐\n│\n${fichs.length>0?fichs.map((f,i)=>`◎ ─ ${i+1}. ${f}`).join("\n"):"◎ ─ _Sem ficheiros_"}\n│\n◎ ─ *${CONFIG.PREFIXO}arqdelete* [nome ou nº]\n│\n└──────────────────────────────⊰`,ppBotUrl); return;} let nomeAlvo=""; const idx=parseInt(args[0]); if(!isNaN(idx)&&idx>=1&&idx<=fichs.length){nomeAlvo=fichs[idx-1];}else{nomeAlvo=fichs.find(f=>f.toLowerCase().includes(args.join(" ").toLowerCase()))||"";} if(!nomeAlvo){await enviarComFoto(sock,jid,`❌ Ficheiro não encontrado.`,ppBotUrl); return;} try{fs.removeSync(path.join("./vpn",nomeAlvo)); await enviarComFoto(sock,jid,`✅ *${nomeAlvo}* eliminado!`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarComFoto(sock,jid,`❌ Erro: ${e.message}`,ppBotUrl);} return;}
+        if(comando==="arquivo"){
+          const fichs=fs.readdirSync("./vpn");
+          if(!args[0]){await enviarComFoto(sock,jid,`┌─⊱ 『 📁 FICHEIROS (${fichs.length}) 』 ⊰─┐\n│\n${fichs.length>0?fichs.map((f,i)=>`◎ ─ ${i+1}. ${f}`).join("\n"):"◎ ─ _Sem ficheiros_"}\n│\n◎ ─ *${CONFIG.PREFIXO}arqadd* para adicionar\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
+          const enc=fichs.find(f=>f.toLowerCase().includes(args.join(" ").toLowerCase()));
+          if(!enc){await enviarComFoto(sock,jid,`❌ Não encontrado.`,ppBotUrl); return;}
+          await sock.sendMessage(jid,{document:fs.readFileSync(path.join("./vpn",enc)),fileName:enc,mimetype:"application/octet-stream"},{quoted:msg});
+          await reagir(sock,msg,"✅"); return;
+        }
+
+        if(comando==="arqadd"){
+          const docDireto=msg.message?.documentMessage;
+          const docCitado=msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.documentMessage;
+          const docMsg=docDireto||docCitado;
+          if(!docMsg){await enviarComFoto(sock,jid,`┌─⊱ 『 📤 ADICIONAR FICHEIRO 』 ⊰─┐\n│\n◎ ─ 1️⃣ Envia o ficheiro\n◎ ─ 2️⃣ Legenda: *${CONFIG.PREFIXO}arqadd*\n│\n◎ ─ _OU cita o ficheiro com_\n   *${CONFIG.PREFIXO}arqadd*\n│\n◎ ─ ✅ .ehi .npv .ovpn .conf .hia\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
+          try{
+            let buffer; if(docDireto){buffer=await downloadMediaMessage(msg,"buffer",{});}else{const ctx3=msg.message?.extendedTextMessage?.contextInfo; const qm={key:{remoteJid:jid,id:ctx3?.stanzaId||"",participant:ctx3?.participant||"",fromMe:false},message:ctx3?.quotedMessage}; buffer=await downloadMediaMessage(qm,"buffer",{});}
+            let nomeArq=docMsg.fileName||`arq_${Date.now()}.ehi`; const extActual=path.extname(nomeArq).toLowerCase(); if(!ARQ_EXTS.includes(extActual)) nomeArq=nomeArq+".ehi";
+            let destPath=path.join("./vpn",nomeArq); if(fs.existsSync(destPath)){const base=path.basename(nomeArq,path.extname(nomeArq)); const ext=path.extname(nomeArq); nomeArq=`${base}_${Date.now()}${ext}`; destPath=path.join("./vpn",nomeArq);}
+            fs.writeFileSync(destPath,buffer); const tam=(buffer.length/1024).toFixed(1);
+            await enviarComFoto(sock,jid,`┌─⊱ 『 ✅ FICHEIRO ADICIONADO! 』 ⊰─┐\n│\n◎ ─ 📄 *${nomeArq}*\n◎ ─ 💾 *${tam} KB*\n│\n◎ ─ Usa *${CONFIG.PREFIXO}arquivo* para listar.\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅");
+          }catch(e){await enviarComFoto(sock,jid,`❌ Erro: ${e.message}`,ppBotUrl);}
+          return;
+        }
+
+        if(comando==="arqdelete"){
+          const fichs=fs.readdirSync("./vpn");
+          if(!args[0]){await enviarComFoto(sock,jid,`┌─⊱ 『 🗑️ ELIMINAR FICHEIRO 』 ⊰─┐\n│\n◎ ─ *${CONFIG.PREFIXO}arqdelete* [nome ou nº]\n│\n${fichs.length>0?fichs.map((f,i)=>`◎ ─ ${i+1}. ${f}`).join("\n"):"◎ ─ _Sem ficheiros_"}\n│\n└──────────────────────────────⊰`,ppBotUrl); return;}
+          let nomeAlvo=""; const idx=parseInt(args[0]);
+          if(!isNaN(idx)&&idx>=1&&idx<=fichs.length){nomeAlvo=fichs[idx-1];}else{nomeAlvo=fichs.find(f=>f.toLowerCase().includes(args.join(" ").toLowerCase()))||"";}
+          if(!nomeAlvo){await enviarComFoto(sock,jid,`❌ Ficheiro não encontrado.`,ppBotUrl); return;}
+          try{fs.removeSync(path.join("./vpn",nomeAlvo)); await enviarComFoto(sock,jid,`┌─⊱ 『 ✅ ELIMINADO! 』 ⊰─┐\n│\n◎ ─ 🗑️ *${nomeAlvo}*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"✅");}catch(e){await enviarComFoto(sock,jid,`❌ Erro: ${e.message}`,ppBotUrl);}
+          return;
+        }
+
         if(comando==="decrypt"){const docResp=msg.message?.documentMessage||msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.documentMessage; if(docResp){try{let buf; if(msg.message?.documentMessage) buf=await downloadMediaMessage(msg,"buffer",{}); else{const q=msg.message?.extendedTextMessage?.contextInfo?.quotedMessage; buf=await downloadMediaMessage({message:q,key:msg.key},"buffer",{});} await enviarComFoto(sock,jid,analisarArquivo(buf.toString("utf8"),docResp.fileName||"ficheiro"),ppBotUrl); await reagir(sock,msg,"🔓");}catch(e){await enviarComFoto(sock,jid,`❌ ${e.message}`,ppBotUrl);} return;} await enviarComFoto(sock,jid,`↩️ Responde um ficheiro com *${CONFIG.PREFIXO}decrypt*`,ppBotUrl); return;}
         if(comando==="denunciar"){const ctx3=msg.message?.extendedTextMessage?.contextInfo; if(!ctx3?.participant){await enviarSemFoto(sock,jid,`↩️ Responde mensagem com *${CONFIG.PREFIXO}denunciar [motivo]*`); return;} try{const den=extrairJid(ctx3.participant),mot=args.join(" ")||"Sem motivo"; const meta=await sock.groupMetadata(jid); for(const a of meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p))){try{await sock.sendMessage(a,{text:`┌─⊱ 『 🚨 DENÚNCIA! 』 ⊰─┐\n│\n◎ ─ 👤 @${den.split("@")[0]}\n◎ ─ 📝 *Motivo:* ${mot}\n│\n└──────────────────────────────⊰`,mentions:[den]});}catch{}} await enviarSemFoto(sock,jid,`✅ *Denúncia enviada!*`);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="perfil"){const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant); if(!alvo||!alvo.includes("@")){await enviarComFoto(sock,jid,`↩️ Menciona alguém!`,ppBotUrl); return;} const ehZoada=Math.random()<0.5,LISTA=ehZoada?PERFIS_ZOADA:PERFIS_ELOGIO; const desc=LISTA[Math.floor(Math.random()*LISTA.length)]; let ppAlvo=null; try{ppAlvo=await sock.profilePictureUrl(alvo,"image");}catch{} const textoFinal=`${ehZoada?"😂":"🌟"} ${desc}\n\n📱 +${alvo.split("@")[0]}`; if(ppAlvo) await sock.sendMessage(jid,{image:{url:ppAlvo},caption:textoFinal,mentions:[alvo]}); else await sock.sendMessage(jid,{text:textoFinal,mentions:[alvo]}); await reagir(sock,msg,ehZoada?"😂":"🌟"); return;}
@@ -3231,7 +1391,7 @@ _Após pagamento, envia comprovativo!_ 🧾`;
         if(comando==="sorteio"&&isGrupo){try{const meta=await sock.groupMetadata(jid),membros=meta.participants.filter(p=>!p.admin).map(p=>extrairJid(p.id||p)); if(!membros.length){await enviarComFoto(sock,jid,"❌ Sem membros.",ppBotUrl); return;} const vencedor=membros[Math.floor(Math.random()*membros.length)]; await sock.sendMessage(jid,{text:`┌─⊱ 『 🎉 SORTEIO! 』 ⊰─┐\n│\n◎ ─ 🏆 @${vencedor.split("@")[0]}! 🎊\n│\n└──────────────────────────────⊰`,mentions:[vencedor]}); await reagir(sock,msg,"🎉");}catch{} return;}
         if(comando==="verifica"&&isGrupo){const buffer=bufferMsgs[jid]||[]; const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)),infrat={}; for(const m of buffer){if(admins.includes(m.sender)||ehDono(m.sender)) continue; if(LINK_RX.test(m.texto)) infrat[m.sender]=true;} const lista=Object.keys(infrat); for(const inf of lista){try{await sock.groupParticipantsUpdate(jid,[inf],"remove");}catch{}} await enviarComFoto(sock,jid,`✅ *${lista.length}* banido(s)!`,ppBotUrl); await reagir(sock,msg,"🔨"); return;}
         if(comando==="aviso"&&isGrupo){const avisoTxt=args.join(" "); if(!avisoTxt){await enviarComFoto(sock,jid,`◎ ─ *${CONFIG.PREFIXO}aviso* [mensagem]`,ppBotUrl); return;} try{const meta=await sock.groupMetadata(jid),todos=meta.participants.map(p=>extrairJid(p.id||p)); await sock.sendMessage(jid,{text:`📢 *AVISO!*\n✦ ─────────── ✦\n\n${avisoTxt}\n\n${todos.map(p=>`@${p.split("@")[0]}`).join(" ")}`,mentions:todos}); await reagir(sock,msg,"📢");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
-        if(comando==="apagar"&&isGrupo){const ctx3=msg.message?.extendedTextMessage?.contextInfo; if(!ctx3?.stanzaId){await enviarComFoto(sock,jid,`↩️ Cita mensagem com *${CONFIG.PREFIXO}apagar*`,ppBotUrl); return;} try{await sock.sendMessage(jid,{delete:{remoteJid:jid,id:ctx3.stanzaId,participant:ctx3.participant||""}}); await reagir(sock,msg,"🗑️");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
+        if(comando==="apagar"&&isGrupo){const ctx3=msg.message?.extendedTextMessage?.contextInfo; if(!ctx3?.stanzaId){await enviarComFoto(sock,jid,`↩️ Cita uma mensagem com *${CONFIG.PREFIXO}apagar*`,ppBotUrl); return;} try{await sock.sendMessage(jid,{delete:{remoteJid:jid,id:ctx3.stanzaId,participant:ctx3.participant||""}}); await reagir(sock,msg,"🗑️");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="banir"&&isGrupo){const alvo=extrairJid(msg.message.extendedTextMessage?.contextInfo?.participant); if(!alvo){await enviarComFoto(sock,jid,"↩️ Responde a mensagem.",ppBotUrl); return;} try{await sock.groupParticipantsUpdate(jid,[alvo],"remove"); await enviarComFoto(sock,jid,`✅ *@${alvo.split("@")[0]} BANIDO!* 🔨`,ppBotUrl); await reagir(sock,msg,"🔨");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="addadmin"&&isGrupo){const alvo=extrairJid(msg.message.extendedTextMessage?.contextInfo?.participant); if(!alvo){await enviarComFoto(sock,jid,"↩️ Responde a mensagem.",ppBotUrl); return;} try{await sock.groupParticipantsUpdate(jid,[alvo],"promote"); await enviarComFoto(sock,jid,`👑 *@${alvo.split("@")[0]}* é admin!`,ppBotUrl); await reagir(sock,msg,"👑");}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
         if(comando==="removeadmin"&&isGrupo){const alvo=extrairJid(msg.message.extendedTextMessage?.contextInfo?.participant); if(!alvo){await enviarComFoto(sock,jid,"↩️ Responde a mensagem.",ppBotUrl); return;} try{await sock.groupParticipantsUpdate(jid,[alvo],"demote"); await enviarComFoto(sock,jid,`✅ Admin removido!`,ppBotUrl);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
@@ -3239,11 +1399,11 @@ _Após pagamento, envia comprovativo!_ 🧾`;
         if(comando==="abrir"&&isGrupo){try{await sock.groupSettingUpdate(jid,"not_announcement"); await enviarComFoto(sock,jid,"🔓 *Grupo aberto!*",ppBotUrl);}catch(e){await enviarSemFoto(sock,jid,`❌ ${e.message}`);} return;}
 
         if(["quiz","vof","completar","caca","guerra"].includes(comando)&&jogoLoop[jid]?.activo){await enviarComFoto(sock,jid,`⚠️ Jogo activo! Usa *${CONFIG.PREFIXO}stop*`,ppBotUrl); return;}
-        if(comando==="quiz"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"quiz",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`🎮 *QUIZ* iniciado!\n${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"} | 🛑 *${CONFIG.PREFIXO}stop*`,ppBotUrl); await reagir(sock,msg,"🎮"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
-        if(comando==="vof"){jogoLoop[jid]={tipo:"vof",categoria:null,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`✅❌ *V/F* iniciado!\n🛑 *${CONFIG.PREFIXO}stop*`,ppBotUrl); await reagir(sock,msg,"❓"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
-        if(comando==="completar"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"completar",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`🔤 *COMPLETA* iniciado!\n${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"} | 🛑 *${CONFIG.PREFIXO}stop*`,ppBotUrl); await reagir(sock,msg,"🔤"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
-        if(comando==="caca"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"caca",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`🔍 *CAÇA-PALAVRAS* iniciado!\n${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"} | 🛑 *${CONFIG.PREFIXO}stop*`,ppBotUrl); await reagir(sock,msg,"🔍"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
-        if(comando==="guerra"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"guerra",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`⚔️ *GUERRA* iniciado!\n${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"} | 🛑 *${CONFIG.PREFIXO}stop*`,ppBotUrl); await reagir(sock,msg,"⚔️"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
+        if(comando==="quiz"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"quiz",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`┌─⊱ 『 🎮 QUIZ! 』 ⊰─┐\n│\n◎ ─ ${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"}\n◎ ─ ♾️ Loop | 🛑 *${CONFIG.PREFIXO}stop*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"🎮"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
+        if(comando==="vof"){jogoLoop[jid]={tipo:"vof",categoria:null,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`┌─⊱ 『 ✅❌ V/F! 』 ⊰─┐\n│\n◎ ─ ♾️ Loop | 🛑 *${CONFIG.PREFIXO}stop*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"❓"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
+        if(comando==="completar"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"completar",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`┌─⊱ 『 🔤 COMPLETA! 』 ⊰─┐\n│\n◎ ─ ${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"}\n◎ ─ ♾️ Loop | 🛑 *${CONFIG.PREFIXO}stop*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"🔤"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
+        if(comando==="caca"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"caca",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`┌─⊱ 『 🔍 CAÇA-PALAVRAS! 』 ⊰─┐\n│\n◎ ─ ${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"}\n◎ ─ ♾️ Loop | 🛑 *${CONFIG.PREFIXO}stop*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"🔍"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
+        if(comando==="guerra"){const categoria=args.length>0?args.join(" "):null; jogoLoop[jid]={tipo:"guerra",categoria,activo:true,usadas:[],rodada:0}; await enviarComFoto(sock,jid,`┌─⊱ 『 ⚔️ GUERRA! 』 ⊰─┐\n│\n◎ ─ ${categoria?`🎯 *${categoria.toUpperCase()}*`:"🎲 Variado"}\n◎ ─ ♾️ Loop | 🛑 *${CONFIG.PREFIXO}stop*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"⚔️"); setTimeout(()=>proximaPergunta(sock,jid),2000); return;}
         if(comando==="rank"){const r=fs.readJsonSync(ARQUIVO_RANK); const n=sender.split("@")[0]; const d=r[n]||{xp:0,nivel:1,msgs:0}; const bar="█".repeat(Math.min(10,Math.floor((d.xp%100)/10)))+"░".repeat(10-Math.min(10,Math.floor((d.xp%100)/10))); await enviarComFoto(sock,jid,`┌─⊱ 『 🏆 RANK — @${n} 』 ⊰─┐\n│\n◎ ─ ⭐ Nível: *${d.nivel}*\n◎ ─ ✨ XP: *${d.xp}*\n◎ ─ 📊 [${bar}]\n◎ ─ 💬 Msgs: *${d.msgs}*\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"🏆"); return;}
         if(comando==="toprank"){const r=fs.readJsonSync(ARQUIVO_RANK); const medalhas=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]; const top=Object.entries(r).sort((a,b)=>b[1].xp-a[1].xp).slice(0,10).map(([n,d],i)=>`◎ ─ ${medalhas[i]} +${n} — Nv.*${d.nivel}* | *${d.xp}* XP`).join("\n"); await enviarComFoto(sock,jid,`┌─⊱ 『 🏆 TOP 10 』 ⊰─┐\n│\n${top||"◎ ─ _Sem dados_"}\n│\n└──────────────────────────────⊰`,ppBotUrl); await reagir(sock,msg,"🏆"); return;}
 
@@ -3251,7 +1411,7 @@ _Após pagamento, envia comprovativo!_ 🧾`;
     });
 
   }catch(e){
-    console.error("❌ Erro crítico startBot:",e.message);
+    console.error("❌ Erro crítico:",e.message);
     tentativasReconexao++;
     setTimeout(()=>startBot(),Math.min(5000*tentativasReconexao,60000));
   }
