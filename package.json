@@ -22,6 +22,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@itsliaaa/baileys": "^0.3.18-final",
     "@whiskeysockets/baileys": "^7.0.0-rc13",
     "axios": "^1.18.1",
     "bcryptjs": "^2.4.3",
