@@ -26,11 +26,7 @@ const CONFIG = {
   PREFIXO:          "!",
   NUMERO_BOT:       "244954260707",
   NUMEROS_ADM:      ["926612801","244926612801","169853876965546"],
-<<<<<<< HEAD
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-=======
   GROQ_API_KEY:     process.env.GROQ_API_KEY,
->>>>>>> bcff44d (Atualiza bot e adiciona novos dados)
   DONO_JID:         "169853876965546@lid",
   DONO_NOME:        "ISAÍAS PEDRO",
   DONO_NUM:         "926 612 801",
