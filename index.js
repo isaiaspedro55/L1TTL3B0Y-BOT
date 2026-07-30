@@ -45,10 +45,6 @@ try {
   console.log("⚠️ Mongo module não encontrado:", e.message);
 }
 
-let ButtonV2 = null;
-try { ButtonV2 = require("@systemzero/baileys/lib/MB.cjs").ButtonV2; }
-catch(e) { console.log("⚠️ ButtonV2:", e.message); }
-
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 const CONFIG = {
