@@ -2002,7 +2002,7 @@ async function startBot(){
     tentativasReconexao++;
     setTimeout(()=>startBot(),Math.min(5000*tentativasReconexao,60000));
   }
-});
+}
 
 app.post("/api/connection/disconnect", async (req,res)=>{
   try{
