@@ -1,65 +1,17 @@
 services:
   - type: web
     name: l1ttl3b0y
-    runtime: node
+    env: node
     plan: free
-    region: frankfurt
 
     buildCommand: |
       npm install
-      apt-get update -y
-      apt-get install -y ffmpeg
-      pip install -U yt-dlp || pip3 install -U yt-dlp || true
-      npm install -g yt-dlp 2>/dev/null || true
+      pip install yt-dlp edge-tts --break-system-packages
 
-    startCommand: npm start
-
-    healthCheckPath: /health
-
-    autoDeploy: true
+    startCommand: node index.js
 
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
-      - key: PREFIX
-        value: "!"
-      - key: PREFIXES
-        value: "!,.,/,#,$,%,-,+"
-      - key: MULTIPREFIX
-        value: true
-      - key: ALLOW_NO_PREFIX
-        value: false
-      - key: BOT_NUMBER
-        value: "244954260707"
-      - key: OWNER_NUMBERS
-        value: "926612801,244926612801,169853876965546"
-      - key: OWNER_NAME
-        value: "ISAÍAS PEDRO"
-      - key: OWNER_NUMBER
-        value: "926 612 801"
-      - key: DONO_JID
-        value: "169853876965546@lid"
-      - key: KEEP_ALIVE
-        value: true
-      - key: MONGODB_URI
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: CHANNEL_LINK
-        value: "https://whatsapp.com/channel/0029VbC8voN4Y9lszc9VuT2D"
-      - key: RENDER_EXTERNAL_URL
-        sync: false
-      - key: SENHA_BOT
-        value: "lordinho2025"
-      - key: DASHBOARD_USER
-        value: "admin"
-      - key: DASHBOARD_PASS
-        value: "admin123"
-      - key: AUTO_PAIR_CODE
-        value: false
-      - key: JWT_SECRET
-        sync: false
-      - key: ENCRYPTION_KEY
-        sync: false
+      - key: TZ
+        value: Africa/Luanda
