@@ -1,0 +1,141 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>💻 Console Live</h1>
+        <p class="muted">Logs em tempo real via WebSocket</p>
+      </div>
+      <div class="flex gap-2 items-center">
+        <div class="bot-status" id="botStatusBadge">
+          <span class="status-dot status-<%= botState.status %>"></span>
+          <span id="botStatusText"><%= botState.status %></span>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="clearConsole()">🗑️ Limpar</button>
+        <button class="btn btn-sm btn-ghost" onclick="toggleAutoScroll()" id="btnAutoScroll">🔒 Auto-scroll ON</button>
+      </div>
+    </header>
+
+    <!-- FILTROS -->
+    <div class="card" style="margin-bottom:1rem;padding:1rem">
+      <div class="flex gap-3 flex-wrap items-center">
+        <span class="muted small" style="font-weight:700;letter-spacing:1px;text-transform:uppercase">Filtro:</span>
+        <button class="btn btn-sm btn-ghost active-filter" data-filter="all" onclick="setFilter('all', this)">Tudo</button>
+        <button class="btn btn-sm btn-ghost" data-filter="info" onclick="setFilter('info', this)" style="color:var(--neon-cyan);border-color:rgba(0,240,255,.3)">Info</button>
+        <button class="btn btn-sm btn-ghost" data-filter="success" onclick="setFilter('success', this)" style="color:var(--neon-green);border-color:rgba(0,255,157,.3)">✅ Success</button>
+        <button class="btn btn-sm btn-ghost" data-filter="warn" onclick="setFilter('warn', this)" style="color:var(--neon-yellow);border-color:rgba(255,215,0,.3)">⚠️ Warn</button>
+        <button class="btn btn-sm btn-ghost" data-filter="error" onclick="setFilter('error', this)" style="color:var(--neon-red);border-color:rgba(255,56,96,.3)">❌ Error</button>
+        <span class="muted small" id="logCount" style="margin-left:auto">0 linhas</span>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="console" id="liveConsole" style="height:520px;border-radius:0;border:none;padding:1rem 1.25rem">
+        <% (botState.recentLogs || []).forEach(l => { %>
+          <div class="console-line log-<%= l.level %>" data-level="<%= l.level %>">
+            <span class="console-time">[<%= new Date(l.time).toLocaleTimeString('pt-BR') %>]</span>
+            <%= l.message %>
+          </div>
+        <% }) %>
+        <% if (!botState.recentLogs?.length) { %>
+          <div class="console-line muted">⚡ Aguardando eventos do bot...</div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- MODO ESPIÃO -->
+    <div class="card" style="margin-top:1.25rem">
+      <div class="flex justify-between items-center" style="margin-bottom:.85rem">
+        <h2 style="margin-bottom:0">🕵️ Modo Espião — Mensagens ao vivo</h2>
+        <span class="chip chip-<%= settings.spy_enabled ? 'success' : 'muted' %>" id="spyChip">
+          <%= settings.spy_enabled ? '🟢 ATIVO' : '⚫ INATIVO' %>
+        </span>
+      </div>
+      <div class="console" id="spyConsole" style="height:250px">
+        <div class="console-line muted">👁️ Ative o Modo Espião no Painel de Controle para ver mensagens aqui...</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const socket = io({ reconnection: true });
+  const liveConsole = document.getElementById('liveConsole');
+  const spyConsole = document.getElementById('spyConsole');
+  const logCount = document.getElementById('logCount');
+
+  let autoScroll = true;
+  let currentFilter = 'all';
+  let totalLines = document.querySelectorAll('.console-line[data-level]').length;
+
+  function updateCount() {
+    logCount.textContent = totalLines + ' linhas';
+  }
+  updateCount();
+
+  function addLog(level, msg) {
+    const t = new Date().toLocaleTimeString('pt-BR');
+    const d = document.createElement('div');
+    d.className = `console-line log-${level}`;
+    d.setAttribute('data-level', level);
+    const safe = String(msg).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    d.innerHTML = `<span class="console-time">[${t}]</span> ${safe}`;
+    if (currentFilter !== 'all' && level !== currentFilter) d.style.display = 'none';
+    liveConsole.appendChild(d);
+    totalLines++;
+    updateCount();
+    if (liveConsole.children.length > 200) liveConsole.removeChild(liveConsole.firstChild);
+    if (autoScroll) liveConsole.scrollTop = liveConsole.scrollHeight;
+  }
+
+  function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active-filter'));
+    btn.classList.add('active-filter');
+    document.querySelectorAll('#liveConsole .console-line').forEach(line => {
+      const lvl = line.getAttribute('data-level');
+      line.style.display = (filter === 'all' || lvl === filter) ? '' : 'none';
+    });
+  }
+
+  function clearConsole() {
+    liveConsole.innerHTML = '<div class="console-line muted">Console limpo.</div>';
+    totalLines = 0;
+    updateCount();
+  }
+
+  function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    const btn = document.getElementById('btnAutoScroll');
+    btn.textContent = autoScroll ? '🔒 Auto-scroll ON' : '🔓 Auto-scroll OFF';
+  }
+
+  socket.on('bot:log', (data) => addLog(data.level || 'info', data.message));
+
+  socket.on('bot:spy', (data) => {
+    if (!spyConsole) return;
+    const t = new Date(data.time).toLocaleTimeString('pt-BR');
+    const d = document.createElement('div');
+    d.className = 'console-line log-info';
+    const safe = (s) => String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    d.innerHTML = `<span class="console-time">[${t}]</span> 📨 <strong>${safe(data.from)}</strong> em <em>${safe(data.group)}</em>: ${safe(data.text)}${data.media ? ' [' + data.media + ']' : ''}`;
+    spyConsole.appendChild(d);
+    spyConsole.scrollTop = spyConsole.scrollHeight;
+    if (spyConsole.children.length > 100) spyConsole.removeChild(spyConsole.firstChild);
+  });
+
+  socket.on('bot:status', (data) => {
+    const s = document.getElementById('botStatusText');
+    const dot = document.querySelector('#botStatusBadge .status-dot');
+    if (s && data.status) s.textContent = data.status;
+    if (dot && data.status) dot.className = 'status-dot status-' + data.status;
+  });
+</script>
+
+<style>
+  .active-filter { border-color: var(--neon-purple) !important; color: var(--neon-purple) !important; background: rgba(177,74,237,.1) !important; }
+</style>
+<%- include('../partials/footer') %>

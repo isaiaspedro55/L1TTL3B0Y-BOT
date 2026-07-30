@@ -1,0 +1,222 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>🧬 DarkSide Command Board</h1>
+        <p class="muted">Todos os comandos nativos/custom, status ativo/desativo e mídia dos menus.</p>
+      </div>
+      <a href="/dashboard/commands/new" class="btn btn-primary">➕ Novo comando</a>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">⚡</div><div><div class="stat-value"><%= nativeCatalog.length %></div><div class="stat-label">Nativos</div></div></div>
+      <div class="stat-card"><div class="stat-icon">✍️</div><div><div class="stat-value"><%= customCommands.length %></div><div class="stat-label">Custom</div></div></div>
+      <div class="stat-card"><div class="stat-icon">✅</div><div><div class="stat-value"><%= nativeCatalog.filter(c => !(overrides[c.name] && overrides[c.name].enabled === false)).length %></div><div class="stat-label">Nativos ativos</div></div></div>
+      <div class="stat-card"><div class="stat-icon">🛑</div><div><div class="stat-value"><%= nativeCatalog.filter(c => overrides[c.name] && overrides[c.name].enabled === false).length %></div><div class="stat-label">Nativos off</div></div></div>
+    </div>
+
+
+
+    <div class="card" style="border-color:rgba(0,240,255,.35);background:linear-gradient(135deg,rgba(0,240,255,.06),rgba(177,74,237,.06))">
+      <h2>🎭 Aparência DarkSide dos menus</h2>
+      <p class="muted">Escolha estrutura, caracteres/símbolos e modo de botões. São 120 combinações visuais geradas pelo motor.</p>
+      <form id="menuStyleForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Estilo do menu</label>
+            <select name="menuStyle" id="menuStyleSelect"></select>
+          </div>
+          <div class="form-group">
+            <label>Mostrar prefixo nos comandos?</label>
+            <select name="showPrefix">
+              <option value="false" <%= settings.menu_show_prefix ? '' : 'selected' %>>Não — visual limpo</option>
+              <option value="true" <%= settings.menu_show_prefix ? 'selected' : '' %>>Sim — mostrar prefixo</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Modo dos botões</label>
+            <select name="buttonMode">
+              <% const bm = settings.button_mode || 'auto'; %>
+              <option value="auto" <%= bm === 'auto' ? 'selected' : '' %>>Auto agressivo</option>
+              <option value="direct" <%= bm === 'direct' ? 'selected' : '' %>>Direct NativeFlow</option>
+              <option value="native" <%= bm === 'native' ? 'selected' : '' %>>NativeFlow viewOnce</option>
+              <option value="wabase" <%= bm === 'wabase' ? 'selected' : '' %>>InteractiveButtons</option>
+              <option value="text" <%= bm === 'text' ? 'selected' : '' %>>Só texto fallback</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">💾 Salvar aparência</button>
+      </form>
+    </div>
+
+
+
+    <div class="card" style="border-color:rgba(255,255,255,.14)">
+      <h2>💧 Marca d'água dos stickers</h2>
+      <p class="muted">Controla metadados pack/author e marca visível em stickers estáticos. Também pode alterar pelo WhatsApp com <code>stickerwm</code>.</p>
+      <form id="stickerWmForm">
+        <div class="form-grid">
+          <div class="form-group"><label>Status</label><select name="enabled"><option value="true" <%= settings.sticker_watermark_enabled !== false ? 'selected' : '' %>>ON</option><option value="false" <%= settings.sticker_watermark_enabled === false ? 'selected' : '' %>>OFF</option></select></div>
+          <div class="form-group"><label>Marca visível</label><select name="visible"><option value="false" <%= settings.sticker_visible_watermark ? '' : 'selected' %>>OFF</option><option value="true" <%= settings.sticker_visible_watermark ? 'selected' : '' %>>ON</option></select></div>
+          <div class="form-group"><label>Pack</label><input name="packName" value="<%= settings.sticker_pack_name || '' %>" placeholder="DARK BOT • Dark Net" /></div>
+          <div class="form-group"><label>Author</label><input name="authorName" value="<%= settings.sticker_author_name || '' %>" placeholder="Dark Net × Arena.ai" /></div>
+          <div class="form-group"><label>Texto visível</label><input name="watermarkText" value="<%= settings.sticker_watermark_text || bot.name %>" maxlength="32" /></div>
+        </div>
+        <button class="btn btn-primary" type="submit">💾 Salvar marca d'água</button>
+      </form>
+    </div>
+
+    <div class="card" style="border-color:var(--neon-purple);background:linear-gradient(135deg,rgba(177,74,237,.08),rgba(0,240,255,.04))">
+      <h2>🖼️ Foto/Vídeo/GIF dos menus</h2>
+      <p class="muted">Configure mídia do menu principal e submenus. Use imagens leves para botões/listas ficarem mais rápidos.</p>
+      <form id="menuMediaForm" enctype="multipart/form-data">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Alvo</label>
+            <select name="target" id="targetSel">
+              <% ['menu','menubtn','menudownload','menustickers','menujogos','menueconomia','menufamilia','menudiversao','menuia','menugrupo','menustatus'].forEach(t => { %>
+                <option value="<%= t %>"><%= t %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Arquivo</label>
+            <input type="file" name="file" accept="image/*,video/*,.gif" />
+          </div>
+          <div class="form-group">
+            <label>Ou URL</label>
+            <input type="url" name="mediaUrl" placeholder="https://..." />
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select name="mediaType">
+              <option value="none">Nenhum</option>
+              <option value="image">Imagem</option>
+              <option value="video">Vídeo/GIF</option>
+              <option value="gif">GIF</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-primary" type="submit">💾 Salvar mídia do menu</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🔎 Filtro</h2>
+      <div class="form-grid">
+        <input id="search" placeholder="Buscar comando, categoria, descrição..." oninput="filterRows()" />
+        <select id="statusFilter" onchange="filterRows()">
+          <option value="all">Todos</option>
+          <option value="on">Ativos</option>
+          <option value="off">Desativados</option>
+        </select>
+        <select id="catFilter" onchange="filterRows()">
+          <option value="all">Todas categorias</option>
+          <% [...new Set(nativeCatalog.map(c => c.category))].sort().forEach(cat => { %><option value="<%= cat %>"><%= cat %></option><% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⚡ Comandos nativos</h2>
+      <div class="table-wrap">
+        <table class="table" id="nativeTable">
+          <thead><tr><th>Comando</th><th>Categoria</th><th>Acesso</th><th>Status</th><th>Mídia</th><th>Ações</th></tr></thead>
+          <tbody>
+          <% nativeCatalog.forEach(c => { const ov = overrides[c.name] || {}; const active = ov.enabled !== false; %>
+            <tr data-search="<%= (c.name+' '+c.category+' '+(c.description||'')).toLowerCase() %>" data-status="<%= active ? 'on' : 'off' %>" data-cat="<%= c.category %>">
+              <td><strong><%= c.emoji || ov.emoji || '⚡' %> <code><%= c.name %></code></strong><div class="muted small"><%= ov.description || c.description || '—' %></div></td>
+              <td><span class="chip"><%= ov.category || c.category %></span></td>
+              <td><% const access = ov.accessLevel || (c.ownerOnly ? 'owner' : c.premium ? 'premium' : 'all'); %>
+                <% if (access === 'owner') { %><span class="chip chip-owner">👑 Dono</span><% } else if (access === 'premium') { %><span class="chip chip-premium">⭐ Premium</span><% } else { %><span class="chip chip-free">🆓 Todos</span><% } %>
+              </td>
+              <td><span class="chip <%= active ? 'chip-success' : 'chip-muted' %>"><%= active ? 'Ativo' : 'Desativado' %></span></td>
+              <td><%= ov.mediaType || '—' %></td>
+              <td>
+                <button class="btn btn-sm <%= active ? 'btn-danger' : 'btn-success' %>" onclick="toggleNative('<%= c.name %>', <%= active ? 'false' : 'true' %>)"><%= active ? '🛑 Desativar' : '✅ Ativar' %></button>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ Comandos custom</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Nome</th><th>Categoria</th><th>Acesso</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody>
+          <% customCommands.forEach(cmd => { %>
+            <tr>
+              <td><strong><code><%= cmd.name %></code></strong><div class="muted small"><%= cmd.description || '' %></div></td>
+              <td><span class="chip"><%= cmd.category %></span></td>
+              <td><%= cmd.accessLevel %></td>
+              <td><span class="chip <%= cmd.enabled ? 'chip-success' : 'chip-muted' %>"><%= cmd.enabled ? 'Ativo' : 'Off' %></span></td>
+              <td><a class="btn btn-sm" href="/dashboard/commands/<%= cmd._id %>/edit">✏️ Editar</a></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+function filterRows(){
+  const q = document.getElementById('search').value.toLowerCase();
+  const st = document.getElementById('statusFilter').value;
+  const cat = document.getElementById('catFilter').value;
+  document.querySelectorAll('#nativeTable tbody tr').forEach(tr => {
+    const okQ = tr.dataset.search.includes(q);
+    const okS = st === 'all' || tr.dataset.status === st;
+    const okC = cat === 'all' || tr.dataset.cat === cat;
+    tr.style.display = okQ && okS && okC ? '' : 'none';
+  });
+}
+async function toggleNative(name, enabled){
+  const res = await fetch('/api/command-overrides/' + encodeURIComponent(name), {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled })
+  });
+  if(!res.ok){ const e = await res.json().catch(()=>({error:'erro'})); return toast(e.error || 'Erro','error'); }
+  location.reload();
+}
+
+const currentStyle = '<%= settings.menu_style || "classic" %>';
+const styleSelect = document.getElementById('menuStyleSelect');
+const names = ['Classic Dark','Cyber Matrix','Royal Neon','Shadow Box','Blade Clean','Arcane Lines','Terminal Web','Aurea Ego','Moonlight','Chaos Grid','Minimal Dark','Nova Premium'];
+for(let i=0;i<120;i++){
+  const id = i === 0 ? 'classic' : 'dark-' + i;
+  const opt = document.createElement('option');
+  opt.value = id;
+  opt.textContent = `${String(i).padStart(3,'0')} — ${names[i % names.length]} ${['⚡','♾️','🌑','👑','🕸️','💎'][i%6]}`;
+  if(id === currentStyle) opt.selected = true;
+  styleSelect.appendChild(opt);
+}
+document.getElementById('menuStyleForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const res = await fetch('/api/settings/menu-style', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  if(res.ok) toast('Aparência salva','success'); else toast('Erro ao salvar aparência','error');
+});
+
+
+document.getElementById('stickerWmForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const res = await fetch('/api/settings/sticker-watermark', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  if(res.ok) toast('Marca d\'água salva','success'); else toast('Erro ao salvar marca','error');
+});
+
+document.getElementById('menuMediaForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const res = await fetch('/api/settings/menu-media', { method:'POST', body: fd });
+  if(res.ok){ toast('Mídia do menu salva','success'); e.target.reset(); }
+  else { const err = await res.json().catch(()=>({error:'erro'})); toast(err.error || 'Erro','error'); }
+});
+</script>
+<%- include('../partials/footer') %>

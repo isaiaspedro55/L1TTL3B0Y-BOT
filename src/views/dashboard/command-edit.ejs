@@ -1,0 +1,125 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1><%= cmd ? '✏️ Editar' : '➕ Novo' %> Comando</h1>
+        <p class="muted">Variáveis: <code>{user}</code> <code>{bot}</code> <code>{owner}</code> <code>{group}</code> <code>{number}</code> <code>{prefix}</code></p>
+      </div>
+      <a href="/dashboard/commands" class="btn btn-ghost">← Voltar</a>
+    </header>
+
+    <div class="card">
+      <form id="cmdForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nome (sem prefixo)</label>
+            <input name="name" required value="<%= cmd?.name || '' %>" placeholder="oi" />
+          </div>
+          <div class="form-group">
+            <label>Categoria</label>
+            <input name="category" value="<%= cmd?.category || 'geral' %>" placeholder="geral, diversão, info..." />
+          </div>
+          <div class="form-group">
+            <label>Aliases (separados por vírgula)</label>
+            <input name="aliases" value="<%= cmd?.aliases?.join(', ') || '' %>" placeholder="ola, hello" />
+          </div>
+          <div class="form-group">
+            <label>Nível de acesso</label>
+            <select name="accessLevel">
+              <option value="all" <%= cmd?.accessLevel === 'all' ? 'selected' : '' %>>🆓 Todos</option>
+              <option value="premium" <%= cmd?.accessLevel === 'premium' ? 'selected' : '' %>>⭐ Premium</option>
+              <option value="owner" <%= cmd?.accessLevel === 'owner' ? 'selected' : '' %>>👑 Dono</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Descrição</label>
+          <input name="description" value="<%= cmd?.description || '' %>" placeholder="Curta descrição" />
+        </div>
+
+        <div class="form-group">
+          <label>Resposta (texto/caption)</label>
+          <textarea name="response" rows="6" placeholder="Olá {user}! Eu sou o {bot}.&#10;&#10;Use símbolos: ╭━━━ ┃ ╰━━━ ◈ ⭐ 👑"><%= cmd?.response || '' %></textarea>
+          <small class="muted">Use emojis e símbolos para criar submenus visuais bonitos.</small>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Anexar mídia</label>
+            <select name="mediaUrl" id="mediaSelect">
+              <option value="">— sem mídia —</option>
+              <% medias.forEach(m => { %>
+                <option value="<%= m.url %>" data-type="<%= m.type %>" <%= cmd?.mediaUrl === m.url ? 'selected' : '' %>>
+                  [<%= m.type %>] <%= m.name %>
+                </option>
+              <% }) %>
+            </select>
+            <small class="muted"><a href="/dashboard/media">📤 Fazer upload de novas mídias</a></small>
+          </div>
+          <div class="form-group">
+            <label>Tipo de mídia</label>
+            <select name="mediaType" id="mediaType">
+              <option value="">—</option>
+              <option value="image" <%= cmd?.mediaType === 'image' ? 'selected' : '' %>>🖼️ Imagem</option>
+              <option value="video" <%= cmd?.mediaType === 'video' ? 'selected' : '' %>>🎬 Vídeo</option>
+              <option value="gif" <%= cmd?.mediaType === 'gif' ? 'selected' : '' %>>✨ GIF</option>
+              <option value="audio" <%= cmd?.mediaType === 'audio' ? 'selected' : '' %>>🎵 Áudio</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group form-check">
+            <label><input type="checkbox" name="enabled" <%= !cmd || cmd.enabled ? 'checked' : '' %> /> Comando ativo</label>
+          </div>
+          <div class="form-group form-check">
+            <label><input type="checkbox" name="isSubmenu" <%= cmd?.isSubmenu ? 'checked' : '' %> /> É submenu</label>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button type="submit" class="btn btn-primary">💾 Salvar</button>
+          <a href="/dashboard/commands" class="btn btn-ghost">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Auto-detectar tipo de mídia
+  document.getElementById('mediaSelect').addEventListener('change', (e) => {
+    const opt = e.target.selectedOptions[0];
+    const type = opt?.dataset?.type;
+    if (type) document.getElementById('mediaType').value = type;
+  });
+
+  const isEdit = <%= cmd ? 'true' : 'false' %>;
+  const cmdId = '<%= cmd?._id || "" %>';
+
+  document.getElementById('cmdForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd.entries());
+    data.enabled = fd.has('enabled');
+    data.isSubmenu = fd.has('isSubmenu');
+
+    const url = isEdit ? '/api/commands/' + cmdId : '/api/commands';
+    const method = isEdit ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      location.href = '/dashboard/commands';
+    } else {
+      const err = await res.json();
+      alert('Erro: ' + (err.error || 'desconhecido'));
+    }
+  });
+</script>
+<%- include('../partials/footer') %>

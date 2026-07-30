@@ -1,0 +1,59 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>💾 Backup & Restore</h1>
+        <p class="muted">Exporte e importe dados do bot</p>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>📤 Exportar</h2>
+      <p class="muted">Faça download de todos os comandos, usuários, mídias e configurações em JSON.</p>
+      <div class="button-row">
+        <a href="/api/backup/export" class="btn btn-primary" download>📥 Baixar Backup JSON</a>
+        <span class="muted">Inclui: comandos, usuários, configs, agenda (sem credenciais sensíveis)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📥 Importar</h2>
+      <div class="alert alert-warning"><span>⚠️</span><span><strong>Cuidado:</strong> isto pode duplicar/sobrescrever dados.</span></div>
+      <form id="importForm" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>Arquivo JSON</label>
+          <input type="file" name="file" accept=".json" required />
+        </div>
+        <div class="form-group form-check">
+          <label><input type="checkbox" name="overwrite" /> Sobrescrever dados existentes</label>
+        </div>
+        <button type="submit" class="btn btn-primary">📤 Importar</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🗑️ Reset do Banco</h2>
+      <p class="muted">Apaga TUDO (perigoso!)</p>
+      <button class="btn btn-danger" onclick="resetDb()">🗑️ Resetar TUDO</button>
+    </div>
+  </main>
+</div>
+<script>
+  document.getElementById('importForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const r = await fetch('/api/backup/import', { method:'POST', body: fd });
+    const d = await r.json();
+    if (r.ok) toast(`Importado! ${d.imported} itens.`, 'success');
+    else toast('Erro: '+d.error, 'error');
+  };
+  async function resetDb() {
+    if (!confirm('TEM CERTEZA? Isso apaga TODOS os dados (exceto o dono).')) return;
+    if (!confirm('ÚLTIMO AVISO! Confirma reset total?')) return;
+    const r = await fetch('/api/backup/reset', { method:'POST' });
+    if (r.ok) { toast('Reset feito', 'warn'); setTimeout(()=>location.reload(),1500); }
+  }
+</script>
+<%- include('../partials/footer') %>

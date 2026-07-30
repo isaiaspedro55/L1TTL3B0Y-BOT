@@ -1,0 +1,211 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>📡 Internet & Configs</h1>
+        <p class="muted">Gerencie atualizações de internet grátis e configs clipboard</p>
+      </div>
+    </header>
+
+    <!-- CANAL WHATSAPP -->
+    <div class="card" style="border-left:4px solid var(--neon-cyan)">
+      <h2>📢 Canal WhatsApp</h2>
+      <p class="muted">Link do canal aparece no rodapé de todas as respostas do bot</p>
+      <form id="channelForm" style="margin-top:1rem">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nome do Canal</label>
+            <input type="text" id="channelName" value="<%= settings.channel_name || '' %>" placeholder="Dark Net Updates" />
+          </div>
+          <div class="form-group">
+            <label>Link do Canal</label>
+            <input type="text" id="channelUrl" value="<%= settings.channel_url || '' %>" placeholder="https://whatsapp.com/channel/..." />
+          </div>
+        </div>
+        <div class="form-group form-check">
+          <label><input type="checkbox" id="channelEnabled" <%= settings.channel_enabled ? 'checked' : '' %> /> Ativar rodapé do canal nas respostas</label>
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Salvar Canal</button>
+      </form>
+    </div>
+
+    <!-- LINKS IMPORTANTES -->
+    <div class="card" style="border-left:4px solid var(--neon-purple)">
+      <h2>🔗 Links Importantes</h2>
+      <form id="linksForm" style="margin-top:1rem">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>👑 Link do Dono (WhatsApp)</label>
+            <input type="text" id="ownerLink" value="<%= settings.owner_link || 'https://wa.me/' + owner.number %>" placeholder="https://wa.me/244..." />
+          </div>
+          <div class="form-group">
+            <label>👥 Link do Grupo</label>
+            <input type="text" id="groupLink" value="<%= settings.group_link || '' %>" placeholder="https://chat.whatsapp.com/..." />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Salvar Links</button>
+      </form>
+    </div>
+
+    <!-- ATUALIZAÇÕES -->
+    <div class="card">
+      <h2>📡 Atualizações de Internet</h2>
+      <p class="muted">Atualizações que aparecem quando o user usa <code>!atualizacoes</code></p>
+
+      <form id="updateForm" style="margin-top:1rem">
+        <div class="form-grid">
+          <div class="form-group"><label>Título</label><input type="text" id="uTitle" placeholder="Unitel 0KB Ilimitado" required /></div>
+          <div class="form-group"><label>Operadora</label><input type="text" id="uOperator" placeholder="Unitel / Movicel / Africell" /></div>
+          <div class="form-group"><label>VPN App</label><input type="text" id="uVpnApp" placeholder="HTTP Injector / NPV Tunnel" /></div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="uStatus"><option value="working">✅ Funcionando</option><option value="slow">🟡 Lento</option><option value="stopped">❌ Parado</option></select>
+          </div>
+        </div>
+        <div class="form-group"><label>Nota</label><input type="text" id="uNote" placeholder="Funciona com payload CONNECT..." /></div>
+        <button type="submit" class="btn btn-primary">➕ Adicionar Atualização</button>
+      </form>
+
+      <div class="table-wrap" style="margin-top:1.5rem">
+        <table class="table" id="updatesTable">
+          <thead><tr><th>Título</th><th>Operadora</th><th>VPN</th><th>Status</th><th>Data</th><th></th></tr></thead>
+          <tbody>
+            <% updates.forEach(u => { %>
+              <tr>
+                <td><strong><%= u.title %></strong></td>
+                <td><%= u.operator || '—' %></td>
+                <td><%= u.vpnApp || '—' %></td>
+                <td><%= u.status === 'working' ? '✅' : u.status === 'slow' ? '🟡' : '❌' %></td>
+                <td><%= u.date || '—' %></td>
+                <td><button class="btn btn-sm btn-danger" onclick="deleteUpdate('<%= u.id %>')">🗑️</button></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CONFIGS CLIPBOARD -->
+    <div class="card">
+      <h2>📋 Configs Clipboard</h2>
+      <p class="muted">Configs que o user recebe com <code>!config &lt;nº&gt;</code> como texto puro (cola no app VPN)</p>
+
+      <form id="configForm" style="margin-top:1rem">
+        <div class="form-grid">
+          <div class="form-group"><label>Título</label><input type="text" id="cTitle" placeholder="Angola Unitel SSH" required /></div>
+          <div class="form-group"><label>Operadora</label><input type="text" id="cOperator" placeholder="Unitel" /></div>
+          <div class="form-group"><label>VPN App</label><input type="text" id="cVpnApp" placeholder="HTTP Injector" /></div>
+          <div class="form-group"><label>Link (opcional)</label><input type="text" id="cLink" placeholder="https://..." /></div>
+        </div>
+        <div class="form-group">
+          <label>Texto Clipboard (o user copia e cola no app)</label>
+          <textarea id="cClipboard" rows="6" placeholder="Cole aqui o texto da config (vmess://, ssh://, payload, etc)..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">➕ Adicionar Config</button>
+      </form>
+
+      <div class="table-wrap" style="margin-top:1.5rem">
+        <table class="table" id="configsTable">
+          <thead><tr><th>Título</th><th>Operadora</th><th>VPN</th><th>Tipo</th><th></th></tr></thead>
+          <tbody>
+            <% configs.forEach(c => { %>
+              <tr>
+                <td><strong><%= c.title %></strong></td>
+                <td><%= c.operator || '—' %></td>
+                <td><%= c.vpnApp || '—' %></td>
+                <td><%= c.clipboard ? '📋 Clipboard' : c.link ? '🔗 Link' : '—' %></td>
+                <td><button class="btn btn-sm btn-danger" onclick="deleteConfig('<%= c.id %>')">🗑️</button></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Canal
+  document.getElementById('channelForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await fetch('/api/settings/channel', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelName: document.getElementById('channelName').value,
+          channelUrl: document.getElementById('channelUrl').value,
+          channelEnabled: document.getElementById('channelEnabled').checked,
+        }),
+      });
+      alert('✅ Canal salvo!');
+    } catch (e) { alert('❌ Erro: ' + e.message); }
+  };
+
+  // Links
+  document.getElementById('linksForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner_link: document.getElementById('ownerLink').value,
+          group_link: document.getElementById('groupLink').value,
+        }),
+      });
+      alert('✅ Links salvos!');
+    } catch (e) { alert('❌ Erro: ' + e.message); }
+  };
+
+  // Atualizações
+  document.getElementById('updateForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await fetch('/api/updates', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: document.getElementById('uTitle').value,
+          operator: document.getElementById('uOperator').value,
+          vpnApp: document.getElementById('uVpnApp').value,
+          status: document.getElementById('uStatus').value,
+          note: document.getElementById('uNote').value,
+        }),
+      });
+      if (r.ok) location.reload();
+      else alert('❌ Erro');
+    } catch (e) { alert('❌ ' + e.message); }
+  };
+
+  async function deleteUpdate(id) {
+    if (!confirm('Apagar esta atualização?')) return;
+    await fetch('/api/updates/' + id, { method: 'DELETE' });
+    location.reload();
+  }
+
+  // Configs
+  document.getElementById('configForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await fetch('/api/clipboard-configs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: document.getElementById('cTitle').value,
+          operator: document.getElementById('cOperator').value,
+          vpnApp: document.getElementById('cVpnApp').value,
+          link: document.getElementById('cLink').value,
+          clipboard: document.getElementById('cClipboard').value,
+        }),
+      });
+      if (r.ok) location.reload();
+      else alert('❌ Erro');
+    } catch (e) { alert('❌ ' + e.message); }
+  };
+
+  async function deleteConfig(id) {
+    if (!confirm('Apagar esta config?')) return;
+    await fetch('/api/clipboard-configs/' + id, { method: 'DELETE' });
+    location.reload();
+  }
+</script>
+<%- include('../partials/footer') %>

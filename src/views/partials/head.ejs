@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= title %> · <%= siteMeta?.title || bot.name %></title>
+  <meta name="description" content="<%= siteMeta?.description || '' %>" />
+  <meta name="keywords" content="<%= siteMeta?.keywords || '' %>" />
+  <meta property="og:title" content="<%= siteMeta?.title || bot.name %>" />
+  <meta property="og:description" content="<%= siteMeta?.description || '' %>" />
+  <meta property="og:image" content="<%= siteMeta?.image || '/img/logo.jpg' %>" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="/img/logo.jpg" type="image/jpeg" />
+  <!-- Socket.IO deve carregar antes dos scripts inline das páginas do dashboard. -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Sidebar overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<script>
+  function toast(msg, type = 'info', duration = 3500) {
+    const c = document.getElementById('toastContainer');
+    if (!c) return;
+    const icons = { success: '✅', error: '❌', warn: '⚠️', info: '💡' };
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.innerHTML = `<span>${icons[type] || '💡'}</span><span>${msg}</span>`;
+    c.appendChild(t);
+    setTimeout(() => {
+      t.style.transition = 'all 0.3s ease';
+      t.style.opacity = '0';
+      t.style.transform = 'translateX(120%)';
+      setTimeout(() => t.remove(), 300);
+    }, duration);
+  }
+  function closeSidebar() {
+    document.querySelector('.sidebar')?.classList.remove('open');
+    document.getElementById('sidebarOverlay')?.classList.remove('open');
+  }
+  function openSidebar() {
+    document.querySelector('.sidebar')?.classList.toggle('open');
+    document.getElementById('sidebarOverlay')?.classList.toggle('open');
+  }
+</script>

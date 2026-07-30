@@ -1,0 +1,76 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>🧠 IA — Configurações</h1>
+        <p class="muted">Configure a inteligência artificial do bot</p>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>⚙️ Comportamento</h2>
+      <form id="iaForm">
+        <div class="form-group form-check">
+          <label><input type="checkbox" id="aiAuto" <%= settings.ai_auto_enabled ? 'checked' : '' %> /> 🤖 Responder automaticamente quando mencionado (@bot) ou em PV</label>
+        </div>
+        <div class="form-group">
+          <label>Personalidade (system prompt)</label>
+          <textarea id="aiSystem" rows="5" placeholder="Você é o DARK BOT, criado por Dark Net. Responda de forma..."><%= settings.ai_system_prompt || '' %></textarea>
+          <small class="muted">Define o "tom" da IA. Vazio usa o padrão.</small>
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Salvar</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🔑 Chaves de API</h2>
+      <div class="alert alert-info"><span>💡</span><span>Configure no Render → Environment Variables (não no dashboard, por segurança):</span></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>GROQ_API_KEY <span class="chip chip-success">recomendado</span></label>
+          <input type="text" value="<%= process.env.GROQ_API_KEY ? '••• configurado •••' : '(não configurado)' %>" disabled />
+          <small class="muted">Grátis em <a href="https://console.groq.com" target="_blank">console.groq.com</a> — Llama 3.1, super rápido</small>
+        </div>
+        <div class="form-group">
+          <label>GEMINI_API_KEY</label>
+          <input type="text" value="<%= process.env.GEMINI_API_KEY ? '••• configurado •••' : '(não configurado)' %>" disabled />
+          <small class="muted">Grátis em <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a> — Gemini 1.5 Flash</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🧪 Testar IA</h2>
+      <div class="form-group">
+        <label>Pergunta de teste</label>
+        <input type="text" id="testQ" placeholder="Olá, quem é você?" />
+      </div>
+      <button class="btn btn-primary" id="testBtn">🚀 Testar</button>
+      <div class="console mt-2" id="testOut" style="height:200px"></div>
+    </div>
+  </main>
+</div>
+<script>
+  document.getElementById('iaForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const r = await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      ai_auto_enabled: document.getElementById('aiAuto').checked,
+      ai_system_prompt: document.getElementById('aiSystem').value,
+    }) });
+    if (r.ok) toast('Salvo!', 'success'); else toast('Erro', 'error');
+  };
+  document.getElementById('testBtn').onclick = async () => {
+    const q = document.getElementById('testQ').value;
+    if (!q) return;
+    const out = document.getElementById('testOut');
+    out.innerHTML = '<div class="console-line log-info">⏳ Pensando...</div>';
+    try {
+      const r = await fetch('/api/ia/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt: q }) });
+      const d = await r.json();
+      out.innerHTML = `<div class="console-line log-success">🧠 ${d.response || d.error}</div>`;
+    } catch (e) { out.innerHTML = '<div class="console-line log-error">❌ '+e.message+'</div>'; }
+  };
+</script>
+<%- include('../partials/footer') %>

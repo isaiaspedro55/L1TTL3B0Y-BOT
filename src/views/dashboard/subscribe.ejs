@@ -1,0 +1,158 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>⭐ Assinar Premium</h1>
+        <p class="muted">Desbloqueie o poder total do <%= bot.name %></p>
+      </div>
+      <% if (userData.role === 'premium' || userData.role === 'owner') { %>
+        <span class="chip chip-premium" style="font-size:.8rem">⭐ Já és Premium</span>
+      <% } %>
+    </header>
+
+    <!-- STATUS ATUAL -->
+    <% if (userData.role === 'owner') { %>
+      <div class="alert alert-success"><span>👑</span><span>Você é o <strong>Dono</strong> — acesso total e ilimitado.</span></div>
+    <% } else if (userData.role === 'premium') { %>
+      <div class="alert alert-success">
+        <span>⭐</span>
+        <span>Premium ativo<% if (userData.premiumUntil) { %> até <strong><%= new Date(userData.premiumUntil).toLocaleDateString('pt-BR') %></strong><% } %>.</span>
+      </div>
+    <% } else { %>
+      <div class="alert alert-warning"><span>⚠️</span><span>Você está no plano <strong>Free</strong>. Algumas funções estão bloqueadas.</span></div>
+    <% } %>
+
+    <!-- BENEFÍCIOS -->
+    <div class="card card-neon-gold" style="margin-bottom:1.5rem">
+      <h2>💎 Benefícios Premium</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem">
+        <% const benefits = [
+          ['🔓','VPN Decrypter completo','Todos os formatos suportados'],
+          ['🧠','IA sem limites','Chat GPT + Gemini ilimitado'],
+          ['📥','Downloads HD','YouTube, TikTok, Instagram, etc.'],
+          ['🎨','Stickers ilimitados','Sem fila, sem espera'],
+          ['⚡','Prioridade máxima','Respostas instantâneas'],
+          ['🎮','Jogos + Economia','Acesso a todos os recursos'],
+          ['💕','Interações VIP','Comandos exclusivos premium'],
+          ['📊','Sem cooldown','Use quantas vezes quiser'],
+        ]; benefits.forEach(([icon, title, desc]) => { %>
+          <div style="display:flex;align-items:center;gap:.85rem;padding:.85rem;background:var(--bg-1);border:1px solid rgba(255,215,0,.15);border-radius:10px">
+            <span style="font-size:1.6rem;flex-shrink:0"><%= icon %></span>
+            <div><strong style="font-size:.9rem;display:block"><%= title %></strong><span class="muted small"><%= desc %></span></div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <!-- PLANOS -->
+    <div class="card">
+      <h2>💰 Escolha seu Plano</h2>
+      <div class="plan-grid">
+        <div class="plan-card">
+          <div class="plan-name">Mensal</div>
+          <div class="plan-price">1.500</div>
+          <div class="plan-period">Kz / 1 mês</div>
+          <button class="btn btn-ghost btn-block" onclick="selectPlan('1 mês - 1.500 Kz')">Escolher</button>
+        </div>
+        <div class="plan-card featured">
+          <div class="plan-badge">Popular</div>
+          <div class="plan-name">Trimestral</div>
+          <div class="plan-price">4.000</div>
+          <div class="plan-period">Kz / 3 meses</div>
+          <button class="btn btn-primary btn-block" onclick="selectPlan('3 meses - 4.000 Kz')">Escolher</button>
+        </div>
+        <div class="plan-card">
+          <div class="plan-name">Semestral</div>
+          <div class="plan-price">7.500</div>
+          <div class="plan-period">Kz / 6 meses</div>
+          <button class="btn btn-ghost btn-block" onclick="selectPlan('6 meses - 7.500 Kz')">Escolher</button>
+        </div>
+        <div class="plan-card">
+          <div class="plan-name">Anual</div>
+          <div class="plan-price">14.000</div>
+          <div class="plan-period">Kz / 1 ano</div>
+          <button class="btn btn-ghost btn-block" onclick="selectPlan('1 ano - 14.000 Kz')">Escolher</button>
+        </div>
+        <div class="plan-card card-neon-gold">
+          <div class="plan-badge">🔥 Best</div>
+          <div class="plan-name">Vitalício</div>
+          <div class="plan-price">30.000</div>
+          <div class="plan-period">Kz / para sempre</div>
+          <button class="btn btn-primary btn-block" onclick="selectPlan('Vitalício - 30.000 Kz')">Escolher</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGAMENTO -->
+    <div class="card" id="paymentCard" style="display:none">
+      <h2>💳 Como Pagar</h2>
+      <div class="alert alert-info" id="selectedPlanAlert"></div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:1.25rem">
+        <div style="padding:1rem;background:var(--bg-1);border:1px solid var(--border);border-radius:12px">
+          <div style="font-weight:700;margin-bottom:.5rem;color:var(--neon-green)">📱 Multicaixa Express</div>
+          <div class="muted small">Número: <code>+<%= owner.number %></code></div>
+          <div class="muted small">Nome: <strong><%= owner.name %></strong></div>
+        </div>
+        <div style="padding:1rem;background:var(--bg-1);border:1px solid var(--border);border-radius:12px">
+          <div style="font-weight:700;margin-bottom:.5rem;color:var(--neon-purple)">💬 WhatsApp / Unitel Money</div>
+          <div class="muted small">Contactar: <a href="https://wa.me/<%= owner.number %>" target="_blank">+<%= owner.number %></a></div>
+          <div class="muted small">Nome: <strong><%= owner.name %></strong></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>📝 Enviar comprovante de pagamento</label>
+        <textarea id="paymentProof" rows="4" placeholder="Cole aqui o comprovante, número de transação ou informações adicionais..."></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="submitPayment()">📤 Enviar Comprovante</button>
+      <p class="muted small" style="margin-top:.5rem">⏱️ Ativação em até 24h após confirmação do pagamento.</p>
+    </div>
+
+    <!-- CONTACTO DIRETO -->
+    <div class="card" style="text-align:center">
+      <h2>📞 Contacto Direto</h2>
+      <p class="muted" style="margin-bottom:1rem">Fale diretamente com o dono para ativar seu premium</p>
+      <div class="button-row" style="justify-content:center">
+        <a href="https://wa.me/<%= owner.number %>" target="_blank" class="btn btn-success">💬 WhatsApp: +<%= owner.number %></a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  let selectedPlan = '';
+
+  function selectPlan(plan) {
+    selectedPlan = plan;
+    const card = document.getElementById('paymentCard');
+    const alert = document.getElementById('selectedPlanAlert');
+    card.style.display = 'block';
+    alert.innerHTML = `<span>💎</span><span>Plano selecionado: <strong>${plan}</strong></span>`;
+    card.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function submitPayment() {
+    const proof = document.getElementById('paymentProof').value.trim();
+    if (!proof) { toast('❌ Por favor escreva alguma informação de pagamento', 'error'); return; }
+    try {
+      const r = await fetch('/api/payment/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: selectedPlan, proof }),
+      });
+      if (r.ok) {
+        toast('✅ Comprovante enviado! Aguarde aprovação em até 24h.', 'success', 5000);
+        document.getElementById('paymentProof').value = '';
+      } else {
+        const d = await r.json();
+        toast(d.error || '❌ Erro ao enviar', 'error');
+      }
+    } catch (e) { toast(e.message, 'error'); }
+  }
+</script>
+<%- include('../partials/footer') %>

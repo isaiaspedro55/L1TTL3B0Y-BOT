@@ -1,0 +1,85 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>💳 Pagamentos Premium</h1>
+        <p class="muted">Aprovar/rejeitar pagamentos enviados pelos usuários</p>
+      </div>
+    </header>
+
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">⏳</div>
+        <div><div class="stat-label">Pendentes</div><div class="stat-value"><%= stats.pending %></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div><div class="stat-label">Aprovados</div><div class="stat-value"><%= stats.approved %></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">❌</div>
+        <div><div class="stat-label">Rejeitados</div><div class="stat-value"><%= stats.rejected %></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div><div class="stat-label">Receita Total</div><div class="stat-value" style="font-size:1.3rem"><%= stats.totalRevenue.toLocaleString('pt-BR') %> Kz</div></div>
+      </div>
+    </section>
+
+    <div class="card">
+      <h2>📋 Pagamentos</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Data</th><th>Usuário</th><th>WhatsApp</th><th>Plano</th><th>Valor</th><th>Método</th><th>Comprovante</th><th>Status</th><th>Ações</th></tr>
+          </thead>
+          <tbody>
+            <% payments.forEach(p => { %>
+              <tr>
+                <td><%= new Date(p.createdAt).toLocaleDateString('pt-BR') %></td>
+                <td><strong><%= p.username || '-' %></strong></td>
+                <td><%= p.whatsappNumber || '-' %></td>
+                <td><span class="chip chip-premium"><%= p.plan %></span></td>
+                <td><%= p.amount %> <%= p.currency %></td>
+                <td><%= p.method %></td>
+                <td>
+                  <% if (p.receipt) { %><a href="<%= p.receipt %>" target="_blank" class="btn btn-sm">📎 Ver</a><% } else { %>-<% } %>
+                </td>
+                <td>
+                  <% if (p.status === 'pendente') { %><span class="chip">⏳ Pendente</span>
+                  <% } else if (p.status === 'aprovado') { %><span class="chip chip-success">✅ Aprovado</span>
+                  <% } else { %><span class="chip" style="color:var(--neon-red)">❌ Rejeitado</span><% } %>
+                </td>
+                <td>
+                  <% if (p.status === 'pendente') { %>
+                    <button class="btn btn-sm btn-success" onclick="aprovar('<%= p._id %>')">✅</button>
+                    <button class="btn btn-sm btn-danger" onclick="rejeitar('<%= p._id %>')">❌</button>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+            <% if (!payments.length) { %><tr><td colspan="9" class="text-center muted">Nenhum pagamento</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  async function aprovar(id) {
+    const dias = prompt('Quantos dias de premium? (30/90/180/365 ou 99999 para vitalício)', '30');
+    if (!dias) return;
+    const r = await fetch('/api/payments/'+id+'/approve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ days: parseInt(dias) }) });
+    if (r.ok) { toast('Pagamento aprovado!', 'success'); setTimeout(()=>location.reload(),1000); }
+    else toast('Erro', 'error');
+  }
+  async function rejeitar(id) {
+    const motivo = prompt('Motivo da rejeição:');
+    if (!motivo) return;
+    const r = await fetch('/api/payments/'+id+'/reject', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes: motivo }) });
+    if (r.ok) { toast('Rejeitado', 'warn'); setTimeout(()=>location.reload(),1000); }
+  }
+</script>
+<%- include('../partials/footer') %>

@@ -1,0 +1,106 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>🤖 Adicionar Bot ao Grupo</h1>
+        <p class="muted">Adicione o <strong><%= bot.name %></strong> ao seu grupo WhatsApp</p>
+      </div>
+    </header>
+
+    <div class="card" style="border-left:4px solid var(--neon-green)">
+      <h2>📱 Como Adicionar</h2>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-icon">📞</div>
+          <h3>Salve o Número</h3>
+          <p>Adicione <strong>+<%= bot.number %></strong> nos seus contatos</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-icon">👥</div>
+          <h3>Abra o Grupo</h3>
+          <p>Vá no grupo onde deseja adicionar o bot</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-icon">➕</div>
+          <h3>Adicione</h3>
+          <p>Vá em "Adicionar participante" e selecione o bot</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-icon">👑</div>
+          <h3>Promova (Opcional)</h3>
+          <p>Torne o bot admin para usar anti-link e anti-spam</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🔗 Links</h2>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem">
+        <a href="https://wa.me/<%= bot.number %>?text=Ol%C3%A1!%20Quero%20adicionar%20o%20bot%20no%20meu%20grupo." target="_blank" class="btn btn-primary" style="flex:1;min-width:180px;text-align:center">
+          📱 Falar com o Bot
+        </a>
+        <a href="https://wa.me/<%= owner.number %>" target="_blank" class="btn btn-ghost" style="flex:1;min-width:180px;text-align:center">
+          👑 Falar com o Dono
+        </a>
+        <a href="#" id="groupLinkBtn" target="_blank" class="btn btn-ghost" style="flex:1;min-width:180px;text-align:center;display:none">
+          👥 Entrar no Grupo
+        </a>
+      </div>
+    </div>
+    <script>
+      fetch('/api/bot/invite-link').then(r => r.json()).then(d => {
+        // Mostra link do grupo se configurado
+      }).catch(() => {});
+      // Carrega link do grupo se existir nas settings
+      fetch('/api/bot/status').then(r => r.json()).catch(() => {});
+    </script>
+
+    <div class="card">
+      <h2>📋 Comandos Básicos</h2>
+      <p class="muted">Depois de adicionar, use estes comandos no grupo:</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Comando</th><th>Descrição</th></tr></thead>
+          <tbody>
+            <tr><td><code><%= bot.prefix %>menu</code></td><td>Ver todos os comandos</td></tr>
+            <tr><td><code><%= bot.prefix %>ping</code></td><td>Verificar se o bot está online</td></tr>
+            <tr><td><code><%= bot.prefix %>sticker</code></td><td>Criar figurinha (envie foto/vídeo)</td></tr>
+            <tr><td><code><%= bot.prefix %>play</code></td><td>Baixar música do YouTube</td></tr>
+            <tr><td><code><%= bot.prefix %>ia</code></td><td>Perguntar à IA</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="alert alert-info">
+      <span>💡</span>
+      <span>Quer acesso a <strong>todos os comandos</strong>? Assine o <a href="/dashboard/subscribe">Premium ⭐</a></span>
+    </div>
+  </main>
+</div>
+
+<style>
+  .steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+  .step-card {
+    background: var(--bg-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; text-align: center; position: relative; transition: all .3s;
+  }
+  .step-card:hover { border-color: var(--neon-cyan); transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,240,255,.15); }
+  .step-num {
+    position: absolute; top: -12px; left: -12px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--gradient-1); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: .8rem; font-family: 'Orbitron', sans-serif;
+  }
+  .step-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+  .step-card h3 { font-size: 1rem; margin-bottom: .25rem; }
+  .step-card p { font-size: .85rem; color: var(--text-muted); }
+</style>
+<%- include('../partials/footer') %>

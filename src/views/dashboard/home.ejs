@@ -1,0 +1,178 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>📊 Dashboard</h1>
+        <p class="muted">Bem-vindo, <strong><%= user.name || user.username %></strong> · <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) %></p>
+      </div>
+      <div class="bot-status" id="botStatusBadge">
+        <span class="status-dot status-<%= stats.botStatus %>"></span>
+        <span id="botStatusText"><%= stats.botStatus %></span>
+      </div>
+    </header>
+
+    <!-- STATS CARDS -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon"><img src="/img/logo.jpg" alt="" style="width:34px;height:34px;border-radius:50%;object-fit:cover" /></div>
+        <div class="stat-info">
+          <div class="stat-label">Status Bot</div>
+          <div class="stat-value" id="statBotStatus" style="font-size:1rem;margin-top:.3rem">
+            <span class="chip chip-<%= stats.botStatus === 'connected' ? 'success' : stats.botStatus === 'disconnected' ? 'danger' : 'info' %>">
+              <%= stats.botStatus %>
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-info">
+          <div class="stat-label">Usuários</div>
+          <div class="stat-value"><%= stats.totalUsers %></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⭐</div>
+        <div class="stat-info">
+          <div class="stat-label">Premium</div>
+          <div class="stat-value"><%= stats.premiumUsers %></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-info">
+          <div class="stat-label">Comandos DB</div>
+          <div class="stat-value"><%= stats.totalCommands %></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🖼️</div>
+        <div class="stat-info">
+          <div class="stat-label">Mídias</div>
+          <div class="stat-value"><%= stats.totalMedia %></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">💬</div>
+        <div class="stat-info">
+          <div class="stat-label">Mensagens</div>
+          <div class="stat-value" id="msgCount"><%= stats.messageCount || 0 %></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AÇÕES RÁPIDAS -->
+    <section class="card">
+      <h2>🚀 Ações Rápidas</h2>
+      <div class="quick-grid">
+        <% if (user.role === 'owner') { %>
+          <a href="/dashboard/connect" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-cyan)">🔌</div>
+            <div><strong>Conectar Bot</strong><p>QR Code ou Pair Code</p></div>
+          </a>
+          <a href="/dashboard/commands" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-purple)">⚡</div>
+            <div><strong>Comandos</strong><p>Criar, editar, deletar</p></div>
+          </a>
+          <a href="/dashboard/media" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-pink)">🖼️</div>
+            <div><strong>Galeria</strong><p>Upload de fotos/vídeos/GIFs</p></div>
+          </a>
+          <a href="/dashboard/users" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-green)">👥</div>
+            <div><strong>Usuários</strong><p>Free / Premium / Bloqueios</p></div>
+          </a>
+          <a href="/dashboard/broadcast" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-yellow)">📢</div>
+            <div><strong>Broadcast</strong><p>Enviar para todos os grupos</p></div>
+          </a>
+          <a href="/dashboard/decrypter" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-orange)">🔓</div>
+            <div><strong>VPN Decrypter</strong><p>Decodificar configs VPN</p></div>
+          </a>
+        <% } else { %>
+          <a href="https://wa.me/<%= bot.number %>" target="_blank" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-green)">📱</div>
+            <div><strong>Falar com Bot</strong><p>+<%= bot.number %></p></div>
+          </a>
+          <a href="https://wa.me/<%= owner.number %>" target="_blank" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-yellow)">👑</div>
+            <div><strong>Suporte / Dono</strong><p><%= owner.name %></p></div>
+          </a>
+          <a href="/dashboard/decrypter" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-cyan)">🔓</div>
+            <div><strong>VPN Decrypter</strong><p>Decodificar configs VPN</p></div>
+          </a>
+          <a href="/dashboard/subscribe" class="quick-card">
+            <div class="quick-icon" style="color:var(--neon-purple)">⭐</div>
+            <div><strong>Assinar Premium</strong><p>Acesso completo ao bot</p></div>
+          </a>
+        <% } %>
+      </div>
+    </section>
+
+    <!-- CONSOLE LIVE (só dono) -->
+    <% if (user.role === 'owner') { %>
+    <section class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <h2 style="margin-bottom:0">📜 Atividade em Tempo Real</h2>
+        <button class="btn btn-sm btn-ghost" onclick="clearConsole()">🗑️ Limpar</button>
+      </div>
+      <div class="console" id="liveConsole">
+        <div class="console-line log-info">
+          <span class="console-time">[--:--:--]</span> ⚡ Aguardando eventos do bot...
+        </div>
+      </div>
+    </section>
+    <% } %>
+
+  </main>
+</div>
+
+<script>
+  const socket = io({ reconnection: true, reconnectionDelay: 2000 });
+  const statusText = document.getElementById('botStatusText');
+  const statusDot = document.querySelector('#botStatusBadge .status-dot');
+  const msgCount = document.getElementById('msgCount');
+  const liveConsole = document.getElementById('liveConsole');
+
+  socket.on('bot:status', (data) => {
+    if (data.status && statusText) {
+      statusText.textContent = data.status;
+      if (statusDot) statusDot.className = 'status-dot status-' + data.status;
+    }
+    if (data.messageCount !== undefined && msgCount) msgCount.textContent = data.messageCount;
+  });
+
+  if (liveConsole) {
+    socket.on('bot:log', (data) => {
+      const time = new Date().toLocaleTimeString('pt-BR');
+      const line = document.createElement('div');
+      line.className = `console-line log-${data.level || 'info'}`;
+      const safe = String(data.message || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      line.innerHTML = `<span class="console-time">[${time}]</span> ${safe}`;
+      liveConsole.appendChild(line);
+      liveConsole.scrollTop = liveConsole.scrollHeight;
+      if (liveConsole.children.length > 120) liveConsole.removeChild(liveConsole.firstChild);
+    });
+  }
+
+  function clearConsole() {
+    if (liveConsole) liveConsole.innerHTML = '<div class="console-line log-info"><span class="console-time">[--:--:--]</span> Console limpo.</div>';
+  }
+
+  // Atualiza stats a cada 15s
+  setInterval(async () => {
+    try {
+      const r = await fetch('/api/bot/status');
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d.messageCount !== undefined && msgCount) msgCount.textContent = d.messageCount;
+      if (d.status && statusText) statusText.textContent = d.status;
+    } catch (e) {}
+  }, 15000);
+</script>
+<%- include('../partials/footer') %>

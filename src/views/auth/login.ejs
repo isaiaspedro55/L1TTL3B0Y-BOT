@@ -1,0 +1,52 @@
+<%- include('../partials/head') %>
+
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <img src="/img/logo.jpg" alt="<%= bot.name %>" />
+    </div>
+    <h1 class="auth-title"><%= bot.name %></h1>
+    <p class="auth-subtitle">⌁ ᴛʜᴇ ᴅᴀʀᴋ sɪᴅᴇ ⌁</p>
+
+    <% const urlParams = typeof URLSearchParams !== 'undefined' ? null : null; %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-error"><span>❌</span><span><%= error %></span></div>
+    <% } %>
+
+    <form class="auth-form" method="POST" action="/login">
+      <div class="form-group">
+        <label>👤 Username</label>
+        <input type="text" name="username" placeholder="Seu username" required autocomplete="username"
+          value="<%= (typeof username !== 'undefined' ? username : '') %>" />
+      </div>
+      <div class="form-group">
+        <label>🔐 Senha</label>
+        <input type="password" name="password" placeholder="Sua senha" required autocomplete="current-password" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:.25rem;padding:.8rem">
+        🚀 Entrar
+      </button>
+    </form>
+
+    <div class="auth-divider">ou</div>
+
+    <div class="auth-footer">
+      <span>Não tem conta?</span>
+      <a href="/register" style="color:var(--neon-purple);font-weight:700">Criar conta</a>
+    </div>
+
+    <div style="text-align:center;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+      <span class="muted small">⚡ Powered by </span>
+      <span style="color:var(--neon-yellow);font-family:'Orbitron',sans-serif;font-size:.72rem;font-weight:900">DARK NET</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Mostra toast se veio de registo bem sucedido
+  if (location.search.includes('registered=1')) {
+    setTimeout(() => toast('✅ Conta criada! Faça login.', 'success', 4000), 300);
+  }
+</script>
+
+<%- include('../partials/footer') %>

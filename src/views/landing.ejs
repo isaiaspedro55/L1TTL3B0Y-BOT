@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title><%= siteMeta?.title || bot.name %></title>
+  <meta name="description" content="<%= siteMeta?.description || 'DARK BOT - Bot WhatsApp profissional' %>">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    body { background:#0a0a0a; color:#e5e5e5; font-family:'Segoe UI',sans-serif; margin:0; }
+    .hero { min-height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column; text-align:center; padding:2rem; }
+    .hero h1 { font-size:3.5rem; color:#8B5CF6; margin:0 0 1rem; letter-spacing:-1px; }
+    .hero p { font-size:1.2rem; color:#aaa; max-width:500px; margin:0 auto 2rem; }
+    .btn-hero { display:inline-block; padding:.85rem 2rem; background:#8B5CF6; color:#fff; border-radius:8px; text-decoration:none; font-weight:600; font-size:1rem; transition:.2s; }
+    .btn-hero:hover { background:#7C3AED; transform:translateY(-2px); }
+    .tag { display:inline-block; background:#1a1a2e; border:1px solid #8B5CF6; color:#8B5CF6; padding:.3rem .8rem; border-radius:20px; font-size:.8rem; margin:.25rem; }
+    .features { display:flex; gap:1.5rem; flex-wrap:wrap; justify-content:center; margin:3rem 0; }
+    .feat { background:#111; border:1px solid #222; border-radius:12px; padding:1.5rem; max-width:200px; text-align:center; }
+    .feat .icon { font-size:2rem; margin-bottom:.5rem; }
+    .feat h3 { margin:0 0 .5rem; font-size:.95rem; color:#e5e5e5; }
+    .feat p { margin:0; font-size:.8rem; color:#777; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div style="font-size:4rem;margin-bottom:1rem">🕸️</div>
+    <h1><%= bot.name %></h1>
+    <p>Bot WhatsApp profissional com Dashboard moderno, IA com memória, downloads, stickers e muito mais.</p>
+    <a href="/login" class="btn-hero">Entrar no Dashboard →</a>
+
+    <div style="margin-top:2rem">
+      <span class="tag">🧠 IA com Memória</span>
+      <span class="tag">📥 Downloads YT</span>
+      <span class="tag">🎨 Stickers</span>
+      <span class="tag">🎮 Jogos</span>
+      <span class="tag">💰 Dark Bank</span>
+      <span class="tag">🛡️ Anti-spam</span>
+      <span class="tag">👥 Grupos</span>
+      <span class="tag">🔓 VPN Decrypt</span>
+    </div>
+
+    <div class="features">
+      <div class="feat"><div class="icon">⚡</div><h3>Rápido</h3><p>Render Free + keep-alive</p></div>
+      <div class="feat"><div class="icon">🛡️</div><h3>Seguro</h3><p>Sem chaves no GitHub</p></div>
+      <div class="feat"><div class="icon">🎨</div><h3>Personalizável</h3><p>10 temas de menu</p></div>
+      <div class="feat"><div class="icon">👑</div><h3>Completo</h3><p>271+ comandos</p></div>
+    </div>
+
+    <p style="color:#555;font-size:.85rem">Criado por <strong style="color:#8B5CF6"><%= owner.name %></strong> · Dark Net Engine 🕸️</p>
+  </div>
+</body>
+</html>

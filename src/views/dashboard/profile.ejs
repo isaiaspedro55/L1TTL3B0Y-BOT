@@ -1,0 +1,103 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>👤 Meu Perfil</h1>
+        <p class="muted">Suas informações no <%= bot.name %></p>
+      </div>
+      <span class="chip chip-<%= userData.role === 'owner' ? 'owner' : userData.role === 'premium' ? 'premium' : 'free' %>">
+        <%= userData.role === 'owner' ? '👑 Dono' : userData.role === 'premium' ? '⭐ Premium' : '🆓 Free' %>
+      </span>
+    </header>
+
+    <!-- PERFIL -->
+    <div class="card">
+      <div class="profile-grid">
+        <div class="profile-avatar">
+          <%= (userData.name || userData.username).charAt(0).toUpperCase() %>
+        </div>
+        <div style="flex:1">
+          <h2 style="font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:900;background:var(--gradient-1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.25rem">
+            <%= userData.name || userData.username %>
+          </h2>
+          <p class="muted">@<%= userData.username %></p>
+          <div class="profile-meta" style="margin-top:.75rem">
+            <div>📱 WhatsApp: <strong><%= userData.whatsappNumber ? '+' + userData.whatsappNumber : '—' %></strong></div>
+            <div>⚡ Comandos usados: <strong><%= userData.commandsUsed || 0 %></strong></div>
+            <div>📅 Membro desde: <strong><%= new Date(userData.createdAt).toLocaleDateString('pt-BR') %></strong></div>
+            <% if (userData.premiumUntil) { %>
+              <div>⏳ Premium válido até: <strong style="color:var(--neon-green)"><%= new Date(userData.premiumUntil).toLocaleDateString('pt-BR') %></strong></div>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDITAR PERFIL -->
+    <div class="card">
+      <h2>✏️ Editar Informações</h2>
+      <form id="profileForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nome completo</label>
+            <input type="text" name="name" value="<%= userData.name || '' %>" placeholder="Seu nome" />
+          </div>
+          <div class="form-group">
+            <label>WhatsApp (com DDI)</label>
+            <input type="tel" name="whatsappNumber" value="<%= userData.whatsappNumber || '' %>" placeholder="244945280380" />
+          </div>
+        </div>
+        <div class="neon-line"></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nova senha (deixe em branco para manter)</label>
+            <input type="password" name="newPassword" placeholder="Nova senha..." minlength="6" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label>Senha atual (para confirmar mudanças)</label>
+            <input type="password" name="currentPassword" placeholder="Senha atual" required autocomplete="current-password" />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Salvar alterações</button>
+      </form>
+    </div>
+
+    <!-- UPGRADE -->
+    <% if (userData.role === 'free') { %>
+    <div class="card upgrade-card card-neon-gold">
+      <h2>⭐ Quer virar Premium?</h2>
+      <p class="muted" style="margin-bottom:1.1rem">Comandos exclusivos, IA sem limites, downloads HD, VPN Decrypter completo e muito mais.</p>
+      <div class="button-row">
+        <a href="/dashboard/subscribe" class="btn btn-primary">💎 Ver Planos</a>
+        <a href="https://wa.me/<%= owner.number %>" target="_blank" class="btn btn-ghost">📞 Falar com Dono</a>
+      </div>
+    </div>
+    <% } %>
+
+  </main>
+</div>
+
+<script>
+  document.getElementById('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true;
+    btn.textContent = '⏳ Salvando...';
+    try {
+      const data = Object.fromEntries(new FormData(e.target));
+      const r = await fetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const d = await r.json();
+      if (r.ok) { toast('✅ Perfil atualizado!', 'success'); setTimeout(() => location.reload(), 1500); }
+      else toast(d.error || '❌ Erro ao salvar', 'error');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = '💾 Salvar alterações'; }
+  });
+</script>
+<%- include('../partials/footer') %>

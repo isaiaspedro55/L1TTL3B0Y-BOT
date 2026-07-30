@@ -1,0 +1,89 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>🖼️ Mídias</h1>
+        <p class="muted">Hospede fotos, vídeos, GIFs e áudios para usar nos comandos</p>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>📤 Upload</h2>
+      <form id="uploadForm" enctype="multipart/form-data">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Arquivo (até 50MB)</label>
+            <input type="file" name="file" accept="image/*,video/*,audio/*" required />
+          </div>
+          <div class="form-group">
+            <label>Nome</label>
+            <input type="text" name="name" placeholder="Opcional" />
+          </div>
+          <div class="form-group">
+            <label>Tags (vírgulas)</label>
+            <input type="text" name="tags" placeholder="meme, engraçado" />
+          </div>
+          <div class="form-group">
+            <label>Modo para vídeo</label>
+            <select name="mediaMode">
+              <option value="normal">🎬 Vídeo normal</option>
+              <option value="circle">⭕ Vídeo circular / rápido (PTV)</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="upBtn">📤 Enviar</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>📚 Galeria (<%= medias.length %>)</h2>
+      <div class="media-grid">
+        <% medias.forEach(m => { %>
+          <div class="media-card">
+            <div class="media-thumb">
+              <% if (m.type === 'image' || m.type === 'gif') { %>
+                <img src="<%= m.url %>" alt="<%= m.name %>" />
+              <% } else if (m.type === 'video') { %>
+                <video src="<%= m.url %>" muted></video>
+              <% } else { %>
+                <div class="media-icon">🎵</div>
+              <% } %>
+            </div>
+            <div class="media-info">
+              <strong><%= m.name %></strong>
+              <small class="muted"><%= m.type %><% if (m.type === 'video') { %> · <%= m.mediaMode === 'circle' ? '⭕ circular/PTV' : '🎬 normal' %><% } %> · <%= Math.round((m.size||0)/1024) %>KB</small>
+              <div class="button-row">
+                <button class="btn btn-sm" onclick="navigator.clipboard.writeText('<%= m.url %>'); this.innerText='✅'">📋 URL</button>
+                <button class="btn btn-sm btn-danger" onclick="delMedia('<%= m._id %>')">🗑️</button>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+        <% if (medias.length === 0) { %>
+          <p class="muted text-center">Nenhuma mídia ainda. Faça o primeiro upload!</p>
+        <% } %>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = document.getElementById('upBtn');
+    btn.disabled = true; btn.textContent = '⏳ Enviando...';
+    const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+    if (res.ok) location.reload();
+    else { const err = await res.json(); alert('Erro: ' + err.error); btn.disabled = false; btn.textContent = '📤 Enviar'; }
+  });
+
+  async function delMedia(id) {
+    if (!confirm('Deletar esta mídia?')) return;
+    await fetch('/api/media/' + id, { method: 'DELETE' });
+    location.reload();
+  }
+</script>
+<%- include('../partials/footer') %>

@@ -1,0 +1,329 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>🔌 Conectar Bot</h1>
+        <p class="muted">Conecte o <%= bot.name %> ao WhatsApp via QR Code ou Pair Code</p>
+      </div>
+      <div class="bot-status" id="botStatusBadge">
+        <span class="status-dot status-<%= botState.status %>"></span>
+        <span id="botStatusText"><%= botState.status %></span>
+      </div>
+    </header>
+
+    <div class="alert alert-info" id="connInstructions">
+      <span>💡</span>
+      <span><strong>Como conectar:</strong> Escolha QR Code (escaneie pelo WhatsApp) ou Pair Code (digite no app). No Render, pode levar até 30s para aparecer.</span>
+    </div>
+
+    <div id="connectedBanner" style="display:none">
+      <div class="alert alert-success">
+        <span>✅</span>
+        <span><strong>Bot conectado!</strong> WhatsApp está online e pronto.</span>
+      </div>
+    </div>
+
+    <div class="connect-grid">
+      <!-- QR CODE -->
+      <div class="card">
+        <h2>📱 QR Code</h2>
+        <p class="muted" style="margin-bottom:.75rem">Escaneie pelo WhatsApp → Aparelhos Conectados</p>
+
+        <div class="qr-area" id="qrArea">
+          <% if (botState.qr) { %>
+            <img src="<%= botState.qr %>" alt="QR Code" id="qrImg" />
+          <% } else if (botState.status === 'connected') { %>
+            <div class="qr-placeholder success">
+              <div class="qr-icon">✅</div>
+              <p><strong>Conectado!</strong></p>
+              <p class="muted small" style="margin-top:.3rem"><%= botState.user?.id?.split(':')[0] %></p>
+            </div>
+          <% } else { %>
+            <div class="qr-placeholder">
+              <div class="qr-icon">📱</div>
+              <p>Clique em <strong>Gerar QR</strong></p>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="button-row">
+          <button class="btn btn-primary" id="btnQr" onclick="startQR()" <%= botState.status === 'connected' ? 'disabled' : '' %>>
+            📱 Gerar QR Code
+          </button>
+          <% if (botState.status === 'connected') { %>
+            <button class="btn btn-danger btn-sm" onclick="disconnectBot()">🔌 Desconectar</button>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- PAIR CODE -->
+      <div class="card">
+        <h2>🔐 Pair Code</h2>
+        <p class="muted" style="margin-bottom:.75rem">WhatsApp → Aparelhos Conectados → Vincular com número</p>
+
+        <div class="form-group">
+          <label>Número do WhatsApp (com DDI)</label>
+          <input type="tel" id="pairNumber" placeholder="Ex: 244945280380" value="<%= owner.number %>" />
+          <small class="muted">DDI + DDD + número. Sem + ou espaços.</small>
+        </div>
+
+        <div class="pair-area" id="pairArea">
+          <% if (botState.pairingCode) { %>
+            <div style="text-align:center">
+              <div class="muted small" style="margin-bottom:.5rem">SEU PAIR CODE:</div>
+              <div class="pair-code"><%= botState.pairingCode %></div>
+              <div class="muted small" style="margin-top:.5rem">⏱️ Expira em ~3 minutos</div>
+            </div>
+          <% } else { %>
+            <div class="qr-placeholder">
+              <div class="qr-icon">🔐</div>
+              <p>Clique em <strong>Gerar Pair Code</strong></p>
+            </div>
+          <% } %>
+        </div>
+
+        <button class="btn btn-success" id="btnPair" onclick="startPair()" <%= botState.status === 'connected' ? 'disabled' : '' %>>
+          🔐 Gerar Pair Code
+        </button>
+      </div>
+    </div>
+
+    <!-- LOG DE CONEXÃO -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.85rem">
+        <h2 style="margin-bottom:0">📡 Log de Conexão</h2>
+        <button class="btn btn-sm btn-ghost" onclick="clearLog()">🗑️ Limpar</button>
+      </div>
+      <div class="console" id="connLog" style="height:200px">
+        <% (botState.recentLogs || []).slice(-20).forEach(l => { %>
+          <div class="console-line log-<%= l.level %>">
+            <span class="console-time">[<%= new Date(l.time).toLocaleTimeString('pt-BR') %>]</span>
+            <%= l.message %>
+          </div>
+        <% }) %>
+        <% if (!botState.recentLogs?.length) { %>
+          <div class="console-line muted">Aguardando logs...</div>
+        <% } %>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+
+<script>
+  const connectSocket = (typeof io !== 'undefined') ? (window.darkBotSocket || io({ reconnection: true })) : null;
+  if (connectSocket) window.darkBotSocket = connectSocket;
+  const statusText = document.getElementById('botStatusText');
+  const statusDot = document.querySelector('#botStatusBadge .status-dot');
+  const qrArea = document.getElementById('qrArea');
+  const pairArea = document.getElementById('pairArea');
+  const connLog = document.getElementById('connLog');
+  const connectedBanner = document.getElementById('connectedBanner');
+  const connInstructions = document.getElementById('connInstructions');
+
+  let fastPollTimer = null;
+  let lastQr = '';
+  let lastPair = '';
+  let lastStatusLog = '';
+
+  function addLog(level, msg) {
+    if (!connLog) return;
+    const t = new Date().toLocaleTimeString('pt-BR');
+    const d = document.createElement('div');
+    d.className = `console-line log-${level}`;
+    const safe = String(msg).replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    d.innerHTML = `<span class="console-time">[${t}]</span> ${safe}`;
+    connLog.appendChild(d);
+    connLog.scrollTop = connLog.scrollHeight;
+    if (connLog.children.length > 80) connLog.removeChild(connLog.firstChild);
+  }
+
+  function clearLog() {
+    if (connLog) connLog.innerHTML = '<div class="console-line muted">Log limpo.</div>';
+  }
+
+  function setButtons({ qrDisabled = false, pairDisabled = false, qrText = '📱 Gerar QR Code', pairText = '🔐 Gerar Pair Code' } = {}) {
+    const qr = document.getElementById('btnQr');
+    const pair = document.getElementById('btnPair');
+    if (qr) { qr.disabled = qrDisabled; qr.textContent = qrText; }
+    if (pair) { pair.disabled = pairDisabled; pair.textContent = pairText; }
+  }
+
+  function resetConnectButtons() {
+    setButtons();
+  }
+
+  function setStatusBadge(status) {
+    if (statusText) statusText.textContent = status;
+    if (statusDot) statusDot.className = 'status-dot status-' + status;
+  }
+
+  function renderBotStatus(data = {}, silent = false) {
+    if (!data.status) return;
+    const s = data.status;
+    const err = data.error || data.lastError || data.message || '';
+    setStatusBadge(s);
+
+    if (s === 'connected') {
+      if (connectedBanner) connectedBanner.style.display = 'block';
+      if (connInstructions) connInstructions.style.display = 'none';
+      setButtons({ qrDisabled: true, pairDisabled: true });
+      qrArea.innerHTML = `<div class="qr-placeholder success"><div class="qr-icon">✅</div><p><strong>Conectado!</strong></p><p class="muted small">${data.user?.id || ''}</p></div>`;
+      pairArea.innerHTML = `<div class="qr-placeholder success"><div class="qr-icon">✅</div><p><strong>Ativo!</strong></p></div>`;
+      if (!silent && lastStatusLog !== 'connected') toast('✅ Bot conectado ao WhatsApp!', 'success', 4000);
+      lastStatusLog = 'connected';
+      return;
+    }
+
+    if (s === 'qr') {
+      if (data.qr && data.qr !== lastQr) {
+        lastQr = data.qr;
+        qrArea.innerHTML = `<img src="${data.qr}" alt="QR Code" style="max-width:240px;border-radius:12px;background:white;padding:10px" />`;
+        addLog('success', '📱 QR Code gerado — escaneie agora!');
+        if (!silent) toast('📱 QR Code pronto — escaneie!', 'success');
+      }
+      setButtons({ qrText: '🔄 Gerar novo QR', pairText: '🔐 Gerar Pair Code' });
+      return;
+    }
+
+    if (s === 'pairing') {
+      if (data.pairingCode && data.pairingCode !== lastPair) {
+        lastPair = data.pairingCode;
+        pairArea.innerHTML = `<div style="text-align:center">
+          <div class="muted small">SEU PAIR CODE:</div>
+          <div class="pair-code">${data.pairingCode}</div>
+          <div class="muted small" style="margin-top:.5rem">Abra o WhatsApp do número escolhido → Aparelhos conectados → Vincular com número → digite este código.</div>
+          <div class="muted small">⏱️ Expira em ~3 min</div>
+        </div>`;
+        addLog('success', `🔐 Pair Code gerado: ${data.pairingCode}`);
+        if (!silent) toast(`🔐 Pair Code: ${data.pairingCode}`, 'success', 8000);
+      } else if (!data.pairingCode) {
+        pairArea.innerHTML = `<div class="qr-placeholder"><div class="spinner"></div><p>Solicitando pair code...</p><p class="muted small">Pode levar alguns segundos no Render.</p></div>`;
+      }
+      setButtons({ qrText: '📱 Gerar QR Code', pairText: '🔄 Gerar novo Pair Code' });
+      return;
+    }
+
+    if (s === 'connecting') {
+      qrArea.innerHTML = `<div class="qr-placeholder"><div class="spinner"></div><p>Conectando...</p><p class="muted small">Aguardando resposta do WhatsApp...</p></div>`;
+      if (!silent && lastStatusLog !== 'connecting') addLog('info', '🔄 Conectando ao WhatsApp...');
+      lastStatusLog = 'connecting';
+      setButtons({ qrDisabled: true, pairDisabled: true, qrText: '⏳ Aguarde...', pairText: '⏳ Aguarde...' });
+      return;
+    }
+
+    if (s === 'disconnected') {
+      if (err && !silent) addLog('warn', `⚠️ Desconectado: ${err}`);
+      if (err) {
+        qrArea.innerHTML = `<div class="qr-placeholder"><div class="qr-icon">⚠️</div><p>Não conectado</p><p class="muted small">${String(err).replace(/</g,'&lt;')}</p></div>`;
+      }
+      resetConnectButtons();
+    }
+  }
+
+  async function refreshStatus(silent = true) {
+    try {
+      const r = await fetch('/api/bot/status', { cache: 'no-store' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      renderBotStatus(data, silent);
+      return data;
+    } catch (e) {
+      if (!silent) {
+        addLog('error', '❌ Falha ao consultar status: ' + e.message);
+        toast(e.message, 'error');
+      }
+      return null;
+    }
+  }
+
+  function startFastPolling(seconds = 90) {
+    if (fastPollTimer) clearInterval(fastPollTimer);
+    refreshStatus(false);
+    const stopAt = Date.now() + seconds * 1000;
+    fastPollTimer = setInterval(() => {
+      refreshStatus(true);
+      if (Date.now() > stopAt) {
+        clearInterval(fastPollTimer);
+        fastPollTimer = null;
+        resetConnectButtons();
+      }
+    }, 2000);
+  }
+
+  if (connectSocket) {
+    connectSocket.on('connect', () => addLog('info', '🔌 Socket conectado ao servidor'));
+    connectSocket.on('bot:status', (data) => renderBotStatus(data, false));
+    connectSocket.on('bot:log', (data) => addLog(data.level || 'info', data.message));
+    connectSocket.on('bot:error', (data) => {
+      addLog('error', '❌ ' + data.message);
+      toast(data.message, 'error');
+      resetConnectButtons();
+    });
+  } else {
+    addLog('warn', 'Socket.IO não carregou; usando atualização por polling.');
+  }
+
+  async function postJSON(url, body = null) {
+    const opts = { method: 'POST', headers: {'Content-Type':'application/json'} };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(url, opts);
+    let data = {};
+    try { data = await r.json(); } catch (_) {}
+    if (!r.ok) throw new Error(data.error || `Erro HTTP ${r.status}`);
+    return data;
+  }
+
+  async function startQR() {
+    const btn = document.getElementById('btnQr');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Aguarde...'; }
+    qrArea.innerHTML = `<div class="qr-placeholder"><div class="spinner"></div><p>Gerando QR Code...</p><p class="muted small">Aguarde até 30 segundos.</p></div>`;
+    addLog('info', '🔄 Iniciando nova sessão com QR Code...');
+    try {
+      await postJSON('/api/bot/start', { mode: 'qr', fresh: true });
+      addLog('info', '✅ Pedido enviado ao servidor. Aguardando QR Code...');
+      startFastPolling(120);
+    } catch(e) {
+      addLog('error', '❌ ' + e.message);
+      toast(e.message, 'error');
+      resetConnectButtons();
+    }
+  }
+
+  async function startPair() {
+    const num = document.getElementById('pairNumber')?.value?.replace(/\D/g, '');
+    if (!num || num.length < 10) { toast('❌ Número inválido (mín. 10 dígitos com DDI)', 'error'); return; }
+    const btn = document.getElementById('btnPair');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Aguarde...'; }
+    pairArea.innerHTML = `<div class="qr-placeholder"><div class="spinner"></div><p>Gerando código...</p><p class="muted small">Aguarde a resposta do WhatsApp.</p></div>`;
+    addLog('info', `🔐 Solicitando pair code para ${num}...`);
+    try {
+      await postJSON('/api/bot/start', { mode: 'pair', phoneNumber: num, fresh: true });
+      addLog('info', '✅ Pedido enviado ao servidor. Aguardando pair code...');
+      startFastPolling(120);
+    } catch(e) {
+      addLog('error', '❌ ' + e.message);
+      toast(e.message, 'error');
+      resetConnectButtons();
+    }
+  }
+
+  async function disconnectBot() {
+    if (!confirm('Desconectar o bot do WhatsApp?')) return;
+    try {
+      await postJSON('/api/bot/logout');
+      toast('🔌 Bot desconectado.', 'warn');
+      resetConnectButtons();
+      refreshStatus(false);
+    } catch(e) { toast(e.message, 'error'); }
+  }
+
+  // Polling leve permanente: se WebSocket falhar no Render, a página continua atualizando.
+  setInterval(() => refreshStatus(true), 5000);
+  refreshStatus(true);
+</script>
+<%- include('../partials/footer') %>

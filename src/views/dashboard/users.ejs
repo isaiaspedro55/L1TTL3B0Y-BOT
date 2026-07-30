@@ -1,0 +1,181 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+
+    <header class="page-header">
+      <div>
+        <h1>👥 Usuários</h1>
+        <p class="muted">Gerencie usuários, planos e bloqueios</p>
+      </div>
+      <div class="flex gap-2">
+        <span class="chip chip-info"><%= users.length %> total</span>
+        <span class="chip chip-premium"><%= users.filter(u=>u.role==='premium').length %> premium</span>
+      </div>
+    </header>
+
+    <!-- BUSCA -->
+    <div class="card" style="padding:1rem;margin-bottom:1rem">
+      <div class="flex gap-2 flex-wrap">
+        <input type="text" id="searchInput" placeholder="🔍 Buscar por nome, username ou número..." style="flex:1;min-width:200px;background:var(--bg-1);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:.6rem 1rem;font-family:Rajdhani,sans-serif;font-size:.92rem" oninput="filterUsers(this.value)" />
+        <select id="filterRole" onchange="filterUsers(document.getElementById('searchInput').value)" style="background:var(--bg-1);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:.6rem 1rem;font-family:Rajdhani,sans-serif;font-size:.92rem;cursor:pointer">
+          <option value="">Todos os planos</option>
+          <option value="owner">👑 Dono</option>
+          <option value="premium">⭐ Premium</option>
+          <option value="free">🆓 Free</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="table-wrap">
+        <table class="table" id="usersTable">
+          <thead>
+            <tr>
+              <th>Usuário</th>
+              <th>WhatsApp</th>
+              <th>Plano</th>
+              <th>Premium até</th>
+              <th>Cadastro</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(u => { %>
+            <tr data-name="<%= (u.name||u.username||'').toLowerCase() %>" data-number="<%= u.whatsappNumber||'' %>" data-role="<%= u.role %>">
+              <td>
+                <div class="flex items-center gap-2">
+                  <div style="width:34px;height:34px;border-radius:50%;background:var(--gradient-1);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;color:white;flex-shrink:0">
+                    <%= (u.name||u.username||'?').charAt(0).toUpperCase() %>
+                  </div>
+                  <div>
+                    <div style="font-weight:700;font-size:.9rem"><%= u.name || u.username %></div>
+                    <div class="muted small">@<%= u.username %></div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <% if (u.whatsappNumber) { %>
+                  <a href="https://wa.me/<%= u.whatsappNumber %>" target="_blank" style="font-family:'JetBrains Mono',monospace;font-size:.83rem">+<%= u.whatsappNumber %></a>
+                <% } else { %>
+                  <span class="muted small">—</span>
+                <% } %>
+              </td>
+              <td>
+                <span class="chip chip-<%= u.role === 'owner' ? 'owner' : u.role === 'premium' ? 'premium' : 'free' %>">
+                  <%= u.role === 'owner' ? '👑 Dono' : u.role === 'premium' ? '⭐ Premium' : '🆓 Free' %>
+                </span>
+              </td>
+              <td>
+                <% if (u.premiumUntil) { %>
+                  <span class="<%= new Date(u.premiumUntil) > new Date() ? 'chip chip-success' : 'chip chip-danger' %>">
+                    <%= new Date(u.premiumUntil).toLocaleDateString('pt-BR') %>
+                  </span>
+                <% } else { %>
+                  <span class="muted small">—</span>
+                <% } %>
+              </td>
+              <td class="muted small"><%= new Date(u.createdAt).toLocaleDateString('pt-BR') %></td>
+              <td>
+                <div class="flex gap-1">
+                  <% if (u.role !== 'owner') { %>
+                    <button class="btn btn-sm btn-warning" onclick="setPremium('<%= u._id %>', '<%= u.name||u.username %>')" title="Premium">⭐</button>
+                    <button class="btn btn-sm btn-ghost" onclick="resetFree('<%= u._id %>', '<%= u.name||u.username %>')" title="Free">🆓</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteUser('<%= u._id %>', '<%= u.name||u.username %>')" title="Deletar">🗑️</button>
+                  <% } else { %>
+                    <span class="chip chip-owner">Dono</span>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MODAL: Set Premium -->
+    <div class="modal" id="premiumModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>⭐ Definir Premium</h3>
+          <button class="modal-close" onclick="closeModal('premiumModal')">✕</button>
+        </div>
+        <p id="premiumModalName" class="muted" style="margin-bottom:1rem"></p>
+        <div class="form-group">
+          <label>Duração</label>
+          <select id="premiumDays">
+            <option value="30">30 dias (1 mês)</option>
+            <option value="90">90 dias (3 meses)</option>
+            <option value="180">180 dias (6 meses)</option>
+            <option value="365">365 dias (1 ano)</option>
+            <option value="36500">Vitalício</option>
+          </select>
+        </div>
+        <div class="button-row">
+          <button class="btn btn-primary" onclick="confirmPremium()">⭐ Confirmar</button>
+          <button class="btn btn-ghost" onclick="closeModal('premiumModal')">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  let selectedUserId = null;
+
+  function filterUsers(q) {
+    q = q.toLowerCase();
+    const role = document.getElementById('filterRole').value;
+    document.querySelectorAll('#usersTable tbody tr').forEach(row => {
+      const name = row.dataset.name || '';
+      const num = row.dataset.number || '';
+      const r = row.dataset.role || '';
+      const matchText = name.includes(q) || num.includes(q);
+      const matchRole = !role || r === role;
+      row.style.display = matchText && matchRole ? '' : 'none';
+    });
+  }
+
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); selectedUserId = null; }
+
+  function setPremium(id, name) {
+    selectedUserId = id;
+    document.getElementById('premiumModalName').textContent = `Usuário: ${name}`;
+    openModal('premiumModal');
+  }
+
+  async function confirmPremium() {
+    if (!selectedUserId) return;
+    const days = document.getElementById('premiumDays').value;
+    try {
+      const r = await fetch(`/api/users/${selectedUserId}/premium`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: parseInt(days) }),
+      });
+      if (r.ok) { toast('⭐ Premium ativado!', 'success'); closeModal('premiumModal'); setTimeout(() => location.reload(), 1000); }
+      else toast('❌ Erro ao ativar', 'error');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function resetFree(id, name) {
+    if (!confirm(`Remover premium de ${name}?`)) return;
+    try {
+      const r = await fetch(`/api/users/${id}/free`, { method: 'POST' });
+      if (r.ok) { toast('🆓 Plano resetado', 'success'); setTimeout(() => location.reload(), 1000); }
+      else toast('❌ Erro', 'error');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function deleteUser(id, name) {
+    if (!confirm(`Deletar usuário ${name}? Esta ação é irreversível.`)) return;
+    try {
+      const r = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      if (r.ok) { toast('🗑️ Usuário deletado', 'warn'); setTimeout(() => location.reload(), 1000); }
+      else toast('❌ Erro ao deletar', 'error');
+    } catch (e) { toast(e.message, 'error'); }
+  }
+</script>
+<%- include('../partials/footer') %>

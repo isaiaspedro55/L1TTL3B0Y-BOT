@@ -1,0 +1,428 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>👥 GRUPOS · LIVE</h1>
+        <p class="muted">Gestão + eventos em tempo real · <strong><%= groups.length %></strong> grupos</p>
+      </div>
+      <div class="button-row">
+        <button class="btn btn-primary" onclick="location.reload()">🔄 Atualizar</button>
+        <span class="live-badge" id="liveBadge">
+          <span class="live-dot"></span> LIVE
+        </span>
+      </div>
+    </header>
+
+    <% if (!groups.length) { %>
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <span>Bot não está em nenhum grupo. <a href="/dashboard/connect">Verifique a conexão</a></span>
+      </div>
+    <% } %>
+
+    <!-- LIVE FEED -->
+    <div class="card" style="border-left:4px solid var(--neon-cyan)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <h2 style="margin:0">📡 FEED DE GRUPOS · TEMPO REAL</h2>
+        <div class="button-row">
+          <span class="muted small" id="evtCounter">0 eventos</span>
+          <button class="btn btn-sm btn-ghost" onclick="clearFeed()">🗑️ Limpar</button>
+        </div>
+      </div>
+      <div id="liveFeed" class="live-feed">
+        <div class="feed-empty">
+          <span class="spinner-mini"></span>
+          Aguardando atividade nos grupos... <em>(entradas, saídas, banimentos)</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <input type="text" id="searchInput" placeholder="🔍 Buscar grupo..." oninput="filterGroups(this.value)" />
+    </div>
+
+    <div class="groups-grid">
+      <% groups.forEach(g => {
+        const settings = settingsMap[g.id] || {};
+      %>
+        <div class="card group-card" data-jid="<%= g.id %>" data-name="<%= (g.subject || '').toLowerCase() %>" style="<%= settings.botEnabled === false ? 'opacity:.6' : '' %>">
+          <div class="group-header">
+            <div class="group-avatar"><%= (g.subject || '?').charAt(0).toUpperCase() %></div>
+            <div style="flex:1;min-width:0">
+              <h3 style="margin:0;font-size:1.05rem"><%= g.subject || 'Sem nome' %></h3>
+              <div class="muted small">👥 <span class="participant-count" data-jid="<%= g.id %>"><%= g.participants?.length || 0 %></span> membros</div>
+              <div class="muted small" style="word-break:break-all;font-family:'JetBrains Mono',monospace;font-size:.7rem"><%= g.id %></div>
+            </div>
+          </div>
+
+          <% if (g.desc) { %>
+            <p class="muted small" style="margin:.5rem 0"><%= (g.desc || '').slice(0,150) %><%= g.desc?.length > 150 ? '...' : '' %></p>
+          <% } %>
+
+          <div class="group-stats">
+            <span class="chip">👑 <%= g.participants?.filter(p=>p.admin).length || 0 %> admins</span>
+            <% if (settings.botEnabled === false) { %>
+              <span class="chip" style="color:var(--neon-red)">🔴 Bot OFF</span>
+            <% } else { %>
+              <span class="chip chip-success">🟢 Bot ON</span>
+            <% } %>
+            <% if (settings.antilink) { %><span class="chip chip-info">🛡️ Antilink</span><% } %>
+            <% if (settings.antispam) { %><span class="chip chip-info">🛡️ Antispam</span><% } %>
+            <% if (settings.welcome) { %><span class="chip chip-info">👋 Welcome</span><% } %>
+            <span class="chip" id="activity-<%= g.id.replace('@', '_').replace(/[^a-zA-Z0-9_]/g,'') %>" style="display:none">📊 ativo</span>
+          </div>
+
+          <div class="button-row" style="margin-top:.75rem">
+            <button class="btn btn-sm" onclick="openSettings('<%= g.id %>', '<%= (g.subject || '').replace(/'/g, "\\'") %>')">⚙️ Config</button>
+            <button class="btn btn-sm" onclick="openBroadcast('<%= g.id %>', '<%= (g.subject || '').replace(/'/g, "\\'") %>')">📢 Broadcast</button>
+            <button class="btn btn-sm" onclick="viewMembers('<%= g.id %>')">👥 Membros</button>
+            <button class="btn btn-sm btn-danger" onclick="leaveGroup('<%= g.id %>', '<%= (g.subject || '').replace(/'/g, "\\'") %>')">🚪 Sair</button>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- Modal: Config -->
+    <div class="modal" id="settingsModal">
+      <div class="modal-content" style="max-width:700px">
+        <h2>⚙️ <span id="settingsGroupName"></span></h2>
+        <form id="settingsForm">
+          <input type="hidden" id="settingsJid" />
+
+          <h3 style="margin-top:1rem">🤖 Bot</h3>
+          <div class="form-group form-check">
+            <label><input type="checkbox" id="setEnabled" /> 🟢 Bot ATIVO neste grupo</label>
+          </div>
+          <div class="form-group form-check">
+            <label><input type="checkbox" id="setOnlyAdmins" /> 🔐 Só admins podem usar bot</label>
+          </div>
+          <div class="form-group">
+            <label>Nome do bot neste grupo</label>
+            <input type="text" id="setCustomBotName" placeholder="Vazio = nome padrão" />
+          </div>
+          <div class="form-group">
+            <label>Comandos/submenus bloqueados neste grupo</label>
+            <textarea id="setBlockedCommands" rows="3" placeholder="play&#10;video&#10;menudownload"></textarea>
+            <small class="muted">Um por linha. O menu e menubtn escondem esses itens.</small>
+          </div>
+
+          <h3 style="margin-top:1rem">🛡️ Anti-Link</h3>
+          <div class="form-group form-check">
+            <label><input type="checkbox" id="setAntilink" /> Ativar anti-link</label>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Modo</label>
+              <select id="setAntilinkMode">
+                <option value="smart">🧠 Inteligente (recomendado)</option>
+                <option value="whatsapp_only">📱 Apenas WhatsApp groups</option>
+                <option value="all_links">🚨 TODOS os links/domínios</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Ação</label>
+              <select id="setAntilinkAction">
+                <option value="warn">⚠️ Apagar + Avisar (com warnings)</option>
+                <option value="kick">🚫 Apagar + Banir imediato</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Max avisos (depois ban)</label>
+              <input type="number" id="setMaxWarns" value="3" min="1" max="10" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Whitelist de domínios (1 por linha)</label>
+            <textarea id="setWhitelist" rows="3" placeholder="youtube.com&#10;github.com&#10;wikipedia.org"></textarea>
+          </div>
+
+          <h3 style="margin-top:1rem">⚠️ Anti-Spam</h3>
+          <div class="form-group form-check">
+            <label><input type="checkbox" id="setAntispam" /> Ativar anti-spam (5 msgs em 5s = warn)</label>
+          </div>
+
+          <h3 style="margin-top:1rem">👋 Boas-vindas</h3>
+          <div class="form-group form-check">
+            <label><input type="checkbox" id="setWelcome" /> Boas-vindas ativas</label>
+          </div>
+          <div class="form-group form-check">
+            <label><input type="checkbox" id="setGoodbye" /> Despedida ativa</label>
+          </div>
+          <div class="form-group">
+            <label>Mensagem custom de boas-vindas (use @user e @grupo)</label>
+            <textarea id="setCustomWelcome" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Mensagem custom de despedida</label>
+            <textarea id="setCustomGoodbye" rows="2"></textarea>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" class="btn btn-primary">💾 Salvar</button>
+            <button type="button" class="btn btn-ghost" onclick="closeModal('settingsModal')">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Broadcast -->
+    <div class="modal" id="broadcastModal">
+      <div class="modal-content">
+        <h2>📢 Broadcast: <span id="broadcastGroupName"></span></h2>
+        <form id="broadcastForm">
+          <input type="hidden" id="broadcastJid" />
+          <div class="form-group">
+            <label>Mensagem</label>
+            <textarea id="broadcastMsg" rows="5" required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Mídia (opcional)</label>
+            <select id="broadcastMedia">
+              <option value="">— sem —</option>
+              <% medias.forEach(m => { %>
+                <option value="<%= m.url %>" data-type="<%= m.type %>">[<%= m.type %>] <%= m.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="button-row">
+            <button type="submit" class="btn btn-primary">📤 Enviar</button>
+            <button type="button" class="btn btn-ghost" onclick="closeModal('broadcastModal')">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Membros -->
+    <div class="modal" id="membersModal">
+      <div class="modal-content" style="max-width:700px">
+        <h2>👥 Membros</h2>
+        <div id="membersList" style="max-height:60vh;overflow:auto">Carregando...</div>
+        <div class="button-row mt-2">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('membersModal')">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<style>
+  .groups-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+  .group-card { transition: all 0.3s; position: relative; }
+  .group-card:hover { border-color: var(--neon-cyan); transform: translateY(-2px); }
+  .group-card.flash { border-color: var(--neon-green); box-shadow: 0 0 20px rgba(0,255,153,0.5); animation: flashEffect 1.5s; }
+  @keyframes flashEffect { 0% { box-shadow: 0 0 30px rgba(0,255,153,0.9); } 100% { box-shadow: 0 0 5px rgba(0,255,153,0.1); } }
+  .group-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+  .group-avatar { width: 48px; height: 48px; background: var(--gradient-1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 1.3rem; color: white; flex-shrink: 0; }
+  .group-stats { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .5rem; }
+  .member-item { display: flex; justify-content: space-between; padding: .5rem; border-bottom: 1px solid var(--border); font-size: .85rem; }
+  .member-item .num { font-family: 'JetBrains Mono', monospace; color: var(--neon-cyan); }
+
+  /* Live feed igual */
+  .live-badge { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, rgba(0,255,153,0.2), rgba(0,255,153,0.05)); border: 1px solid var(--neon-green); padding: 4px 12px; border-radius: 999px; font-family: 'Orbitron', monospace; font-weight: 700; font-size: 0.8rem; color: var(--neon-green); }
+  .live-dot { width: 8px; height: 8px; background: var(--neon-green); border-radius: 50%; box-shadow: 0 0 8px var(--neon-green); animation: liveBlink 1s infinite; }
+  @keyframes liveBlink { 50% { opacity: 0.3; } }
+  .live-feed { max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; margin-top: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+  .feed-empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+  .feed-item { padding: 8px 12px; margin-bottom: 4px; border-radius: 4px; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; animation: slideIn 0.3s; border-left: 3px solid var(--neon-cyan); background: rgba(0,240,255,0.05); }
+  .feed-item.add { border-left-color: var(--neon-green); background: rgba(0,255,153,0.05); }
+  .feed-item.remove { border-left-color: var(--neon-red); background: rgba(255,56,96,0.05); }
+  .feed-item.antilink { border-left-color: var(--neon-yellow); background: rgba(255,215,0,0.05); }
+  @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  .feed-time { color: var(--text-muted); font-size: 0.7rem; }
+  .feed-cmd { color: var(--neon-cyan); font-weight: bold; }
+  .feed-user { color: var(--neon-pink); }
+  .spinner-mini { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--neon-cyan); border-radius: 50%; animation: spin 1s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const feed = document.getElementById('liveFeed');
+  const counter = document.getElementById('evtCounter');
+  let evtCount = 0;
+
+  // Socket.IO LIVE
+  try {
+    const socket = io({ transports: ['polling', 'websocket'] });
+
+    socket.on('connect', () => console.log('✅ Live groups'));
+
+    socket.on('group:event', (data) => {
+      addEvent(data);
+      flashGroup(data.group?.jid);
+    });
+
+    socket.on('user:command', (data) => {
+      if (data.group) flashGroup(null, data.group);
+    });
+
+    socket.on('antilink:action', (data) => {
+      addAntilinkEvent(data);
+    });
+  } catch(e) { console.error('Socket failed:', e); }
+
+  function addEvent(data) {
+    if (feed.querySelector('.feed-empty')) feed.innerHTML = '';
+    const time = new Date(data.ts || Date.now()).toLocaleTimeString('pt-BR');
+    const typeMap = { add: '➕ ENTROU', remove: '➖ SAIU', promote: '⬆️ PROMOVIDO', demote: '⬇️ REBAIXADO' };
+    const type = typeMap[data.type] || data.type;
+    const participants = (data.participants || []).map(p => '@' + (p.number || 'unknown')).join(', ');
+
+    const item = document.createElement('div');
+    item.className = 'feed-item ' + data.type;
+    item.innerHTML =
+      `<span class="feed-time">[${time}]</span>` +
+      `<span class="feed-cmd">${type}</span>` +
+      `<span class="feed-user">${escapeHtml(participants)}</span>` +
+      `<span>em</span>` +
+      `<strong>${escapeHtml(data.group?.name || data.group?.jid)}</strong>`;
+    feed.insertBefore(item, feed.firstChild);
+    while (feed.children.length > 30) feed.removeChild(feed.lastChild);
+    evtCount++;
+    counter.textContent = evtCount + ' eventos';
+  }
+
+  function addAntilinkEvent(data) {
+    if (feed.querySelector('.feed-empty')) feed.innerHTML = '';
+    const time = new Date(data.ts || Date.now()).toLocaleTimeString('pt-BR');
+    const item = document.createElement('div');
+    item.className = 'feed-item antilink';
+    item.innerHTML =
+      `<span class="feed-time">[${time}]</span>` +
+      `<span class="feed-cmd">🛡️ ANTI-LINK</span>` +
+      `<span class="feed-user">@${escapeHtml(data.user)}</span>` +
+      `<span>(${escapeHtml(data.action)} - ${escapeHtml(data.type)})</span>`;
+    feed.insertBefore(item, feed.firstChild);
+    evtCount++;
+    counter.textContent = evtCount + ' eventos';
+  }
+
+  function flashGroup(jid, groupName) {
+    let card;
+    if (jid) card = document.querySelector(`[data-jid="${jid}"]`);
+    else if (groupName) card = [...document.querySelectorAll('.group-card')].find(c => c.querySelector('h3')?.textContent === groupName);
+    if (card) {
+      card.classList.remove('flash');
+      void card.offsetWidth;
+      card.classList.add('flash');
+    }
+  }
+
+  function clearFeed() {
+    feed.innerHTML = '<div class="feed-empty">Feed limpo. Aguardando...</div>';
+    evtCount = 0;
+    counter.textContent = '0 eventos';
+  }
+
+  function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // Filtros e modais (igual)
+  function filterGroups(text) {
+    const t = text.toLowerCase();
+    document.querySelectorAll('.group-card').forEach(g => {
+      g.style.display = g.dataset.name?.includes(t) ? '' : 'none';
+    });
+  }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  async function openSettings(jid, name) {
+    document.getElementById('settingsJid').value = jid;
+    document.getElementById('settingsGroupName').textContent = name;
+    try {
+      const r = await fetch('/api/groups/' + encodeURIComponent(jid) + '/settings');
+      const s = await r.json();
+      document.getElementById('setEnabled').checked = s.botEnabled !== false;
+      document.getElementById('setAntilink').checked = !!s.antilink;
+      document.getElementById('setAntilinkMode').value = s.antilinkMode || 'smart';
+      document.getElementById('setAntilinkAction').value = s.antilinkAction || 'warn';
+      document.getElementById('setMaxWarns').value = s.maxWarns || 3;
+      document.getElementById('setWhitelist').value = (s.antilinkWhitelist || []).join('\n');
+      document.getElementById('setAntispam').checked = !!s.antispam;
+      document.getElementById('setWelcome').checked = s.welcome !== false;
+      document.getElementById('setGoodbye').checked = s.goodbye !== false;
+      document.getElementById('setOnlyAdmins').checked = !!s.onlyAdmins;
+      document.getElementById('setCustomBotName').value = s.customBotName || '';
+      document.getElementById('setBlockedCommands').value = [...(s.blockedCommands || []), ...(s.blockedSubmenus || [])].join('\n');
+      document.getElementById('setCustomWelcome').value = s.customWelcome || '';
+      document.getElementById('setCustomGoodbye').value = s.customGoodbye || '';
+    } catch (e) {}
+    document.getElementById('settingsModal').classList.add('open');
+  }
+
+  document.getElementById('settingsForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const jid = document.getElementById('settingsJid').value;
+    const wl = document.getElementById('setWhitelist').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const data = {
+      botEnabled: document.getElementById('setEnabled').checked,
+      antilink: document.getElementById('setAntilink').checked,
+      antilinkMode: document.getElementById('setAntilinkMode').value,
+      antilinkAction: document.getElementById('setAntilinkAction').value,
+      antilinkWhitelist: wl,
+      maxWarns: parseInt(document.getElementById('setMaxWarns').value) || 3,
+      antispam: document.getElementById('setAntispam').checked,
+      welcome: document.getElementById('setWelcome').checked,
+      goodbye: document.getElementById('setGoodbye').checked,
+      onlyAdmins: document.getElementById('setOnlyAdmins').checked,
+      customBotName: document.getElementById('setCustomBotName').value,
+      blockedCommands: document.getElementById('setBlockedCommands').value.split('\n').map(s=>s.trim().replace(/^[!./#]+/,'').toLowerCase()).filter(Boolean),
+      customWelcome: document.getElementById('setCustomWelcome').value,
+      customGoodbye: document.getElementById('setCustomGoodbye').value,
+    };
+    const r = await fetch('/api/groups/' + encodeURIComponent(jid) + '/settings', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data),
+    });
+    if (r.ok) { toast('✅ Salvo!', 'success'); setTimeout(()=>location.reload(), 800); }
+    else toast('❌ Erro ao salvar', 'error');
+  };
+
+  function openBroadcast(jid, name) {
+    document.getElementById('broadcastJid').value = jid;
+    document.getElementById('broadcastGroupName').textContent = name;
+    document.getElementById('broadcastModal').classList.add('open');
+  }
+  document.getElementById('broadcastForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const jid = document.getElementById('broadcastJid').value;
+    const text = document.getElementById('broadcastMsg').value;
+    const mediaUrl = document.getElementById('broadcastMedia').value;
+    const mediaType = document.getElementById('broadcastMedia').selectedOptions[0]?.dataset?.type || '';
+    const r = await fetch('/api/groups/' + encodeURIComponent(jid) + '/send', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text, mediaUrl, mediaType }),
+    });
+    if (r.ok) { toast('📤 Enviado!', 'success'); closeModal('broadcastModal'); }
+    else { const d = await r.json(); toast('❌ ' + d.error, 'error'); }
+  };
+
+  async function viewMembers(jid) {
+    document.getElementById('membersList').innerHTML = '<div class="spinner-mini"></div> Carregando...';
+    document.getElementById('membersModal').classList.add('open');
+    try {
+      const r = await fetch('/api/groups/' + encodeURIComponent(jid) + '/members');
+      const data = await r.json();
+      const html = (data.members || []).map((m, i) => `
+        <div class="member-item">
+          <span>${i+1}. <span class="num">${m.id.split('@')[0].split(':')[0]}</span> ${m.admin ? '👑' : ''}</span>
+          <span><button class="btn btn-sm btn-danger" onclick="banMember('${jid}','${m.id}')">🚫</button></span>
+        </div>`).join('');
+      document.getElementById('membersList').innerHTML = html || '<div class="muted">Sem membros</div>';
+    } catch (e) {
+      document.getElementById('membersList').innerHTML = '<div class="alert alert-error">' + e.message + '</div>';
+    }
+  }
+  async function banMember(groupJid, userJid) {
+    if (!confirm('Banir?')) return;
+    const r = await fetch('/api/groups/' + encodeURIComponent(groupJid) + '/ban', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ userJid }),
+    });
+    if (r.ok) { toast('🚫 Banido', 'warn'); viewMembers(groupJid); }
+  }
+  async function leaveGroup(jid, name) {
+    if (!confirm('Bot vai sair de "'+name+'". Confirma?')) return;
+    const r = await fetch('/api/groups/' + encodeURIComponent(jid) + '/leave', { method: 'POST' });
+    if (r.ok) { toast('🚪 Saí', 'warn'); setTimeout(()=>location.reload(), 1000); }
+  }
+</script>
+<%- include('../partials/footer') %>

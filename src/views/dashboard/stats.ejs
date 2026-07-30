@@ -1,0 +1,82 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>📈 Estatísticas</h1>
+        <p class="muted">Análise detalhada do uso do bot</p>
+      </div>
+    </header>
+
+    <section class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">📊</div><div><div class="stat-label">Comandos hoje</div><div class="stat-value"><%= stats.today %></div></div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div><div class="stat-label">Esta semana</div><div class="stat-value"><%= stats.week %></div></div></div>
+      <div class="stat-card"><div class="stat-icon">📆</div><div><div class="stat-label">Este mês</div><div class="stat-value"><%= stats.month %></div></div></div>
+      <div class="stat-card"><div class="stat-icon">∑</div><div><div class="stat-label">Total</div><div class="stat-value"><%= stats.total %></div></div></div>
+    </section>
+
+    <div class="card">
+      <h2>📊 Comandos por dia (últimos 14 dias)</h2>
+      <canvas id="chartDays" height="100"></canvas>
+    </div>
+
+    <div class="form-grid">
+      <div class="card">
+        <h2>🔥 Top 10 Comandos</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>#</th><th>Comando</th><th>Usos</th></tr></thead>
+            <tbody>
+              <% topCommands.forEach((c,i) => { %>
+                <tr><td><%= i+1 %></td><td><code>!<%= c._id %></code></td><td><span class="chip chip-success"><%= c.count %></span></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>👥 Top 10 Usuários</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>#</th><th>Usuário</th><th>Comandos</th></tr></thead>
+            <tbody>
+              <% topUsers.forEach((u,i) => { %>
+                <tr><td><%= i+1 %></td><td><strong><%= u._id || 'Anônimo' %></strong></td><td><span class="chip chip-info"><%= u.count %></span></td></tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const days = <%- JSON.stringify(daysData) %>;
+  const ctx = document.getElementById('chartDays');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: days.map(d => d._id),
+      datasets: [{
+        label: 'Comandos',
+        data: days.map(d => d.count),
+        borderColor: '#b14aed',
+        backgroundColor: 'rgba(177, 74, 237, 0.15)',
+        fill: true, tension: 0.4, borderWidth: 3,
+        pointBackgroundColor: '#00f0ff', pointRadius: 5,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#e8e8ff' } } },
+      scales: {
+        x: { ticks: { color: '#7a7a9c' }, grid: { color: 'rgba(177,74,237,0.1)' } },
+        y: { ticks: { color: '#7a7a9c' }, grid: { color: 'rgba(177,74,237,0.1)' }, beginAtZero: true },
+      },
+    },
+  });
+</script>
+<%- include('../partials/footer') %>

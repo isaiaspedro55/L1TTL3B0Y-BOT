@@ -1,0 +1,108 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>📅 Agendamentos</h1>
+        <p class="muted">Programe mensagens para serem enviadas em horários específicos</p>
+      </div>
+      <button class="btn btn-primary" onclick="document.getElementById('modal').classList.add('open')">➕ Nova agenda</button>
+    </header>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Título</th><th>Destino</th><th>Quando</th><th>Repetir</th><th>Status</th><th>Ações</th></tr>
+          </thead>
+          <tbody>
+            <% schedules.forEach(s => { %>
+              <tr>
+                <td><strong><%= s.title %></strong></td>
+                <td><code><%= s.targetJid %></code></td>
+                <td><%= new Date(s.scheduledFor).toLocaleString('pt-BR') %></td>
+                <td><span class="chip"><%= s.repeat %></span></td>
+                <td><% if (s.sent && s.repeat === 'none') { %><span class="chip chip-success">Enviado</span><% } else { %><span class="chip chip-info">Ativo</span><% } %></td>
+                <td><button class="btn btn-sm btn-danger" onclick="delSchedule('<%= s._id %>')">🗑️</button></td>
+              </tr>
+            <% }) %>
+            <% if (!schedules.length) { %><tr><td colspan="6" class="text-center muted">Nenhum agendamento</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal" id="modal">
+      <div class="modal-content">
+        <h2>➕ Novo agendamento</h2>
+        <form id="schForm">
+          <div class="form-group">
+            <label>Título</label>
+            <input type="text" name="title" required placeholder="Ex: Aviso semanal" />
+          </div>
+          <div class="form-group">
+            <label>Destino (JID do grupo ou número@s.whatsapp.net)</label>
+            <input type="text" name="targetJid" required placeholder="120363xxx@g.us ou 244xxx@s.whatsapp.net" />
+            <small class="muted">Use <code>!id</code> no WhatsApp para descobrir o JID</small>
+          </div>
+          <div class="form-group">
+            <label>Mensagem</label>
+            <textarea name="message" rows="4" required></textarea>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Mídia (opcional)</label>
+              <select name="mediaUrl">
+                <option value="">— sem —</option>
+                <% medias.forEach(m => { %><option value="<%= m.url %>" data-type="<%= m.type %>">[<%= m.type %>] <%= m.name %></option><% }) %>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tipo</label>
+              <select name="mediaType">
+                <option value="">—</option>
+                <option value="image">Imagem</option>
+                <option value="video">Vídeo</option>
+                <option value="audio">Áudio</option>
+                <option value="gif">GIF</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Quando</label>
+              <input type="datetime-local" name="scheduledFor" required />
+            </div>
+            <div class="form-group">
+              <label>Repetir</label>
+              <select name="repeat">
+                <option value="none">Não</option>
+                <option value="daily">Diário</option>
+                <option value="weekly">Semanal</option>
+                <option value="monthly">Mensal</option>
+              </select>
+            </div>
+          </div>
+          <div class="button-row">
+            <button type="submit" class="btn btn-primary">💾 Salvar</button>
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal').classList.remove('open')">Cancelar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  document.getElementById('schForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd.entries());
+    const r = await fetch('/api/schedule', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    if (r.ok) location.reload(); else toast('Erro', 'error');
+  };
+  async function delSchedule(id) {
+    if (!confirm('Excluir?')) return;
+    await fetch('/api/schedule/'+id, { method:'DELETE' });
+    location.reload();
+  }
+</script>
+<%- include('../partials/footer') %>

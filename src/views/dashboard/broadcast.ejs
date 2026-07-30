@@ -1,0 +1,89 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>📢 Broadcast</h1>
+        <p class="muted">Envie mensagens em massa para todos os grupos onde o bot está</p>
+      </div>
+    </header>
+
+    <div class="alert alert-warning">
+      <span>⚠️</span>
+      <span><strong>Atenção:</strong> use com responsabilidade. Spam pode banir o número do WhatsApp.</span>
+    </div>
+
+    <div class="card">
+      <h2>✏️ Compor mensagem</h2>
+      <form id="bcForm">
+        <div class="form-group">
+          <label>Mensagem (suporta emojis e *formatação*)</label>
+          <textarea id="bcText" rows="8" placeholder="📢 Olá pessoal!&#10;&#10;Mensagem importante do {bot}&#10;_— {owner}_" required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Anexar mídia (opcional)</label>
+          <select id="bcMedia">
+            <option value="">— sem mídia —</option>
+            <% medias.forEach(m => { %>
+              <option value="<%= m.url %>" data-type="<%= m.type %>">[<%= m.type %>] <%= m.name %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Delay entre mensagens (segundos)</label>
+          <input type="number" id="bcDelay" value="2" min="1" max="30" />
+        </div>
+        <div class="button-row">
+          <button type="submit" class="btn btn-primary">📤 Enviar Broadcast</button>
+          <span class="muted" id="bcStatus"></span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>📊 Progresso</h3>
+      <div class="console" id="bcLog" style="height:200px;font-size:0.85rem">
+        <div class="console-line log-info"><span class="console-time">[--:--:--]</span> Aguardando envio...</div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  const socket = io();
+  const bcLog = document.getElementById('bcLog');
+
+  function log(level, msg) {
+    const t = new Date().toLocaleTimeString('pt-BR');
+    const l = document.createElement('div');
+    l.className = `console-line log-${level}`;
+    l.innerHTML = `<span class="console-time">[${t}]</span> ${msg}`;
+    bcLog.appendChild(l);
+    bcLog.scrollTop = bcLog.scrollHeight;
+  }
+
+  socket.on('broadcast:progress', (d) => log('info', `📤 ${d.current}/${d.total}: ${d.group}`));
+  socket.on('broadcast:done', (d) => { log('success', `✅ Enviado para ${d.count} grupos!`); toast('Broadcast concluído!', 'success'); });
+  socket.on('broadcast:error', (d) => log('error', '❌ ' + d.message));
+
+  document.getElementById('bcForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const text = document.getElementById('bcText').value.trim();
+    const mediaUrl = document.getElementById('bcMedia').value;
+    const mediaType = document.getElementById('bcMedia').selectedOptions[0]?.dataset?.type || '';
+    const delay = parseInt(document.getElementById('bcDelay').value) || 2;
+    if (!text) return toast('Digite uma mensagem!', 'error');
+    if (!confirm('Confirmar envio do broadcast?')) return;
+    log('warn', '🚀 Iniciando broadcast...');
+    try {
+      const r = await fetch('/api/broadcast', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, mediaUrl, mediaType, delay }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      toast('Broadcast iniciado!', 'success');
+    } catch (err) { toast('Erro: ' + err.message, 'error'); log('error', err.message); }
+  };
+</script>
+<%- include('../partials/footer') %>

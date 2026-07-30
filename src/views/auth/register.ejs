@@ -1,0 +1,52 @@
+<%- include('../partials/head') %>
+
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <img src="/img/logo.jpg" alt="<%= bot.name %>" />
+    </div>
+    <h1 class="auth-title">Criar Conta</h1>
+    <p class="auth-subtitle">⌁ <%= bot.name %> ⌁</p>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="alert alert-error"><span>❌</span><span><%= error %></span></div>
+    <% } %>
+
+    <form class="auth-form" method="POST" action="/register">
+      <div class="form-group">
+        <label>📛 Nome completo</label>
+        <input type="text" name="name" placeholder="Seu nome"
+          value="<%= (typeof name !== 'undefined' ? name : '') %>" />
+      </div>
+      <div class="form-group">
+        <label>👤 Username</label>
+        <input type="text" name="username" placeholder="username (sem espaços)" required
+          pattern="[a-zA-Z0-9_]+" title="Apenas letras, números e _"
+          value="<%= (typeof username !== 'undefined' ? username : '') %>" />
+      </div>
+      <div class="form-group">
+        <label>📱 WhatsApp (com DDI)</label>
+        <input type="tel" name="whatsappNumber" placeholder="Ex: 244945280380"
+          value="<%= (typeof whatsappNumber !== 'undefined' ? whatsappNumber : '') %>" />
+        <small class="muted">DDI + número, sem +, espaços ou traços</small>
+      </div>
+      <div class="form-group">
+        <label>🔐 Senha</label>
+        <input type="password" name="password" placeholder="Mín. 6 caracteres"
+          required minlength="6" autocomplete="new-password" />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" style="margin-top:.25rem;padding:.8rem">
+        📝 Criar Conta
+      </button>
+    </form>
+
+    <div class="auth-divider">ou</div>
+
+    <div class="auth-footer">
+      <span>Já tem conta?</span>
+      <a href="/login" style="color:var(--neon-purple);font-weight:700">Entrar</a>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/footer') %>

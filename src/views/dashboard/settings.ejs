@@ -1,0 +1,162 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>⚙️ Configurações</h1>
+        <p class="muted">Personalize comportamentos globais do bot</p>
+      </div>
+    </header>
+
+    <div class="card">
+      <h2>👋 Boas-vindas / Despedidas</h2>
+      <form id="welcomeForm">
+        <div class="form-group form-check">
+          <label><input type="checkbox" id="welcomeEnabled" <%= settings.welcome_enabled !== false ? 'checked' : '' %> /> Mensagem de boas-vindas ATIVA</label>
+        </div>
+        <div class="form-group">
+          <label>Mensagem ao ENTRAR (use @user e @grupo)</label>
+          <textarea id="welcomeMessage" rows="5"><%= settings.welcome_message || '╭━〔 🌙 *BEM-VINDO* 〕━╮\n│ 👋 Olá @user!\n│ 🎉 Você entrou em *@grupo*\n│ 🤖 Powered by ' + bot.name + '\n╰━━━━━━━━━━━━━━━━━╯' %></textarea>
+        </div>
+        <div class="form-group">
+          <label>Mensagem ao SAIR</label>
+          <textarea id="goodbyeMessage" rows="3"><%= settings.goodbye_message || '👋 @user saiu de *@grupo*. Até mais!' %></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Salvar</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🤖 Bot</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nome do Bot</label>
+          <input type="text" value="<%= bot.name %>" disabled />
+          <small class="muted">Definido em variável de ambiente</small>
+        </div>
+        <div class="form-group">
+          <label>Prefixo de comandos</label>
+          <input type="text" value="<%= bot.prefix %>" disabled />
+        </div>
+        <div class="form-group">
+          <label>Número do Bot</label>
+          <input type="text" value="<%= bot.number %>" disabled />
+        </div>
+        <div class="form-group">
+          <label>Dono</label>
+          <input type="text" value="<%= owner.name %> (<%= owner.number %>)" disabled />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>⌨️ Multiprefixo & Auto Decrypt</h2>
+      <form id="advancedBotForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Prefixos de comandos</label>
+            <input type="text" id="prefixesInput" value="<%= Array.isArray(settings.prefixes) ? settings.prefixes.join(' ') : (settings.prefixes || bot.prefix) %>" placeholder="Ex: ! . # /" />
+            <small class="muted">Separe por espaço ou vírgula. O primeiro vira o prefixo principal nos menus.</small>
+          </div>
+          <div class="form-group form-check" style="display:flex;align-items:center;margin-top:1.8rem">
+            <label><input type="checkbox" id="autoDecryptEnabled" <%= settings.auto_decrypt_enabled === false || settings.auto_decrypt_enabled === 'false' ? '' : 'checked' %> /> Auto decrypt global ATIVO</label>
+          </div>
+          <div class="form-group">
+            <label>Donos extras WhatsApp</label>
+            <textarea id="ownerNumbers" rows="3" placeholder="2449...&#10;2449..."><%= Array.isArray(settings.owner_numbers) ? settings.owner_numbers.join('\n') : (settings.owner_numbers || '') %></textarea>
+            <small class="muted">Um número por linha. O dono principal do .env continua absoluto.</small>
+          </div>
+          <div class="form-group form-check" style="display:flex;align-items:center;margin-top:1.8rem">
+            <label><input type="checkbox" id="godModeAdmin" <%= settings.godmode_admin_enabled === true || settings.godmode_admin_enabled === 'true' ? 'checked' : '' %> /> God Mod ADM para donos no WhatsApp</label>
+          </div>
+          <div class="form-group form-check" style="display:flex;align-items:center;margin-top:1.8rem">
+            <label><input type="checkbox" id="botInteractionEnabled" <%= settings.bot_interaction_enabled === true || settings.bot_interaction_enabled === 'true' ? 'checked' : '' %> /> BotChat: responder “oi” de outros bots/menções</label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">💾 Salvar Multiprefixo</button>
+      </form>
+      <p class="muted small" style="margin-top:.75rem">Comando do dono: <code>!autodecrypt on/off</code> e <code>!prefixos ! . #</code></p>
+    </div>
+
+
+
+    <div class="card">
+      <h2>🌐 Meta do Site / Preview</h2>
+      <form id="siteMetaForm">
+        <div class="form-grid">
+          <div class="form-group"><label>Título</label><input id="siteMetaTitle" value="<%= settings.site_meta_title || bot.name %>" /></div>
+          <div class="form-group"><label>Imagem OG/Preview</label><input id="siteMetaImage" value="<%= settings.site_meta_image || '/img/logo.jpg' %>" /></div>
+          <div class="form-group"><label>Keywords</label><input id="siteMetaKeywords" value="<%= settings.site_meta_keywords || 'whatsapp, bot, dark bot, automação' %>" /></div>
+        </div>
+        <div class="form-group"><label>Descrição</label><textarea id="siteMetaDescription" rows="3"><%= settings.site_meta_description || 'DARK BOT - Bot WhatsApp profissional com Dashboard' %></textarea></div>
+        <button type="submit" class="btn btn-primary">💾 Salvar Meta</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🎨 Marca d'água em Stickers</h2>
+      <p class="muted">As figurinhas geradas pelo bot contêm automaticamente:</p>
+      <ul style="margin: 1rem 0 0 1.5rem; line-height: 2;">
+        <li>📛 <strong>Pack:</strong> <%= bot.name %> • Dono: <%= owner.name %></li>
+        <li>👤 <strong>Author:</strong> Nome do usuário | Nome do grupo</li>
+      </ul>
+    </div>
+  </main>
+</div>
+<script>
+  document.getElementById('welcomeForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          welcome_enabled: document.getElementById('welcomeEnabled').checked,
+          welcome_message: document.getElementById('welcomeMessage').value,
+          goodbye_message: document.getElementById('goodbyeMessage').value,
+        }),
+      });
+      if (r.ok) toast('Configurações salvas!', 'success');
+      else toast('Erro ao salvar', 'error');
+    } catch (err) { toast(err.message, 'error'); }
+  };
+
+
+  document.getElementById('siteMetaForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site_meta_title: document.getElementById('siteMetaTitle').value,
+          site_meta_description: document.getElementById('siteMetaDescription').value,
+          site_meta_keywords: document.getElementById('siteMetaKeywords').value,
+          site_meta_image: document.getElementById('siteMetaImage').value,
+        }),
+      });
+      if (r.ok) toast('Meta do site salva!', 'success'); else toast('Erro ao salvar meta', 'error');
+    } catch (err) { toast(err.message, 'error'); }
+  };
+
+  document.getElementById('advancedBotForm').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const prefixes = document.getElementById('prefixesInput').value
+        .split(/[\s,]+/).map(x => x.trim()).filter(Boolean).slice(0, 10);
+      if (!prefixes.length) { toast('Informe pelo menos 1 prefixo', 'error'); return; }
+      const r = await fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prefixes,
+          auto_decrypt_enabled: document.getElementById('autoDecryptEnabled').checked,
+          owner_numbers: document.getElementById('ownerNumbers').value.split(/\n|,|\s+/).map(x => x.replace(/\D/g,'')).filter(Boolean),
+          godmode_admin_enabled: document.getElementById('godModeAdmin').checked,
+          bot_interaction_enabled: document.getElementById('botInteractionEnabled').checked,
+        }),
+      });
+      if (r.ok) toast('Multiprefixo/Auto decrypt salvos!', 'success');
+      else toast('Erro ao salvar', 'error');
+    } catch (err) { toast(err.message, 'error'); }
+  };
+</script>
+<%- include('../partials/footer') %>

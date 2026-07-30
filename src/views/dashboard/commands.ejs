@@ -1,0 +1,99 @@
+<%- include('../partials/head') %>
+<div class="app-shell">
+  <%- include('../partials/sidebar') %>
+  <main class="main">
+    <header class="page-header">
+      <div>
+        <h1>⚡ Comandos</h1>
+        <p class="muted">Todos os comandos do <%= bot.name %>: nativos, custom, ativos e desativados.</p>
+      </div>
+      <div class="button-row">
+        <a href="/dashboard/board" class="btn btn-ghost">🧬 Command Board</a>
+        <a href="/dashboard/commands/new" class="btn btn-primary">➕ Novo custom</a>
+      </div>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">⚡</div><div><div class="stat-value"><%= nativeCatalog.length %></div><div class="stat-label">Nativos</div></div></div>
+      <div class="stat-card"><div class="stat-icon">✍️</div><div><div class="stat-value"><%= commands.length %></div><div class="stat-label">Custom</div></div></div>
+      <div class="stat-card"><div class="stat-icon">✅</div><div><div class="stat-value"><%= nativeCatalog.filter(c => !(overrides[c.name] && overrides[c.name].enabled === false)).length %></div><div class="stat-label">Nativos ativos</div></div></div>
+      <div class="stat-card"><div class="stat-icon">🛑</div><div><div class="stat-value"><%= nativeCatalog.filter(c => overrides[c.name] && overrides[c.name].enabled === false).length %></div><div class="stat-label">Nativos off</div></div></div>
+    </div>
+
+    <div class="card" style="background:linear-gradient(135deg,rgba(177,74,237,.08),rgba(0,240,255,.04));border-color:var(--neon-purple)">
+      <h2>🧬 Comandos nativos — DarkSide Engine</h2>
+      <p class="muted">Ative/desative comandos nativos direto daqui. Prefixo não aparece na estrutura do menu, mas o bot continua usando o prefixo configurado.</p>
+      <div class="form-grid" style="margin:1rem 0">
+        <input id="nativeSearch" placeholder="Buscar comando/categoria/descrição..." oninput="filterNative()" />
+        <select id="nativeStatus" onchange="filterNative()">
+          <option value="all">Todos</option>
+          <option value="on">Ativos</option>
+          <option value="off">Desativados</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="table" id="nativeTable">
+          <thead><tr><th>Comando</th><th>Categoria</th><th>Acesso</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody>
+            <% nativeCatalog.forEach(c => { const ov = overrides[c.name] || {}; const active = ov.enabled !== false; const access = ov.accessLevel || (c.ownerOnly ? 'owner' : c.premium ? 'premium' : 'all'); %>
+              <tr data-status="<%= active ? 'on' : 'off' %>" data-search="<%= (c.name+' '+c.category+' '+(ov.description||c.description||'')).toLowerCase() %>">
+                <td><strong><%= ov.emoji || c.emoji || '⚡' %> <code><%= c.name %></code></strong><div class="muted small"><%= ov.description || c.description || '—' %></div></td>
+                <td><span class="chip"><%= ov.category || c.category %></span></td>
+                <td><% if (access === 'owner') { %><span class="chip chip-owner">👑 Dono</span><% } else if (access === 'premium') { %><span class="chip chip-premium">⭐ Premium</span><% } else { %><span class="chip chip-free">🆓 Todos</span><% } %></td>
+                <td><span class="chip <%= active ? 'chip-success' : 'chip-muted' %>"><%= active ? 'Ativo' : 'Desativado' %></span></td>
+                <td><button class="btn btn-sm <%= active ? 'btn-danger' : 'btn-success' %>" onclick="toggleNative('<%= c.name %>', <%= active ? 'false' : 'true' %>)"><%= active ? '🛑 Desativar' : '✅ Ativar' %></button></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>✍️ Comandos custom editáveis</h2>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Nome</th><th>Categoria</th><th>Acesso</th><th>Mídia</th><th>Usos</th><th>Status</th><th>Ações</th></tr>
+          </thead>
+          <tbody>
+            <% commands.forEach(cmd => { %>
+              <tr>
+                <td><strong><code><%= cmd.name %></code></strong><% if (cmd.aliases && cmd.aliases.length) { %><div class="muted small">alias: <%= cmd.aliases.join(', ') %></div><% } %></td>
+                <td><span class="chip"><%= cmd.category %></span></td>
+                <td><% if (cmd.accessLevel === 'owner') { %><span class="chip chip-owner">👑 Dono</span><% } else if (cmd.accessLevel === 'premium') { %><span class="chip chip-premium">⭐ Premium</span><% } else { %><span class="chip chip-free">🆓 Todos</span><% } %></td>
+                <td><%= cmd.mediaType || '—' %></td>
+                <td><%= cmd.usageCount || 0 %></td>
+                <td><% if (cmd.enabled) { %><span class="chip chip-success">Ativo</span><% } else { %><span class="chip chip-muted">Inativo</span><% } %></td>
+                <td><a href="/dashboard/commands/<%= cmd._id %>/edit" class="btn btn-sm">✏️</a><button class="btn btn-sm btn-danger" onclick="delCmd('<%= cmd._id %>')">🗑️</button></td>
+              </tr>
+            <% }) %>
+            <% if (commands.length === 0) { %><tr><td colspan="7" class="text-center muted">Nenhum comando custom ainda.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  function filterNative(){
+    const q = document.getElementById('nativeSearch').value.toLowerCase();
+    const st = document.getElementById('nativeStatus').value;
+    document.querySelectorAll('#nativeTable tbody tr').forEach(tr => {
+      const okQ = tr.dataset.search.includes(q);
+      const okS = st === 'all' || tr.dataset.status === st;
+      tr.style.display = okQ && okS ? '' : 'none';
+    });
+  }
+  async function toggleNative(name, enabled){
+    const res = await fetch('/api/command-overrides/' + encodeURIComponent(name), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled }) });
+    if (!res.ok) { const err = await res.json().catch(()=>({error:'erro'})); return toast(err.error || 'Erro','error'); }
+    location.reload();
+  }
+  async function delCmd(id) {
+    if (!confirm('Deletar este comando?')) return;
+    await fetch('/api/commands/' + id, { method: 'DELETE' });
+    location.reload();
+  }
+</script>
+<%- include('../partials/footer') %>
