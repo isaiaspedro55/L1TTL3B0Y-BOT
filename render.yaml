@@ -3,15 +3,11 @@ services:
     name: l1ttl3b0y
     env: node
     plan: free
-
-    buildCommand: |
-      npm install
-      pip install yt-dlp edge-tts --break-system-packages
-
+    buildCommand: npm install && pip3 install yt-dlp edge-tts --break-system-packages 2>/dev/null || pip install yt-dlp edge-tts
     startCommand: node index.js
-
     envVars:
       - key: NODE_ENV
         value: production
-      - key: TZ
-        value: Africa/Luanda
+
+      - key: SCRAPER_HUB_URL
+        value: http://localhost:3000
