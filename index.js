@@ -1,3 +1,4 @@
+require("dotenv").config();
 // ✅ LINHA 1 ABSOLUTA
 process.env.TMPDIR = require("path").join(process.cwd(), "downloads");
 
@@ -23,6 +24,8 @@ try { DL = require("./downloader"); } catch(e) { console.log("⚠️ downloader.
 fs.ensureDirSync(process.env.TMPDIR);
 fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./dados");
+
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 const CONFIG = {
   PREFIXO:         "!",
