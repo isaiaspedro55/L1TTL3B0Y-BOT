@@ -30,7 +30,7 @@ ENCRYPTION_KEY = 7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8
 # Ex: senha M1nha@123 vira M1nha%40123
 MONGODB_URI = mongodb+srv://pedroisaias222_db_user:SUA_SENHA_AQUI@cluster0.mkvc2ye.mongodb.net/l1ttl3b0y?retryWrites=true&w=majority&appName=Cluster0
 
-GROQ_API_KEY = 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
+GROQ_API_KEY=
 SYSTEMZONE_KEY = SUA_APIKEY_AQUI
 
 RENDER_EXTERNAL_URL = https://l1ttl3b0y.onrender.com

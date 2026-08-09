@@ -16,7 +16,7 @@ const CONFIG = {
   PREFIXO: "/",
   NUMERO_BOT: "244954260707",
   NUMEROS_ADM: ["926612801", "244926612801", "169853876965546"],
-  GROQ_KEY: "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",
+  GROQ_KEY: process.env.GROQ_API_KEY || '',
   PASTA_DOWNLOAD: "./downloads",
   PASTA_ARQ: "./vpn",
   PASTA_DADOS: "./dados",
