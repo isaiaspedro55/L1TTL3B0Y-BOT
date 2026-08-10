@@ -210,7 +210,7 @@ function criarSeloBot(jid){const num=CONFIG.NUMERO_BOT;return{key:{participant:"
 // ════════════════════════════════════════════════
 // ✅ BARRA DE CARREGAMENTO
 // ════════════════════════════════════════════════
-const FRAMES_LOADING=["⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛  0%","🟦🟦⬛⬛⬛⬛⬛⬛⬛⬛ 20%","🟦🟦🟦🟦⬛⬛⬛⬛⬛⬛ 40%","🟦🟦🟦🟦🟦🟦⬛⬛⬛⬛ 60%","🟦🟦🟦🟦🟦🟦🟦🟦⬛⬛ 80%","🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 100% ✅"];
+const FRAMES_LOADING=["[░░░░░░░░░░░░░░]  0%","▓▓▓▓▓░░░░░░░░░░░ 20%","▓▓▓▓▓▓▓░░░░░░░░░ 40%","▓▓▓▓▓▓▓▓▓░░░░░░░ 60%","▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80%","▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ 100% ✅"];
 async function barraCarregamento(sock,jid,seloBot,titulo,callbackDownload){
   let loadingMsg=null;
   try{loadingMsg=await sock.sendMessage(jid,{text:bBloco(`⏬ ${titulo}`,[FRAMES_LOADING[0]])},{quoted:seloBot});}catch{}
