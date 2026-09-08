@@ -26,14 +26,13 @@ const CONFIG = {
   PREFIXO:         "!",
   NUMERO_BOT:      "244954260707",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
-  GROQ_KEY: process.env.GROQ_API_KEY || '',
   DONO_JID:        "169853876965546@lid",
   DONO_NOME:       "ISAÍAS PEDRO",
   DONO_NUM:        "926 612 801",
   VOZ_TTS:         "pt-PT-DuarteNeural",
   SENHA_BOT:       "lordinho2025",
   CANAL_URL:       "https://whatsapp.com/channel/0029VbDBkEcK5cDMSt0E4r0Q",
-  NOME_BOT:        "LORDE LÁ DJUM",
+  NOME_BOT:        "⚡️SHAZAM⚡️",
   SCRAPER_HUB_URL: process.env.SCRAPER_HUB_URL||"http://localhost:3000",
   IS_SERVER:       !!(process.env.RENDER||process.env.RAILWAY||process.env.NODE_ENV==="production"),
 };
@@ -383,7 +382,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const cargo=isDono?"👑 Criador":(isAdmin?"👮 Administrador":"👤 Utilizador");
   const secoes=buildSecoes(isDono);
   const em=ME.e||ME.principal||"🌀";
-  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`*Bot*: ${CONFIG.NOME_BOT}`)}\n${bLine("👤",`*Usuário*: ${nomeUser}`)}\n${bLine("🎖️",`*Cargo*: ${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
+  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`*Bot*: ${CONFIG.NOME_BOT}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
   try{
     const payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:"≡ Categorias",sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
     if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
@@ -455,65 +454,128 @@ async function scraperTikTokSearch(query,limit=10){try{const data=await scraperH
 async function scraperTikTokTrending(region="AO",limit=10){try{const data=await scraperHub(`/api/tiktok/trending?region=${region}&limit=${limit}`);return data?.resultados||data?.results||data?.videos||[];}catch{return[];}}
 async function scraperTikTokUser(username){try{const data=await scraperHub(`/api/tiktok/user?username=${encodeURIComponent(username)}`);return data?.resultado||data?.result||data?.user||null;}catch{return null;}}
 async function scraperYouTubeSearch(query,limit=5){try{const data=await scraperHub(`/api/youtube/search?q=${encodeURIComponent(query)}&limit=${limit}`);return data?.resultados||data?.results||data?.videos||[];}catch{return[];}}
-async function downloadViaScraperHub(url,formato){const resp=await axios.post(`${CONFIG.SCRAPER_HUB_URL}/api/youtube/download`,{url,formato},{timeout:180000,httpsAgent});if(!resp.data?.filename)throw new Error("Scraper Hub: sem filename");const filename=resp.data.filename;const fileResp=await axios.get(`${CONFIG.SCRAPER_HUB_URL}/api/youtube/file/${filename}`,{responseType:"arraybuffer",timeout:180000,httpsAgent});return Buffer.from(fileResp.data);}
+async function downloadViaScraperHub(url,formato){
+  // Timeout rápido (3s) para não bloquear quando servidor não está up
+  try{
+    const resp=await axios.post(`${CONFIG.SCRAPER_HUB_URL}/api/youtube/download`,{url,formato},{timeout:3000,httpsAgent});
+    if(!resp.data?.filename)throw new Error("sem filename");
+    const filename=resp.data.filename;
+    const fileResp=await axios.get(`${CONFIG.SCRAPER_HUB_URL}/api/youtube/file/${filename}`,{responseType:"arraybuffer",timeout:120000,httpsAgent});
+    return Buffer.from(fileResp.data);
+  }catch(e){
+    if(e.code==="ECONNREFUSED"||e.code==="ENOTFOUND"||e.message.includes("timeout")||e.message.includes("ECONNREFUSED")){
+      throw new Error("Scraper Hub offline");
+    }
+    throw e;
+  }
+}
 
 // ════════════════════════════════════════════════
 // ✅ DOWNLOADS — Sem downloader.js externo
 // ════════════════════════════════════════════════
 async function downloadMusica(entrada,altaQualidade=false){
-  const isUrl=entrada.startsWith("http");
-  const nomeBase=`mus_${Date.now()}`;
-  const saida=path.join("./downloads",`${nomeBase}.%(ext)s`);
-  const quality=altaQualidade?"0":"5";
+  const isUrl=entrada.startsWith("http")||entrada.includes("youtu.be")||entrada.includes("youtube.com");
+  const outputDir="./downloads";
+  const query=isUrl?entrada:`ytsearch1:${entrada}`;
 
-  // 1. yt-dlp directo (mais fiável)
-  const fontes=isUrl?[entrada]:[
-    `ytsearch1:${entrada}`,
-    `ytsearch1:${entrada.split(" ").slice(0,5).join(" ")} official audio`,
-  ];
-  for(const fonte of fontes){
+  // Tenta múltiplos player clients para contornar HTTP 403
+  // android_vr e mweb são os mais eficazes para contornar bot detection
+  const playerClients=["android_vr","mweb","android_creator","ios","tv_embedded","android"];
+
+  for(const client of playerClients){
+    const nomeBase=`mus_${Date.now()}_${client.slice(0,3)}`;
+    const saida=`${outputDir}/${nomeBase}.%(ext)s`;
+    const cmd=[
+      YTDLP_CMD,
+      "-x --audio-format mp3 --audio-quality 0",
+      `--extractor-args "youtube:player_client=${client}"`,
+      "--no-playlist --no-warnings --no-check-certificate",
+      "--geo-bypass --force-ipv4",
+      `--add-header "User-Agent:Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36"`,
+      "--retries 2 --fragment-retries 2",
+      `-o "${saida}"`,
+      `"${query}"`,
+    ].join(" ");
     try{
-      const cmd=`${YTDLP_CMD} -x --audio-format mp3 --audio-quality ${quality} --no-playlist --no-warnings --no-check-certificate --geo-bypass -o "${saida}" "${fonte}"`;
-      await runCmd(cmd);
-      const arq=encontrarArquivo("./downloads",nomeBase);
-      if(arq&&fs.statSync(arq).size>3000)return arq;
-    }catch(e){console.log(`⚠️ mp3 yt-dlp:`,e.message.slice(0,80));}
+      await new Promise((resolve,reject)=>{
+        require("child_process").exec(cmd,{timeout:90000,maxBuffer:150*1024*1024},(err,stdout,stderr)=>{
+          if(err) reject(new Error((stderr||err.message).slice(0,200)));
+          else resolve(stdout);
+        });
+      });
+      const arq=encontrarArquivo(outputDir,nomeBase);
+      if(arq&&fs.existsSync(arq)&&fs.statSync(arq).size>3000){
+        console.log(`✅ mp3 OK com player_client=${client}`);
+        return arq;
+      }
+    }catch(e){
+      const msg=e.message;
+      // Se for 403 tenta próximo client, outros erros param
+      if(msg.includes("403")||msg.includes("Forbidden")||msg.includes("Sign in")){
+        console.log(`⚠️ mp3 [${client}]: 403 → tentando próximo...`);
+        continue;
+      }
+      console.log(`⚠️ mp3 [${client}]:`,msg.slice(0,80));
+    }
   }
 
-  // 2. Scraper Hub fallback
+  // Fallback 1: SoundCloud (funciona sem autenticação)
+  if(!isUrl){
+    console.log("🎵 Tentando SoundCloud...");
+    const nomeBaseSC=`mus_sc_${Date.now()}`;
+    const saidaSC=`${outputDir}/${nomeBaseSC}.%(ext)s`;
+    try{
+      await new Promise((resolve,reject)=>{
+        require("child_process").exec(
+          `${YTDLP_CMD} -x --audio-format mp3 --audio-quality 0 -o "${saidaSC}" --no-playlist --no-warnings "scsearch1:${entrada}"`,
+          {timeout:60000,maxBuffer:100*1024*1024},
+          (err,stdout,stderr)=>err?reject(new Error(err.message)):resolve(stdout)
+        );
+      });
+      const arqSC=encontrarArquivo(outputDir,nomeBaseSC);
+      if(arqSC&&fs.statSync(arqSC).size>3000){
+        console.log("✅ mp3 OK via SoundCloud");
+        return arqSC;
+      }
+    }catch(e){console.log("⚠️ SoundCloud:",e.message.slice(0,60));}
+  }
+
+  // Fallback 2: Scraper Hub (se estiver online)
   try{
     const buf=await downloadViaScraperHub(entrada,"mp3");
-    const p=path.join("./downloads",`mus_hub_${Date.now()}.mp3`);
+    const p=`${outputDir}/mus_hub_${Date.now()}.mp3`;
     fs.writeFileSync(p,buf);
-    if(fs.statSync(p).size>3000)return p;
+    if(fs.statSync(p).size>3000){console.log("✅ mp3 OK via Scraper Hub");return p;}
     fs.removeSync(p);
-  }catch(e){console.log("⚠️ Scraper Hub mp3:",e.message);}
-
-  // 3. Piped/Invidious (servidor)
-  if(CONFIG.IS_SERVER){
-    try{
-      const resultados=await buscarYouTubePiped(entrada);
-      if(resultados.length){
-        const vid=resultados[0].url.match(/(?:v=|youtu\.be\/)([^&\n?]+)/)?.[1];
-        if(vid){
-          for(const inst of PIPED_INSTANCES){
-            try{
-              const{data}=await axios.get(`${inst}/streams/${vid}`,{timeout:12000,httpsAgent});
-              const audioStream=(data?.audioStreams||[]).filter(s=>s.mimeType?.includes("audio")).sort((a,b)=>(b.bitrate||0)-(a.bitrate||0));
-              if(audioStream[0]?.url){
-                const resp=await axios.get(audioStream[0].url,{responseType:"arraybuffer",timeout:120000,httpsAgent,maxContentLength:Infinity});
-                const p=path.join("./downloads",`mus_piped_${Date.now()}.mp3`);
-                fs.writeFileSync(p,Buffer.from(resp.data));
-                if(fs.statSync(p).size>3000)return p;
-                fs.removeSync(p);
-              }
-            }catch{continue;}
-          }
-        }
-      }
-    }catch(e){console.log("⚠️ Piped mp3:",e.message);}
+  }catch(e){
+    if(!e.message.includes("offline"))console.log("⚠️ Hub mp3:",e.message.slice(0,60));
   }
+
   return null;
+}
+
+// Busca thumbnail de música no YouTube
+async function buscarThumbnailYT(query){
+  const isUrl=query.startsWith("http")||query.includes("youtu");
+  const q=isUrl?query:`ytsearch1:${query}`;
+  try{
+    const{execSync}=require("child_process");
+    const url=execSync(`${YTDLP_CMD} --get-thumbnail --no-playlist --no-warnings "${q}"`,{timeout:15000}).toString().trim();
+    if(url&&url.startsWith("http")) return url;
+  }catch{}
+  return null;
+}
+
+// Busca título de música no YouTube
+async function buscarTituloYT(query){
+  const isUrl=query.startsWith("http")||query.includes("youtu");
+  const q=isUrl?query:`ytsearch1:${query}`;
+  try{
+    const{execSync}=require("child_process");
+    const titulo=execSync(`${YTDLP_CMD} --get-title --no-playlist --no-warnings "${q}"`,{timeout:15000}).toString().trim();
+    if(titulo) return titulo;
+  }catch{}
+  return query;
 }
 
 async function downloadVideo(entrada,height=480){
@@ -1002,12 +1064,86 @@ async function startBot(){
             return;
           }
 
+          // ✅ Detectar palavra "prefixo" sem prefixo → mostra prefixo actual
+          if(/^prefixo$/i.test(texto.trim())){
+            await sock.sendMessage(jid,{
+              text:bBloco("⌨️ PREFIXO",[
+                bLine("⌨️","Este é o meu prefixo actual:"),
+                B_SEP,
+                `\`\`\`${CONFIG.PREFIXO}\`\`\``,
+                B_SEP,
+                bLine("💡","Copia e usa antes dos comandos:"),
+                bLine("📋",`${CONFIG.PREFIXO}menu | ${CONFIG.PREFIXO}play | ${CONFIG.PREFIXO}mp3`),
+              ])
+            },{quoted:seloBot});
+            return;
+          }
+
           // ✅ Tenta o assistente — passa isGrupo para lógica correcta
           const foiAssistente=await executarAssistente(sock,jid,msg,sender,seloBot,texto,isDono,isAdmin,isGrupo);
           if(foiAssistente)return;
 
           // Números para menu fallback
           if(/^[0-9]$/.test(texto.trim())){const chaveMenu=`${jid}_${sender}`;const estadoMenu=menuEsperandoResposta.get(chaveMenu);if(estadoMenu&&(Date.now()-estadoMenu.timestamp)<120000){const catId=MENU_NUMEROS[texto.trim()];if(catId){if(catId==="cat_dono"&&!estadoMenu.isDono){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono.")},{quoted:seloBot});return;}menuEsperandoResposta.delete(chaveMenu);await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}}}
+
+          // ✅ Detectar #revelar (sem prefixo) — como na imagem
+          if(texto.toLowerCase().trim()==="#revelar"||texto.toLowerCase().trim()==="revelar"){
+            const ctx=msg.message?.extendedTextMessage?.contextInfo;
+            const stanzaId=ctx?.stanzaId;
+            if(!ctx||!stanzaId){return;}
+            const quemEnviou=ctx.participant||ctx.remoteJid||"";
+            const nomeEnviou=quemEnviou?`@${quemEnviou.split("@")[0].split(":")[0]}`:"alguém";
+            const mentions=quemEnviou?[quemEnviou]:[];
+            const cached=cacheViewOnce[jid]?.[stanzaId];
+            const revelarMidia=async(buf,tipo)=>{
+              const caption=`👁️ *IMAGEM REVELADA*
+
+📝
+
+📩 Originalmente enviado por:
+${nomeEnviou}`;
+              if(tipo==="video") await sock.sendMessage(jid,{video:buf,caption,mentions},{quoted:seloBot});
+              else if(tipo==="audio") await sock.sendMessage(jid,{audio:buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:seloBot});
+              else await sock.sendMessage(jid,{image:buf,caption,mentions},{quoted:seloBot});
+              await reagir(sock,msg,"👁️");
+            };
+            if(cached){try{await revelarMidia(cached.buf,cached.tipo);return;}catch{}}
+            const qMsg=ctx.quotedMessage;
+            if(qMsg){
+              let innerMsg=null;
+              for(const key of["viewOnceMessage","viewOnceMessageV2","viewOnceMessageV2Extension"]){
+                if(qMsg[key]?.message){innerMsg=qMsg[key].message;break;}
+              }
+              if(innerMsg){
+                try{
+                  const fakeMsg={key:{remoteJid:jid,id:stanzaId,participant:ctx.participant||"",fromMe:false},message:innerMsg};
+                  const buf=await downloadMediaMessage(fakeMsg,"buffer",{});
+                  let tipo="imagem";
+                  if(innerMsg.videoMessage) tipo="video";
+                  else if(innerMsg.audioMessage||innerMsg.pttMessage) tipo="audio";
+                  await revelarMidia(buf,tipo);
+                  return;
+                }catch{}
+              }
+            }
+            return;
+          }
+
+          // ✅ Detectar "prefixo" escrito sem ! (texto puro)
+          const textoLowerTrim=texto.toLowerCase().trim();
+          if(textoLowerTrim==="prefixo"||textoLowerTrim==="prefix"){
+            try{
+              await sock.sendMessage(jid,{
+                text:`*${CONFIG.PREFIXO}*`,
+                footer:`Prefixo do ${CONFIG.NOME_BOT}`,
+                buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
+                headerType:1
+              },{quoted:seloBot});
+            }catch{
+              await sock.sendMessage(jid,{text:`O prefixo é: *${CONFIG.PREFIXO}*`},{quoted:seloBot});
+            }
+            return;
+          }
 
           // Resposta play (mp3/mp4/doc em texto)
           const bodyLower=texto.toLowerCase().trim();
@@ -1179,28 +1315,23 @@ async function startBot(){
         if(comando==="out"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Só em grupos.")},{quoted:seloBot});return;}try{await sock.sendMessage(jid,{text:bLine("👋","*Bot a sair...*")},{quoted:seloBot});await new Promise(r=>setTimeout(r,1000));await sock.groupLeave(jid);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="prefixo"||comando==="prefixos"){
           if(!args[0]){
-            // Resposta bonita mostrando o prefixo actual (imagem 1)
-            const textoP=bBloco("⌨️ PREFIXO",[
-              bLine("⌨️",`Prefixo actual: *${CONFIG.PREFIXO}*`),
-              bLine("💡","Para mudar: *!prefixo [símbolo]*"),
-              B_SEP,
-              bLine("📋","*Comandos usam:* "+CONFIG.PREFIXO+"play, "+CONFIG.PREFIXO+"mp3, "+CONFIG.PREFIXO+"menu..."),
-            ]);
+            // Só mostra o prefixo com botão copiar
+            const msgPref=`*${CONFIG.PREFIXO}*`;
             try{
               await sock.sendMessage(jid,{
-                text:textoP,
-                footer:CONFIG.NOME_BOT,
-                buttons:[{buttonId:"copy_prefix",buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』Copiar Prefixo`},type:1}],
+                text:msgPref,
+                footer:`Prefixo do ${CONFIG.NOME_BOT}`,
+                buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
                 headerType:1
               },{quoted:seloBot});
             }catch{
-              await sock.sendMessage(jid,{text:textoP},{quoted:seloBot});
+              await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
             }
             return;
           }
           const novoPref=args[0].trim().charAt(0);
           CONFIG.PREFIXO=novoPref;
-          await sock.sendMessage(jid,{text:bBloco("✅ PREFIXO ALTERADO",[bLine("⌨️",`Novo prefixo: *${novoPref}*`)])},{quoted:seloBot});
+          await sock.sendMessage(jid,{text:`✅ Prefixo alterado para *${novoPref}*`},{quoted:seloBot});
           return;
         }
         if(comando==="ping"){const ini=Date.now();await sock.sendMessage(jid,{text:"⏳"});await sock.sendMessage(jid,{text:bBloco("📡 PING",[bLine("🏓",`*${Date.now()-ini}ms*`),bLine("⏱️",`${Math.floor(process.uptime()/60)} min`),bLine("💾",`${(process.memoryUsage().heapUsed/1024/1024).toFixed(1)}MB`),bLine("🌐",CONFIG.IS_SERVER?"☁️ Servidor":"📱 Local")])},{quoted:seloBot});return;}
@@ -1216,7 +1347,51 @@ async function startBot(){
 
         // ─── PLAY ───
         if(comando==="play"){await processarComandoPlay(sock,jid,msg,args.join(" ").trim());return;}
-        if(comando==="mp3"&&args.length>0){const entrada=args.join(" ");await reagir(sock,msg,"🎵");let arqFinal=null;try{arqFinal=await barraCarregamento(sock,jid,seloBot,`A baixar MP3: _${entrada.slice(0,40)}_`,()=>downloadMusica(entrada,false));}catch(e){console.log("❌ mp3:",e.message);}if(!arqFinal||!fs.existsSync(arqFinal)){await sock.sendMessage(jid,{text:bBloco("❌ NÃO ENCONTREI",[bLine("💡",`_${entrada}_`)])},{quoted:seloBot});await reagir(sock,msg,"❌");return;}try{await enviarAudio(sock,jid,arqFinal,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}setTimeout(()=>{try{fs.removeSync(arqFinal);}catch{}},15000);return;}
+        if(comando==="mp3"&&args.length>0){
+          const entrada=args.join(" ");
+          await reagir(sock,msg,"🎵");
+          await sock.sendMessage(jid,{text:"🎵 A buscar música... Aguarda 👀"},{quoted:seloBot});
+          try{
+            // Busca thumbnail e título em paralelo com o download
+            const [thumbUrl,titulo,arqFinal]=await Promise.all([
+              buscarThumbnailYT(entrada).catch(()=>null),
+              buscarTituloYT(entrada).catch(()=>entrada),
+              downloadMusica(entrada,false),
+            ]);
+
+            if(!arqFinal||!fs.existsSync(arqFinal)){
+              await sock.sendMessage(jid,{text:`❌ Não encontrei: _${entrada}_`},{quoted:seloBot});
+              await reagir(sock,msg,"❌");
+              return;
+            }
+
+            // Envia thumbnail + caption primeiro (como script original)
+            const caption=`🎵 *${titulo}*\n\n_Enviando o áudio..._ 👀`;
+            if(thumbUrl){
+              try{await sock.sendMessage(jid,{image:{url:thumbUrl},caption},{quoted:seloBot});}
+              catch{await sock.sendMessage(jid,{text:caption},{quoted:seloBot});}
+            }else{
+              await sock.sendMessage(jid,{text:caption},{quoted:seloBot});
+            }
+
+            // Envia o áudio
+            const buf=fs.readFileSync(arqFinal);
+            await sock.sendMessage(jid,{
+              audio:buf,
+              mimetype:"audio/mpeg",
+              fileName:`${titulo}.mp3`,
+            },{quoted:seloBot});
+
+            await reagir(sock,msg,"✅");
+            addXP(sender,5);
+            setTimeout(()=>{try{fs.removeSync(arqFinal);}catch{}},15000);
+          }catch(e){
+            console.log("❌ mp3:",e.message);
+            await sock.sendMessage(jid,{text:`❌ Ocorreu um erro. Tenta novamente. 👀`},{quoted:seloBot});
+            await reagir(sock,msg,"❌");
+          }
+          return;
+        }
         if(comando==="mp4"&&args.length>0){const entrada=args.join(" ");await reagir(sock,msg,"🎬");let saida=null;try{saida=await barraCarregamento(sock,jid,seloBot,`A baixar vídeo: _${entrada.slice(0,40)}_`,()=>downloadVideo(entrada,480));}catch(e){console.log("❌ mp4:",e.message);}if(!saida||!fs.existsSync(saida)){await sock.sendMessage(jid,{text:bBloco("❌ NÃO ENCONTREI",[bLine("💡","Tenta outro link ou nome.")])},{quoted:seloBot});await reagir(sock,msg,"❌");return;}try{await enviarVideo(sock,jid,saida,bLine("🎬",`_© ${CONFIG.NOME_BOT}_`),[sender],seloBot);await reagir(sock,msg,"✅");addXP(sender,5);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}setTimeout(()=>{try{fs.removeSync(saida);}catch{}},15000);return;}
         if(comando==="mp4hd"&&args.length>0){const entrada=args.join(" ");await reagir(sock,msg,"📹");let result=null;try{result=await barraCarregamento(sock,jid,seloBot,`A baixar vídeo 720p...`,()=>downloadVideoHD(entrada,720));}catch(e){console.log("❌ mp4hd:",e.message);}if(!result||!result.filePath||!fs.existsSync(result.filePath)){await sock.sendMessage(jid,{text:bBloco("❌ NÃO ENCONTREI",[bLine("💡","Tenta *!mp4*.")])},{quoted:seloBot});await reagir(sock,msg,"❌");return;}try{await enviarVideo(sock,jid,result.filePath,bLine("📹",`${result.quality} | 💾 ${result.sizeMB}MB`),[sender],seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{fs.removeSync(result.filePath);}catch{}},15000);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="ytsearch"&&args.length>0){const query=args.join(" ");let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("🔍 YOUTUBE",[bLine("🔍",`_${query}_`),FRAMES_LOADING[0]])},{quoted:seloBot});}catch{}const videos=await scraperYouTubeSearch(query,5);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("🔍 YOUTUBE",[bLine("🔍",`_${query}_`),FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));if(!videos.length){await sock.sendMessage(jid,{text:bLine("❌","Nenhum resultado.")},{quoted:seloBot});return;}const lista=videos.slice(0,5).map((v,i)=>`◎ *${i+1}.* 🎵 ${(v.title||v.titulo||"N/A").slice(0,40)}\n   ⏱️ ${formatarDuracao(v.duration||0)}`).join("\n\n");if(videos[0]?.thumbnail)await sock.sendMessage(jid,{image:{url:videos[0].thumbnail},caption:bBloco("🔎 YOUTUBE — "+query,[lista])},{quoted:seloBot});else await sock.sendMessage(jid,{text:bBloco("🔎 YOUTUBE — "+query,[lista])},{quoted:seloBot});await reagir(sock,msg,"🔍");return;}
@@ -1337,7 +1512,50 @@ async function startBot(){
         if(comando==="cotacao"){try{const resp=await chatIA("Cotações actuais do Kwanza (AOA) para USD, EUR, BRL. Formato curto.","Sê direto.");await sock.sendMessage(jid,{text:bBloco("💱 COTAÇÕES KWANZA",[bLine("💱",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="tempo"){if(!args[0]){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}tempo* [cidade]`)},{quoted:seloBot});return;}const local=args.join(" ");try{const res=await axios.get(`https://wttr.in/${encodeURIComponent(local)}?format=j1`,{timeout:10000,httpsAgent});const cur=res.data.current_condition[0];await sock.sendMessage(jid,{text:bBloco("🌤️ "+local.toUpperCase(),[bLine("🌡️",`*${cur.temp_C}°C* — ${cur.weatherDesc[0].value}`),bLine("💧",`${cur.humidity}% | 💨 ${cur.windspeedKmph}km/h`)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Cidade não encontrada.")},{quoted:seloBot});}return;}
         if(comando==="horario"){const agora=new Date();const opc=(tz)=>({timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false});await sock.sendMessage(jid,{text:bBloco("🕐 HORÁRIO MUNDIAL",[bLine("🇦🇴",`Angola: *${agora.toLocaleTimeString("pt-AO",opc("Africa/Luanda"))}*`),bLine("🇧🇷",`Brasil: *${agora.toLocaleTimeString("pt-BR",opc("America/Sao_Paulo"))}*`),bLine("🇵🇹",`Portugal: *${agora.toLocaleTimeString("pt-PT",opc("Europe/Lisbon"))}*`),bLine("🇺🇸",`EUA: *${agora.toLocaleTimeString("en-US",opc("America/New_York"))}*`)])},{quoted:seloBot});return;}
-        if(comando==="ver"){const ctx=msg.message?.extendedTextMessage?.contextInfo,stanzaId=ctx?.stanzaId;if(!ctx||!stanzaId){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde view-once com *${CONFIG.PREFIXO}ver*`)},{quoted:seloBot});return;}const quemEnviou=ctx.participant?`@${ctx.participant.split("@")[0].split(":")[0]}`:"alguém";const mentions=ctx.participant?[ctx.participant]:[];const cached=cacheViewOnce[jid]?.[stanzaId];if(cached){try{if(cached.tipo==="video")await sock.sendMessage(jid,{video:cached.buf,caption:bLine("🔓",`De: ${quemEnviou}`),mentions},{quoted:seloBot});else if(cached.tipo==="audio")await sock.sendMessage(jid,{audio:cached.buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:seloBot});else await sock.sendMessage(jid,{image:cached.buf,caption:bLine("🔓",`De: ${quemEnviou}`),mentions},{quoted:seloBot});await reagir(sock,msg,"🔓");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}const qMsg=ctx.quotedMessage;if(qMsg){let innerMsg=null;for(const key of["viewOnceMessage","viewOnceMessageV2","viewOnceMessageV2Extension"]){if(qMsg[key]?.message){innerMsg=qMsg[key].message;break;}}if(innerMsg){try{const fakeMsg={key:{remoteJid:jid,id:stanzaId,participant:ctx.participant||"",fromMe:false},message:innerMsg};const buf=await downloadMediaMessage(fakeMsg,"buffer",{});if(innerMsg.imageMessage)await sock.sendMessage(jid,{image:buf,caption:bLine("🔓",`De: ${quemEnviou}`),mentions},{quoted:seloBot});else if(innerMsg.videoMessage)await sock.sendMessage(jid,{video:buf,caption:bLine("🔓",`De: ${quemEnviou}`),mentions},{quoted:seloBot});else if(innerMsg.audioMessage||innerMsg.pttMessage)await sock.sendMessage(jid,{audio:buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:seloBot});await reagir(sock,msg,"🔓");}catch{await sock.sendMessage(jid,{text:bLine("❌","Expirada.")},{quoted:seloBot});}return;}}await sock.sendMessage(jid,{text:bLine("❌","Não encontrei.")},{quoted:seloBot});return;}
+        if(comando==="ver"){
+          const ctx=msg.message?.extendedTextMessage?.contextInfo;
+          const stanzaId=ctx?.stanzaId;
+          if(!ctx||!stanzaId){
+            await sock.sendMessage(jid,{text:`❌ ↩️ Responde uma mensagem view-once com *${CONFIG.PREFIXO}ver*\n\n💡 Ou usa *#revelar* a responder a mensagem`},{quoted:seloBot});
+            return;
+          }
+          const quemEnviou=ctx.participant||ctx.remoteJid||"";
+          const nomeEnviou=quemEnviou?`@${quemEnviou.split("@")[0].split(":")[0]}`:"alguém";
+          const mentions=quemEnviou?[quemEnviou]:[];
+          // Tenta cache primeiro
+          const cached=cacheViewOnce[jid]?.[stanzaId];
+          const revelarMidia=async(buf,tipo)=>{
+            const caption=`👁️ *IMAGEM REVELADA*\n\n📝\n\n📩 Originalmente enviado por:\n${nomeEnviou}`;
+            if(tipo==="video") await sock.sendMessage(jid,{video:buf,caption,mentions},{quoted:seloBot});
+            else if(tipo==="audio") await sock.sendMessage(jid,{audio:buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:seloBot});
+            else await sock.sendMessage(jid,{image:buf,caption,mentions},{quoted:seloBot});
+            await reagir(sock,msg,"👁️");
+            addXP(sender,5);
+          };
+          if(cached){try{await revelarMidia(cached.buf,cached.tipo);return;}catch{}}
+          // Tenta descarregar directamente
+          const qMsg=ctx.quotedMessage;
+          if(qMsg){
+            let innerMsg=null;
+            for(const key of["viewOnceMessage","viewOnceMessageV2","viewOnceMessageV2Extension"]){
+              if(qMsg[key]?.message){innerMsg=qMsg[key].message;break;}
+            }
+            if(innerMsg){
+              try{
+                const fakeMsg={key:{remoteJid:jid,id:stanzaId,participant:ctx.participant||"",fromMe:false},message:innerMsg};
+                const buf=await downloadMediaMessage(fakeMsg,"buffer",{});
+                let tipo="imagem";
+                if(innerMsg.videoMessage) tipo="video";
+                else if(innerMsg.audioMessage||innerMsg.pttMessage) tipo="audio";
+                await revelarMidia(buf,tipo);
+                return;
+              }catch{}
+            }
+          }
+          await sock.sendMessage(jid,{text:"❌ Não consegui revelar. A mensagem pode ter expirado."},{quoted:seloBot});
+          await reagir(sock,msg,"❌");
+          return;
+        }
         if(comando==="apagadas"){const lista=msgApagadas[jid]||[];if(!lista.length){await sock.sendMessage(jid,{text:bLine("📭","Nenhuma msg apagada.")},{quoted:seloBot});return;}const ultimas=lista.slice(-10).reverse();const textoLista=ultimas.map(m=>{const hora=new Date(m.apagadoEm).toLocaleTimeString("pt-AO",{timeZone:"Africa/Luanda",hour:"2-digit",minute:"2-digit"});return `${bLine("👤",`+${m.sender?.split("@")[0]||"?"} 🕐 ${hora}`)}\n${bLine("💬",m.texto?`_"${m.texto.slice(0,60)}"_`:`_(${m.tipo})_`)}`;}).join("\n│\n");await sock.sendMessage(jid,{text:bBloco("🕵️ MSGS APAGADAS",[textoLista])},{quoted:seloBot});return;}
         if(comando==="placar"){const busca=args.join(" ").trim();if(!busca){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}placar* [equipa/jogo]`)},{quoted:seloBot});return;}try{const resp=await chatIA(`Dá o último placar de: "${busca}". Direto.`,"Especialista desportivo.");await sock.sendMessage(jid,{text:bBloco("⚽ PLACAR",[bLine("⚽",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Não encontrei.")},{quoted:seloBot});}return;}
 
