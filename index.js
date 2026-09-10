@@ -7,6 +7,7 @@ const {
   DisconnectReason,
   downloadMediaMessage,
   fetchLatestBaileysVersion,
+  generateWAMessageFromContent,
 } = require("@itsliaaa/baileys");
 
 const fs       = require("fs-extra");
@@ -15,17 +16,21 @@ const path     = require("path");
 const axios    = require("axios");
 const https    = require("https");
 const FormData = require("form-data");
+let yts=null; try{yts=require("yt-search");}catch{console.log("⚠️ yt-search não instalado — !play1 não vai funcionar. Corre: npm i yt-search");}
+const { enviarDino } = require("./comando_dino.js");
+const { enviarPiano } = require("./comando_piano.js");
+const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 
 fs.ensureDirSync(process.env.TMPDIR);
 fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./dados");
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-
 const CONFIG = {
   PREFIXO:         "!",
   NUMERO_BOT:      "244954260707",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
+  GROQ_KEY: process.env.GROQ_KEY || "",
+  GEMINI_KEY: process.env.GEMINI_KEY || "",
   DONO_JID:        "169853876965546@lid",
   DONO_NOME:       "ISAÍAS PEDRO",
   DONO_NUM:        "926 612 801",
@@ -157,8 +162,20 @@ function getYtDlpArgs(){
 // ════════════════════════════════════════════════
 // ✅ ARQUIVOS DE DADOS
 // ════════════════════════════════════════════════
-const ARQUIVO_RANK="./dados/rank.json",ARQUIVO_STATS="./dados/stats.json",ARQUIVO_ATIVOS="./dados/ativos.json",ARQUIVO_SILENCIADOS="./dados/silenciados.json",ARQUIVO_COINS="./dados/coins.json",ARQUIVO_COOLDOWNS="./dados/cooldowns.json",ARQUIVO_VIPS="./dados/vips.json",ARQUIVO_ALUGUEL="./dados/aluguel.json";
-[ARQUIVO_RANK,ARQUIVO_STATS,ARQUIVO_ATIVOS,ARQUIVO_SILENCIADOS,ARQUIVO_COINS,ARQUIVO_COOLDOWNS,ARQUIVO_VIPS,ARQUIVO_ALUGUEL].forEach(f=>{if(!fs.existsSync(f)){if(f.includes("stats"))fs.writeJsonSync(f,{total:0,comandos:{},usuarios:{}});else fs.writeJsonSync(f,{});}});
+const ARQUIVO_RANK="./dados/rank.json",ARQUIVO_STATS="./dados/stats.json",ARQUIVO_ATIVOS="./dados/ativos.json",ARQUIVO_SILENCIADOS="./dados/silenciados.json",ARQUIVO_COINS="./dados/coins.json",ARQUIVO_COOLDOWNS="./dados/cooldowns.json",ARQUIVO_VIPS="./dados/vips.json",ARQUIVO_ALUGUEL="./dados/aluguel.json",ARQUIVO_DONOS_EXTRA="./dados/donos_extra.json",ARQUIVO_SUBDONOS="./dados/subdonos.json",ARQUIVO_FONTE="./dados/fonte.json";
+[ARQUIVO_RANK,ARQUIVO_STATS,ARQUIVO_ATIVOS,ARQUIVO_SILENCIADOS,ARQUIVO_COINS,ARQUIVO_COOLDOWNS,ARQUIVO_VIPS,ARQUIVO_ALUGUEL,ARQUIVO_DONOS_EXTRA,ARQUIVO_SUBDONOS,ARQUIVO_FONTE].forEach(f=>{if(!fs.existsSync(f)){if(f.includes("stats"))fs.writeJsonSync(f,{total:0,comandos:{},usuarios:{}});else if(f.includes("fonte"))fs.writeJsonSync(f,{nome:"Abadi"});else fs.writeJsonSync(f,{});}});
+
+// ════ FONTE ACTUAL DO BOT ════
+let FONTE_ATUAL="Abadi";
+try{const fdata=fs.readJsonSync(ARQUIVO_FONTE);if(fdata?.nome&&FONTES[fdata.nome])FONTE_ATUAL=fdata.nome;}catch{}
+function salvarFonteAtual(nome){FONTE_ATUAL=nome;try{fs.writeJsonSync(ARQUIVO_FONTE,{nome});}catch{}}
+function nomeBotEstilizado(){return aplicarFonte(FONTE_ATUAL,CONFIG.NOME_BOT);}
+
+// ════ SISTEMA DE DONOS EXTRA / SUBDONOS ════
+function carregarDonosExtra(){try{return fs.readJsonSync(ARQUIVO_DONOS_EXTRA);}catch{return{};}}
+function salvarDonosExtra(d){try{fs.writeJsonSync(ARQUIVO_DONOS_EXTRA,d);}catch{}}
+function carregarSubdonos(){try{return fs.readJsonSync(ARQUIVO_SUBDONOS);}catch{return{};}}
+function salvarSubdonos(d){try{fs.writeJsonSync(ARQUIVO_SUBDONOS,d);}catch{}}
 
 // ════ SISTEMA DE CASES (Comandos dinâmicos) ════
 const CASES_CODE_PATH="./dados/cases_code.json";
@@ -210,6 +227,9 @@ const banEmCurso=new Set(),historyMsgs={},menuEsperandoResposta=new Map();
 const senhasAprovadas=new Set(),gruposAtivados=new Set(),pedidoSenha=new Set();
 const chatsDesativados=new Set(),vozBotDesativado=new Set(),comandosBloqueados=new Set();
 const antiLinkDesativado=new Set(),cacheViewOnce={};
+const antiLinkModo=new Map(); // jid -> "easy" (padrão, sem ban) | "hard" (remove + bane)
+const bemVindoDesativado=new Set();
+const bemVindoModo=new Map(); // jid -> 1 (simples) | 2 (completo, padrão)
 const jogoAdivinhar={},jogoVelocidade={};
 const playCacheMap=new Map();
 // ✅ ASSISTENTE — apenas responde quando mencionado em grupos
@@ -226,7 +246,8 @@ try{const s=fs.readJsonSync(ARQUIVO_SILENCIADOS);for(const[j,l] of Object.entrie
 // ════════════════════════════════════════════════
 // ✅ HELPERS
 // ════════════════════════════════════════════════
-function ehDono(s){if(!s)return false;const n=String(s).split("@")[0].split(":")[0].replace(/\D/g,"");if(!n)return false;return CONFIG.NUMEROS_ADM.some(d=>{const dn=d.replace(/\D/g,"");return n===dn||n.endsWith(dn)||dn.endsWith(n);});}
+function ehDono(s){if(!s)return false;const n=String(s).split("@")[0].split(":")[0].replace(/\D/g,"");if(!n)return false;if(CONFIG.NUMEROS_ADM.some(d=>{const dn=d.replace(/\D/g,"");return n===dn||n.endsWith(dn)||dn.endsWith(n);}))return true;try{const extra=carregarDonosExtra();return Object.keys(extra).some(d=>{const dn=String(d).replace(/\D/g,"");return dn&&(n===dn||n.endsWith(dn)||dn.endsWith(n));});}catch{return false;}}
+function ehSubdono(s){if(!s)return false;if(ehDono(s))return false;const n=String(s).split("@")[0].split(":")[0].replace(/\D/g,"");if(!n)return false;try{const subs=carregarSubdonos();return Object.keys(subs).some(d=>{const dn=String(d).replace(/\D/g,"");return dn&&(n===dn||n.endsWith(dn)||dn.endsWith(n));});}catch{return false;}}
 function extrairJid(p){if(!p)return "";if(typeof p==="string")return p;if(typeof p==="object"&&p.id)return p.id;return String(p);}
 function removerAcentos(s){return s.normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
 function formatarDuracao(seg){if(!seg||isNaN(seg))return "N/A";const m=Math.floor(seg/60),s=Math.floor(seg%60);return `${m}:${s.toString().padStart(2,"0")}`;}
@@ -294,20 +315,35 @@ function removerPlayCache(chave){playCacheMap.delete(chave);}
 // ════════════════════════════════════════════════
 // ✅ SELO
 // ════════════════════════════════════════════════
-function criarSeloBot(jid){const num=CONFIG.NUMERO_BOT;return{key:{participant:"0@s.whatsapp.net",remoteJid:jid||"status@broadcast",fromMe:false},message:{contactMessage:{displayName:CONFIG.NOME_BOT,vcard:`BEGIN:VCARD\nVERSION:3.0\nN:;${CONFIG.NOME_BOT};;;\nFN:${CONFIG.NOME_BOT}\nitem1.TEL;waid=${num}:+${num}\nitem1.X-ABLabel:WhatsApp\nEND:VCARD`,contextInfo:{forwardingScore:1,isForwarded:true}}}};}
+function criarSeloBot(jid){const num=CONFIG.NUMERO_BOT;const nomeExibido=nomeBotEstilizado();return{key:{participant:"0@s.whatsapp.net",remoteJid:jid||"status@broadcast",fromMe:false},message:{contactMessage:{displayName:nomeExibido,vcard:`BEGIN:VCARD\nVERSION:3.0\nN:;${nomeExibido};;;\nFN:${nomeExibido}\nitem1.TEL;waid=${num}:+${num}\nitem1.X-ABLabel:WhatsApp\nEND:VCARD`,contextInfo:{forwardingScore:1,isForwarded:true}}}};}
 
 // ════════════════════════════════════════════════
-// ✅ LOADING
+// ✅ CARREGAMENTO — mensagem com personalidade do Isaías (sem barra animada)
 // ════════════════════════════════════════════════
-const FRAMES_LOADING=["⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛  0%","🟦🟦⬛⬛⬛⬛⬛⬛⬛⬛ 20%","🟦🟦🟦🟦⬛⬛⬛⬛⬛⬛ 40%","🟦🟦🟦🟦🟦🟦⬛⬛⬛⬛ 60%","🟦🟦🟦🟦🟦🟦🟦🟦⬛⬛ 80%","🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩 100% ✅"];
+const FRAMES_LOADING=["⏳ A processar...","⏳ A processar...","⏳ A processar...","⏳ A processar...","⏳ A processar...","✅ Concluído!"];
+const FRASES_ISAIAS=[
+  "Quem deixa você, é o seu/sua ex, eu vou estar sempre aqui pra você🙂",
+  "Isaías me criou pra tornar a sua vida mais fácil✋🏾🙂🤚🏾",
+  "Enquanto uns te deixam no visto, eu tô aqui a trabalhar pra ti😌",
+  "Isaías não dorme, e eu também não... só pra te servir 🫡",
+  "Relaxa, o teu pedido tá em boas mãos (as minhas) 😎",
+  "Já reparei que só tu me dás valor por aqui... obrigado 🥹",
+  "Isaías fez-me pra ser o teu assistente favorito, e eu não vou decepcionar 💪🏾",
+  "Nem toda gente é de confiança, mas eu sim, sempre aqui 🙌🏾",
+  "Confia, eu sou mais fiel que muita gente aí fora 😂",
+  "O Isaías tá de olho em mim, então vou fazer isto bem feito 👀",
+  "Toda a gente desiste de ti um dia, eu não. Eu só bloqueio quando o dono manda 😭🤚🏾",
+  "Já reparaste que eu nunca te deixo por outro grupo? Fidelidade é isto 🔥",
+];
+function fraseIsaiasAleatoria(){return FRASES_ISAIAS[Math.floor(Math.random()*FRASES_ISAIAS.length)];}
 async function barraCarregamento(sock,jid,seloBot,titulo,callbackDownload){
   let loadingMsg=null;
-  try{loadingMsg=await sock.sendMessage(jid,{text:bBloco(`⏬ ${titulo}`,[FRAMES_LOADING[0]])},{quoted:seloBot});}catch{}
+  const frase=fraseIsaiasAleatoria();
+  try{loadingMsg=await sock.sendMessage(jid,{text:frase},{quoted:seloBot});}catch{}
   const downloadPromise=callbackDownload();
-  for(let i=1;i<=4;i++){await new Promise(r=>setTimeout(r,700));if(loadingMsg){try{await sock.sendMessage(jid,{text:bBloco(`⏬ ${titulo}`,[FRAMES_LOADING[i]]),edit:loadingMsg.key});}catch{}}}
+  await new Promise(r=>setTimeout(r,1100));
+  if(loadingMsg){try{await sock.sendMessage(jid,{text:`${frase}\n\n⏳ _${titulo}... já já envio!_`,edit:loadingMsg.key});}catch{}}
   const resultado=await downloadPromise;
-  if(loadingMsg){try{await sock.sendMessage(jid,{text:bBloco(`⏬ ${titulo}`,[FRAMES_LOADING[5]]),edit:loadingMsg.key});}catch{}}
-  await new Promise(r=>setTimeout(r,400));
   return resultado;
 }
 
@@ -324,7 +360,7 @@ async function rodarLoadingHacker(sock,chatJid,msgAlvo,titulo,formato){
 // ════════════════════════════════════════════════
 function buildSecoes(isDono){
   const E=ME;
-  const principal={title:`${E.principal} MENUS`,highlight_label:"LORDE LÁ DJUM v3.5",rows:[
+  const principal={title:`${E.principal} MENUS`,highlight_label:"⚡️SHAZAM⚡️",rows:[
     {header:`${E.principal} MENU-PRINCIPAL`,title:"_comandos principais._",id:"cat_principal"},
     {header:`${E.downloads} MENU-DOWNLOADS`,title:"_download de conteúdo._",id:"cat_downloads"},
     {header:`${E.musicas} MENU-MÚSICAS`,title:"_músicas, letras, bio._",id:"cat_musicas"},
@@ -342,7 +378,7 @@ function buildSecoes(isDono){
     {header:`${E.adm} MENU-ADM`,title:"_administração._",id:"cat_adm"},
   ]};
   if(isDono)principal.rows.push({header:`${E.dono} MENU-DONO`,title:"_apenas dono._",id:"cat_dono"});
-  const extras={title:`${E.extras} EXTRAS`,highlight_label:"LORDE LÁ DJUM v3.5",rows:[
+  const extras={title:`${E.extras} EXTRAS`,highlight_label:"⚡️SHAZAM⚡️",rows:[
     {header:`${E.assistente} ISAÍAS IA`,title:"_chama pelo nome no grupo!_",id:"cat_assistente"},
     {header:"👨‍💻 CRIADOR",title:"_info do criador._",id:"cat_criador"},
     {header:"📡 PING",title:"_status do bot._",id:"cat_ping"},
@@ -356,10 +392,10 @@ function gerarSubmenu(catId,P){
   const E=ME;const em=E.e||E.principal||"🌀";
   if(catId==="cat_principal")return bBloco(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 【${em}】`,[bLine("🤖",`*Bot:* ${CONFIG.NOME_BOT}`),bLine("👑",`*Criador:* ${CONFIG.DONO_NOME}`),bLine("📞",CONFIG.DONO_NUM),B_SEP,bLine(em,`*${P}menu* / *${P}ping* / *${P}stats* / *${P}sobre*`),bLine(em,`*${P}id* / *${P}regras* / *${P}dono* / *${P}alugar*`),bLine(em,`*${P}pp* [código] → _acesso_`),bLine(em,`*${P}setmenu* [emoji] → _mudar emojis_`)]);
   if(catId==="cat_assistente")return bBloco(`𝑰𝑺𝑨Í𝑨𝑺 𝑰𝑨 【${em}】`,[bLine("💡","*Em grupos:* menciona o nome!"),bLine("📱","*No privado:* fala directamente!"),B_SEP,bLine("💬","_\"Isaías, baixa Calema te amo\"_"),bLine("💬","_\"Isaías, que tempo em Luanda?\"_"),bLine("💬","_\"Isaías, faz uma piada\"_"),B_SEP,bLine(em,`*${P}assistente* → _activar no grupo_`),bLine(em,`*${P}isaias-off* → _desactivar_`)]);
-  if(catId==="cat_downloads")return bBloco(`𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃'𝐬 【${em}】`,[bLine("🎵","*YOUTUBE*"),bLine(em,`*${P}play* [música] → _banner c/ botões_`),bLine(em,`*${P}mp3* / *${P}mp4* / *${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),B_SEP,bLine("📱","*REDES SOCIAIS*"),bLine(em,`*${P}tiktok* / *${P}instagram* / *${P}twitter*`),bLine(em,`*${P}facebook* / *${P}kwai* / *${P}spotify*`),bLine(em,`*${P}soundcloud*`),B_SEP,bLine("📌","*PINTEREST*"),bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pin* [busca] | [qtd] → _até 10 imagens_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),B_SEP,bLine("🖼️","*FICHEIROS*"),bLine(em,`*${P}mediafire* / *${P}apk*`),bLine(em,`*${P}qr* / *${P}tourl* / *${P}mostre*`)]);
+  if(catId==="cat_downloads")return bBloco(`𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃'𝐬 【${em}】`,[bLine("🎵","*YOUTUBE*"),bLine(em,`*${P}play* [música] → _baixa e envia directo_`),bLine(em,`*${P}play1* [música] → _carrossel com 5 opções_`),bLine(em,`*${P}mp3* / *${P}mp4* / *${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),B_SEP,bLine("📱","*REDES SOCIAIS*"),bLine(em,`*${P}tiktok* / *${P}tt* [link] → _download rápido_`),bLine(em,`*${P}instagram* / *${P}twitter*`),bLine(em,`*${P}facebook* / *${P}kwai* / *${P}spotify*`),bLine(em,`*${P}soundcloud*`),B_SEP,bLine("📌","*PINTEREST*"),bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pin* [busca] | [qtd] → _até 10 imagens_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),B_SEP,bLine("🖼️","*FICHEIROS*"),bLine(em,`*${P}mediafire* / *${P}apk*`),bLine(em,`*${P}qr* / *${P}tourl* / *${P}mostre*`)]);
   if(catId==="cat_musicas")return bBloco(`𝐌Ú𝐒𝐈𝐂𝐀𝐬 【${em}】`,[bLine("🎙️","*IDENTIFICAÇÃO*"),bLine(em,`*${P}busca* ↩️ áudio → _reconhece música_`),bLine(em,`*${P}shazam* → _diversão ⚡⚡_`),B_SEP,bLine("📝","*INFORMAÇÃO*"),bLine(em,`*${P}letra* / *${P}cifra* / *${P}bio* / *${P}album*`),B_SEP,bLine("📻","*DESCOBERTA*"),bLine(em,`*${P}recomenda* [género] / *${P}top10* [país]`)]);
-  if(catId==="cat_figurinhas")return bBloco(`𝐅𝐈𝐆𝐔𝐑𝐈𝐍𝐇𝐀𝐬 【${em}】`,[bLine(em,`*${P}sticker* → _imagem/vídeo ➜ sticker_`),bLine(em,`*${P}sf* → _sticker ➜ foto_`),bLine(em,`*${P}brat* [texto] → _brat sticker_`),bLine(em,`*${P}figurinha* [nº]`)]);
-  if(catId==="cat_brincadeiras")return bBloco(`𝐁𝐑𝐈𝐍𝐂𝐀𝐃𝐄𝐈𝐑𝐀𝐬 【${em}】`,[bLine("🎮","*GRUPO:*"),bLine(em,"quiz/vof/completar/caca/guerra/stop"),B_SEP,bLine("🎲","*SOLO:*"),bLine(em,"matematica/jokenpo/dado/cara-coroa"),bLine(em,"adivinhar/velocidade/roleta/aki/aposta"),bLine(em,`*${P}8ball* [pergunta] 🎱`),B_SEP,bLine("😂","*DIVERSÃO:*"),bLine(em,"piada/conselho/poema/historia/perfil/cara/ship/fofoca"),bLine(em,`*${P}cantada* 💘 / *${P}inunca* 🎯 / *${P}conselhobiblico* 📖`),B_SEP,bLine("⚔️","*PvP:*"),bLine(em,`*${P}batalha* @user [apostas]`),B_SEP,bLine("🏆","rank/toprank/nivel")]);
+  if(catId==="cat_figurinhas")return bBloco(`𝐅𝐈𝐆𝐔𝐑𝐈𝐍𝐇𝐀𝐬 【${em}】`,[bLine(em,`*${P}s* → _imagem/vídeo ➜ sticker_`),bLine(em,`*${P}sf* → _sticker ➜ foto_`),bLine(em,`*${P}brat* [texto] → _brat sticker_`),bLine(em,`*${P}figurinha* [nº]`)]);
+  if(catId==="cat_brincadeiras")return bBloco(`𝐁𝐑𝐈𝐍𝐂𝐀𝐃𝐄𝐈𝐑𝐀𝐬 【${em}】`,[bLine("🎮","*GRUPO:*"),bLine(em,"quiz/vof/completar/caca/guerra/stop"),B_SEP,bLine("🎲","*SOLO:*"),bLine(em,"matematica/jokenpo/dado/cara-coroa"),bLine(em,"adivinhar/velocidade/roleta/aki/aposta"),bLine(em,`*${P}8ball* [pergunta] 🎱`),B_SEP,bLine("🕹️","*JOGOS INTERACTIVOS:*"),bLine(em,`*${P}dino* 🦖 → _Dino Runner interactivo_`),bLine(em,`*${P}piano* 🎹 → _piano interactivo_`),B_SEP,bLine("😂","*DIVERSÃO:*"),bLine(em,"piada/conselho/poema/historia/perfil/cara/ship/fofoca"),bLine(em,`*${P}cantada* 💘 / *${P}inunca* 🎯 / *${P}conselhobiblico* 📖`),B_SEP,bLine("⚔️","*PvP:*"),bLine(em,`*${P}batalha* @user [apostas]`),B_SEP,bLine("🏆","rank/toprank/nivel")]);
   if(catId==="cat_coins")return bBloco(`𝐂𝐎𝐈𝐍𝐬 & 𝐄𝐂𝐎𝐍𝐎𝐌𝐈𝐀 【${em}】`,[bLine(em,`*${P}moedas* / *${P}diario* / *${P}topcoins*`),bLine(em,`*${P}dar* @user [qtd] / *${P}roubar* @user`),bLine(em,`*${P}aposta* [qtd] / *${P}nivel* / *${P}inventario*`),B_SEP,bLine("💼","*TRABALHO:*"),bLine(em,`*${P}trabalhar* ⏱2h / *${P}minerar* ⏱3h`),bLine(em,`*${P}pescar* ⏱90min / *${P}cacada* ⏱2.5h`),bLine(em,`*${P}bau* ⏱4h / *${P}missao* ⏱24h`),bLine(em,`*${P}treinar* ⏱1h / *${P}dormir* ⏱8h`),bLine(em,`*${P}explorar* ⏱1.5h / *${P}viajar*`),bLine(em,`*${P}crimes* ⏱6h / *${P}mendigar* ⏱30min`)]);
   if(catId==="cat_alteradores")return bBloco(`𝐀𝐋𝐓𝐄𝐑𝐀𝐃𝐎𝐑𝐄𝐬 【${em}】`,[bLine("🔊","*VOZ:*"),bLine(em,`*${P}vz* [texto]`),B_SEP,bLine("📝","*TRANSCRIÇÃO:*"),bLine(em,`*${P}transcrever* / *${P}resumiraudio* / *${P}traduziraudio*`),B_SEP,bLine("🧠","*IA:*"),bLine(em,`*${P}ia* / *${P}resumir* / *${P}traduzir*`),B_SEP,bLine("🖼️","*IMAGEM:*"),bLine(em,`*${P}fotocopia* / *${P}fotoparaia* / *${P}resumirfoto*`)]);
   if(catId==="cat_logos")return bBloco(`𝐋𝐎𝐆𝐎𝐬 & 𝐔𝐓𝐈𝐋𝐈𝐃𝐀𝐃𝐄𝐬 【${em}】`,[bLine(em,`*${P}meme* / *${P}logo* / *${P}card*`),bLine(em,`*${P}calc* / *${P}encurtar* / *${P}qr*`),bLine(em,`*${P}horario* / *${P}tempo* / *${P}cotacao*`),bLine(em,`*${P}ver* / *${P}apagadas* / *${P}placar*`),B_SEP,bLine("📦","*CASES DINÂMICAS:*"),bLine(em,`*${P}addcase* [nome] → _adicionar comando_`),bLine(em,`*${P}cases* → _listar cases_`),bLine(em,`*${P}extraircase* [nome] → _ver código_`),bLine(em,`*${P}delcase* [nome] → _remover_`)]);
@@ -369,8 +405,8 @@ function gerarSubmenu(catId,P){
   if(catId==="cat_ias")return bBloco(`𝐈𝐀𝐬 【${em}】`,[bLine(em,`*${P}gpt* / *${P}gemini* / *${P}deepseek* / *${P}ia*`),bLine("💡","_Em grupos: chama Isaías pelo nome!_"),bLine("📱","_No privado: fala directamente!_")]);
   if(catId==="cat_plaquinhas")return bBloco(`𝐏𝐋𝐀𝐐𝐔𝐈𝐍𝐇𝐀𝐬 【${em}】`,[bLine(em,`*${P}cantada* 💘 / *${P}inunca* 🎯`),bLine(em,`*${P}conselhobiblico* 📖 / *${P}frasemotivacional* 💪`),bLine(em,`*${P}piadacurta* 😂 / *${P}curiosidade* 🤔`),bLine(em,`*${P}bomdia* ☀️ / *${P}boanoite* 🌙`)]);
   if(catId==="cat_18")return bBloco(`𝐌𝐄𝐍𝐔 +𝟏𝟖 【${em}】`,[bLine("⚠️","*EXCLUSIVO PARA VIPS*"),B_SEP,bLine(em,`*${P}piada18* / *${P}truth* / *${P}dare*`),bLine(em,`*${P}crush* / *${P}seduzir* / *${P}beijo* / *${P}abraco*`),bLine(em,`*${P}tapa* / *${P}flirt* / *${P}casal*`),B_SEP,bLine("💰",`*${P}alugar* para ser VIP`)]);
-  if(catId==="cat_adm"||catId==="adm")return bBloco(`𝐀𝐃𝐌𝐈𝐍𝐬 【${em}】`,[bLine("👥","banir/add/addadmin/removeadmin"),bLine("👥","silenciar/dessilenciar/addvip/vips"),bLine("📢","all/att/aviso/link/sorteio"),bLine("⚙️","fechar/abrir/bot/anti-link"),bLine("⚙️","nomegrupo/descgrupo/fotogrupo/scanlink")]);
-  if(catId==="cat_dono")return bBloco(`𝐃𝐎𝐍𝐎 【${em}】`,[bLine(em,`*${CONFIG.PREFIXO}ergue-se* / *${CONFIG.PREFIXO}set* / *${CONFIG.PREFIXO}out*`),bLine(em,`*${CONFIG.PREFIXO}prefixo* / *${CONFIG.PREFIXO}setfoto* / *${CONFIG.PREFIXO}chaton*`),bLine(em,`*${CONFIG.PREFIXO}sms* / *${CONFIG.PREFIXO}gsms*`),bLine(em,`*${CONFIG.PREFIXO}setmenu* [emoji] → _mudar emojis_`),B_SEP,bLine("👑",`*${CONFIG.DONO_NOME}* | 📞 ${CONFIG.DONO_NUM}`)]);
+  if(catId==="cat_adm"||catId==="adm")return bBloco(`𝐀𝐃𝐌𝐈𝐍𝐬 【${em}】`,[bLine("👥","banir/add/addadmin/removeadmin"),bLine("👥","silenciar/dessilenciar/addvip/vips"),bLine("📢","all/att/aviso/link/sorteio"),bLine("⚙️","fechar/abrir/bot"),bLine("⚙️","nomegrupo/descgrupo/fotogrupo/scanlink"),B_SEP,bLine("🔗","*ANTI-LINK:*"),bLine(em,`*${CONFIG.PREFIXO}anti-link easy* → _remove, sem banir_`),bLine(em,`*${CONFIG.PREFIXO}anti-link hard* → _remove e bane_`),bLine(em,`*${CONFIG.PREFIXO}anti-link off*`),B_SEP,bLine("🔔","*BOAS-VINDAS:*"),bLine(em,`*${CONFIG.PREFIXO}bemvindo on/off*`),bLine(em,`*${CONFIG.PREFIXO}bemvindo1* → _simples, sem foto_`),bLine(em,`*${CONFIG.PREFIXO}bemvindo2* → _completa, com foto_`),B_SEP,bLine("🏘️",`*${CONFIG.PREFIXO}grupoinfo* / *${CONFIG.PREFIXO}status* → _info do grupo/bot_`),bLine("😴",`*${CONFIG.PREFIXO}inactivos* [dias] → _lista membros inactivos_`),bLine("👮",`*${CONFIG.PREFIXO}marcaradmins* → _marca só admins_`)]);
+  if(catId==="cat_dono")return bBloco(`𝐃𝐎𝐍𝐎 【${em}】`,[bLine(em,`*${CONFIG.PREFIXO}ergue-se* / *${CONFIG.PREFIXO}set* / *${CONFIG.PREFIXO}out*`),bLine(em,`*${CONFIG.PREFIXO}prefixo* / *${CONFIG.PREFIXO}setfoto* / *${CONFIG.PREFIXO}chaton*`),bLine(em,`*${CONFIG.PREFIXO}sms* / *${CONFIG.PREFIXO}gsms*`),bLine(em,`*${CONFIG.PREFIXO}setmenu* [emoji] → _mudar emojis_`),bLine(em,`*${CONFIG.PREFIXO}setletra* [nome] / *${CONFIG.PREFIXO}verletras*`),bLine(em,`*${CONFIG.PREFIXO}downcase* [comando] → _extrai a case nativa_`),B_SEP,bLine("👑","*SUBDONOS:*"),bLine(em,`*${CONFIG.PREFIXO}addsubdono* @user / *${CONFIG.PREFIXO}removesubdono* @user`),bLine(em,`*${CONFIG.PREFIXO}subdonos* → _lista subdonos_`),bLine("👑","*DONOS:*"),bLine(em,`*${CONFIG.PREFIXO}adddono* @user / *${CONFIG.PREFIXO}removedono* @user`),B_SEP,bLine("👑",`*${CONFIG.DONO_NOME}* | 📞 ${CONFIG.DONO_NUM}`)]);
   return null;
 }
 
@@ -382,7 +418,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const cargo=isDono?"👑 Criador":(isAdmin?"👮 Administrador":"👤 Utilizador");
   const secoes=buildSecoes(isDono);
   const em=ME.e||ME.principal||"🌀";
-  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`*Bot*: ${CONFIG.NOME_BOT}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
+  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
   try{
     const payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:"≡ Categorias",sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
     if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
@@ -426,10 +462,31 @@ function gerarTextoAlugar(){return bBloco("💰 ALUGUEL BOT",[bLine("🎁","*Gr�
 function runCmd(cmd){return new Promise((resolve,reject)=>{exec(cmd,{timeout:180000,maxBuffer:150*1024*1024,env:{...process.env,TMPDIR:process.env.TMPDIR}},(err,stdout,stderr)=>{if(err)reject(new Error(stderr||err.message));else resolve(stdout.trim());});});}
 function encontrarArquivo(pasta,prefixo){try{const arqs=fs.readdirSync(pasta).filter(f=>f.startsWith(prefixo)&&!f.endsWith(".part")&&!f.endsWith(".ytdl"));if(!arqs.length)return null;const p=path.join(pasta,arqs[0]);return fs.statSync(p).size>3000?p:null;}catch{return null;}}
 
+// ════════════════════════════════════════════════
+// ✅ IA — Gemini (principal, grátis) com fallback Groq/Pollinations
+// ════════════════════════════════════════════════
+const IA_OFFLINE_MSG="❌ IA indisponível.";
+const GEMINI_MODELOS=["gemini-2.0-flash","gemini-1.5-flash"];
+async function chamarGeminiChat(mensagens,maxTokens=800,temperature=0.7){
+  if(!CONFIG.GEMINI_KEY)throw new Error("Sem GEMINI_KEY configurada");
+  const sistemaMsg=mensagens.find(m=>m.role==="system")?.content||"";
+  const contents=mensagens.filter(m=>m.role!=="system").map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]}));
+  for(const modelo of GEMINI_MODELOS){
+    try{
+      const body={contents,generationConfig:{maxOutputTokens:maxTokens,temperature}};
+      if(sistemaMsg)body.systemInstruction={parts:[{text:sistemaMsg}]};
+      const{data}=await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${CONFIG.GEMINI_KEY}`,body,{headers:{"Content-Type":"application/json"},timeout:20000,httpsAgent});
+      const resp=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim();
+      if(resp&&resp.length>0)return resp;
+    }catch(e){console.log(`❌ Gemini ${modelo}:`,e.response?.data?.error?.message||e.message);}
+  }
+  throw new Error("Gemini falhou");
+}
 async function chatIA(prompt,sistema="És um assistente simpático que responde em português de Angola. Sê direto."){
+  try{const r=await chamarGeminiChat([{role:"system",content:sistema},{role:"user",content:prompt}],800,0.7);if(r)return r;}catch{}
   for(const modelo of["llama-3.1-8b-instant","mixtral-8x7b-32768"]){try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:modelo,messages:[{role:"system",content:sistema},{role:"user",content:prompt}],max_tokens:800,temperature:0.7},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:20000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();if(resp&&resp.length>2)return resp;}catch(e){console.log(`❌ Groq ${modelo}:`,e.message);}}
   try{const{data}=await axios.get(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?system=${encodeURIComponent(sistema)}&model=openai-large`,{timeout:25000,responseType:"text",httpsAgent});const resp=typeof data==="string"?data.trim():String(data).trim();if(resp.length>5)return resp;}catch{}
-  return "❌ IA indisponível.";
+  return IA_OFFLINE_MSG;
 }
 
 async function transcreverComGroq(buffer){const formData=new FormData();formData.append("file",buffer,{filename:"audio.ogg",contentType:"audio/ogg"});formData.append("model","whisper-large-v3");formData.append("response_format","json");const{data}=await axios.post("https://api.groq.com/openai/v1/audio/transcriptions",formData,{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,...formData.getHeaders()},timeout:60000,httpsAgent});const texto=data?.text?.trim();if(!texto)throw new Error("Áudio não audível");return texto;}
@@ -579,40 +636,26 @@ async function buscarTituloYT(query){
 }
 
 async function downloadVideo(entrada,height=480){
-  const isUrl=entrada.startsWith("http");
-  const nomeBase=`vid_${Date.now()}`;
-  const saida=path.join("./downloads",`${nomeBase}.%(ext)s`);
-  const pesquisa=isUrl?entrada:`ytsearch1:${entrada}`;
-
-  // 1. yt-dlp — tenta formatos progressivamente
-  const formatos=[
-    `best[height<=${height}][ext=mp4]/best[height<=${height}]/best[ext=mp4]/best/worst`,
-    `18`,  // 360p mp4 directo
-    `worst`,
-  ];
-  for(const fmt of formatos){
+  const isUrl=entrada.startsWith("http")||entrada.includes("youtu");
+  const outputDir="./downloads";
+  const query=isUrl?entrada:`ytsearch1:${entrada}`;
+  const playerClients=["android_vr","mweb","android_creator","ios","tv_embedded","android"];
+  for(const client of playerClients){
+    const nomeBase=`vid_${Date.now()}_${client.slice(0,3)}`;
+    const saida=`${outputDir}/${nomeBase}.%(ext)s`;
+    const cmd=[YTDLP_CMD,
+      `-f "best[height<=${height}][ext=mp4]/best[height<=${height}]/18/worst"`,
+      `--extractor-args "youtube:player_client=${client}"`,
+      "--no-playlist --no-warnings --no-check-certificate --geo-bypass --force-ipv4",
+      "--merge-output-format mp4 --retries 2",
+      `-o "${saida}" "${query}"`].join(" ");
     try{
-      const cmd=`${YTDLP_CMD} -f "${fmt}" --no-playlist --no-warnings --no-check-certificate --geo-bypass -o "${saida}" "${pesquisa}"`;
-      await runCmd(cmd);
-      const arq=encontrarArquivo("./downloads",nomeBase);
-      if(arq){
-        const tam=fs.statSync(arq).size;
-        if(tam>10000&&tam<100*1024*1024)return arq;
-        try{fs.removeSync(arq);}catch{}
-      }
-    }catch(e){console.log(`⚠️ mp4 yt-dlp (${fmt}):`,e.message.slice(0,60));}
+      await new Promise((res,rej)=>require("child_process").exec(cmd,{timeout:120000,maxBuffer:200*1024*1024},(err,stdout,stderr)=>err?rej(new Error((stderr||err.message).slice(0,200))):res(stdout)));
+      const arq=encontrarArquivo(outputDir,nomeBase);
+      if(arq&&fs.existsSync(arq)){const tam=fs.statSync(arq).size;if(tam>10000&&tam<100*1024*1024){console.log(`✅ mp4 OK [${client}]`);return arq;}try{fs.removeSync(arq);}catch{}}
+    }catch(e){const msg=e.message;if(msg.includes("403")||msg.includes("Forbidden")||msg.includes("Sign in")){console.log(`⚠️ mp4 [${client}] 403→próximo`);continue;}console.log(`⚠️ mp4 [${client}]:`,msg.slice(0,60));}
   }
-
-  // 2. Scraper Hub fallback
-  try{
-    const buf=await downloadViaScraperHub(entrada,"mp4");
-    const p=path.join("./downloads",`vid_hub_${Date.now()}.mp4`);
-    fs.writeFileSync(p,buf);
-    const tam=fs.statSync(p).size;
-    if(tam>10000&&tam<100*1024*1024)return p;
-    fs.removeSync(p);
-  }catch(e){console.log("⚠️ Scraper Hub mp4:",e.message);}
-
+  try{const buf=await downloadViaScraperHub(entrada,"mp4");const p=`${outputDir}/vid_hub_${Date.now()}.mp4`;fs.writeFileSync(p,buf);const tam=fs.statSync(p).size;if(tam>10000&&tam<100*1024*1024){console.log("✅ mp4 OK via Hub");return p;}fs.removeSync(p);}catch(e){if(!e.message.includes("offline"))console.log("⚠️ Hub mp4:",e.message.slice(0,60));}
   return null;
 }
 
@@ -717,14 +760,33 @@ async function classificarIntencao(pergunta){
   const sistema=`Classificador de intenções para bot WhatsApp. Responde APENAS JSON puro.
 Intenções: DOWNLOADS_MUSICA, DOWNLOADS_VIDEO, DOWNLOADS_TIKTOK, CALCULADORA, TEMPO, HORARIO, MOEDAS, ALUGAR, PING, IA_PERGUNTA, IA_PIADA, IA_HISTORIA, IA_POEMA, DESCONHECIDO
 Formato: {"intencao":"NOME","parametro":"texto ou vazio","confianca":0-100}`;
-  try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:"llama-3.1-8b-instant",messages:[{role:"system",content:sistema},{role:"user",content:pergunta}],max_tokens:200,temperature:0.1},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:12000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();const m=resp?.match(/\{[\s\S]+\}/);if(m)return JSON.parse(m[0]);}catch(e){console.log("❌ classificarIntencao:",e.message);}
+  try{const resp=await chamarGeminiChat([{role:"system",content:sistema},{role:"user",content:pergunta}],200,0.1);const m=resp?.match(/\{[\s\S]+\}/);if(m)return JSON.parse(m[0]);}catch(e){console.log("❌ classificarIntencao Gemini:",e.message);}
+  try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:"llama-3.1-8b-instant",messages:[{role:"system",content:sistema},{role:"user",content:pergunta}],max_tokens:200,temperature:0.1},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:12000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();const m=resp?.match(/\{[\s\S]+\}/);if(m)return JSON.parse(m[0]);}catch(e){console.log("❌ classificarIntencao Groq:",e.message);}
   return{intencao:"DESCONHECIDO",parametro:"",confianca:0};
 }
 
 async function respostaAssistente(pergunta,historico=[],nomeUser){
   const sistema=`Você é Isaías, assistente do bot LORDE LÁ DJUM v3.5 no WhatsApp. Responde em português de Angola. Seja direto, amigável e natural. O utilizador chama-se ${nomeUser}.`;
-  try{const msgs=[{role:"system",content:sistema},...historico.slice(-MAX_HISTORIA_IA*2),{role:"user",content:pergunta}];const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:"llama-3.1-8b-instant",messages:msgs,max_tokens:600,temperature:0.8},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:20000,httpsAgent});return data.choices?.[0]?.message?.content?.trim()||"Desculpa, tenta de novo!";}
-  catch{return"Desculpa, tive um problema. Tenta de novo!";}
+  const msgs=[{role:"system",content:sistema},...historico.slice(-MAX_HISTORIA_IA*2),{role:"user",content:pergunta}];
+  try{const r=await chamarGeminiChat(msgs,600,0.8);if(r)return r;}catch(e){console.log("❌ respostaAssistente Gemini:",e.message);}
+  try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:"llama-3.1-8b-instant",messages:msgs,max_tokens:600,temperature:0.8},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:20000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();if(resp)return resp;}catch(e){console.log("❌ respostaAssistente Groq:",e.message);}
+  return IA_OFFLINE_MSG;
+}
+
+// ✅ Classificador de comando directo — dá ao Assistente controlo de TODOS os comandos, sem prefixo
+async function classificarComandoDireto(pergunta){
+  try{
+    const listaComandos=[...TODOS_COMANDOS].join(", ");
+    const sistema=`Identifica se o pedido do utilizador corresponde claramente a um dos comandos deste bot de WhatsApp.\nComandos disponíveis: ${listaComandos}.\nResponde APENAS JSON puro: {"comando":"nome_exacto_ou_null","args":"argumentos ou vazio"}.\nSe não corresponder claramente a nenhum comando, "comando" deve ser null.`;
+    const resp=await chatIA(pergunta,sistema);
+    if(!resp||resp===IA_OFFLINE_MSG)return null;
+    const m=resp.match(/\{[\s\S]+\}/);
+    if(!m)return null;
+    const p=JSON.parse(m[0]);
+    const cmd=String(p.comando||"").toLowerCase().trim();
+    if(cmd&&cmd!=="null"&&TODOS_COMANDOS.has(cmd))return{comando:cmd,args:p.args||""};
+  }catch(e){console.log("❌ classificarComandoDireto:",e.message);}
+  return null;
 }
 
 async function executarAssistente(sock,jid,msg,sender,seloBot,texto,isDono,isAdmin,isGrupo){
@@ -757,6 +819,19 @@ async function executarAssistente(sock,jid,msg,sender,seloBot,texto,isDono,isAdm
     if(intencao==="ALUGAR"){await sock.sendMessage(jid,{text:gerarTextoAlugar()},{quoted:seloBot});adicionarHistorico(jid,"assistant","Info de aluguel!");return true;}
     if(intencao==="PING"){const ini=Date.now();await envR(bBloco("📡 PING",[bLine("🏓",`*${Date.now()-ini}ms* | ⏱️ ${Math.floor(process.uptime()/60)} min`)]),"📡");return true;}
 
+    // ✅ CONTROLO TOTAL DE COMANDOS — o Assistente executa qualquer comando do bot sem precisar do prefixo
+    if(intencao==="DESCONHECIDO"||confianca<50){
+      const direto=await classificarComandoDireto(perguntaLimpa);
+      if(direto&&direto.comando){
+        const textoComando=`${CONFIG.PREFIXO}${direto.comando}${direto.args?` ${direto.args}`:""}`.trim();
+        await reagir(sock,msg,"⚙️");
+        adicionarHistorico(jid,"assistant",`▶️ A executar: ${textoComando}`);
+        const msgSintetica={...msg,key:{...msg.key,id:`${msg.key.id}_ia${Date.now()}`},message:{conversation:textoComando}};
+        try{sock.ev.emit("messages.upsert",{messages:[msgSintetica],type:"notify"});}catch(e){console.log("❌ Execução directa via Assistente:",e.message);}
+        return true;
+      }
+    }
+
     // IA geral
     await reagir(sock,msg,"🧠");
     let prompt=parametro||perguntaLimpa;
@@ -764,13 +839,14 @@ async function executarAssistente(sock,jid,msg,sender,seloBot,texto,isDono,isAdm
     else if(intencao==="IA_HISTORIA")prompt=`Escreve história curta sobre: ${parametro||"algo interessante"}. Máx 200 palavras.`;
     else if(intencao==="IA_POEMA")prompt=`Escreve poema de 4-6 versos sobre: ${parametro||"Angola"}.`;
     const resp=await respostaAssistente(prompt,assistenteHistoria[jid]||[],nomeUser);
+    if(!resp||resp===IA_OFFLINE_MSG){await reagir(sock,msg,"📵");return true;}
     await sock.sendMessage(jid,{text:resp},{quoted:seloBot});
     await reagir(sock,msg,"🧠");
     adicionarHistorico(jid,"user",prompt);
     adicionarHistorico(jid,"assistant",resp);
     addXP(sender,2);
     return true;
-  }catch(e){console.error("❌ Assistente:",e.message);try{await sock.sendMessage(jid,{text:bBloco("😔 ERRO",[bLine("💡","Tenta de novo ou usa *!menu*!")])},{quoted:seloBot});}catch{}return true;}
+  }catch(e){console.error("❌ Assistente:",e.message);try{await reagir(sock,msg,"📵");}catch{}return true;}
 }
 
 // ════════════════════════════════════════════════
@@ -835,7 +911,81 @@ async function executarReconhecimentoMusica(sock,jid,msg,sender,seloBot){
 }
 
 // ════════════════════════════════════════════════
-// ✅ PLAY BANNER + BOTÕES
+// ✅ PLAY1 (!play1) — carrossel com 5 músicas
+// ════════════════════════════════════════════════
+async function processarComandoPlay1(sock,chatJid,msg,sender,query){
+  const seloBotL=criarSeloBot(chatJid);
+  try{
+    if(!query||!query.trim()){await sock.sendMessage(chatJid,{text:bBloco("⚠️ PLAY1",[bLine("💡",`*${CONFIG.PREFIXO}play1* [nome da música]`)])},{quoted:seloBotL});return;}
+    if(!yts)throw new Error("Módulo yt-search não instalado. Corre: npm i yt-search");
+    await reagir(sock,msg,"🔍");
+
+    const busca=await yts(query);
+    const videos=(busca.videos||[]).slice(0,5);
+    if(!videos.length){await reagir(sock,msg,"❌");await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY1",[bLine("💡","Nenhuma música encontrada!")])},{quoted:seloBotL});return;}
+
+    let mediaHeaderPadrao={hasMediaAttachment:false};
+    const{prepareWAMessageMedia}=require("@itsliaaa/baileys");
+    if(botFotoBuffer){
+      try{
+        const mediaPrep=await prepareWAMessageMedia({image:botFotoBuffer},{upload:sock.waUploadToServer});
+        mediaHeaderPadrao={hasMediaAttachment:true,imageMessage:mediaPrep.imageMessage};
+      }catch{mediaHeaderPadrao={hasMediaAttachment:false};}
+    }
+
+    const cards=[];
+    for(let i=0;i<videos.length;i++){
+      const video=videos[i];
+      let mediaHeaderVideo=mediaHeaderPadrao;
+      try{
+        const mediaPrep=await prepareWAMessageMedia({image:{url:video.thumbnail}},{upload:sock.waUploadToServer});
+        mediaHeaderVideo={hasMediaAttachment:true,imageMessage:mediaPrep.imageMessage};
+      }catch{mediaHeaderVideo=mediaHeaderPadrao;}
+
+      const textoCard=`╔Ξ─ׂ━ ━━╌━╌ ╌━╌━━ ─Ξ╗\n╠━━ׁ۫━፝֟━̷━𑁁━『🎵』━𑁁━፝֟━̷━ׁ۫━Ξ╗\n║[̲̅⊱ 📌 *${video.title}*\n║[̲̅⊱ ⏱️ *Duração:* ${video.timestamp}\n║[̲̅⊱ 👤 *Canal:* ${video.author?.name||"N/A"}\n║[̲̅⊱ 👁️ *Views:* ${(video.views||0).toLocaleString("pt-BR")}\n╚Ξ─ׂ━ ╌━━━╌ ━፝֟╌━━━╌ ━─Ξ╝`;
+
+      cards.push({
+        header:mediaHeaderVideo,
+        body:{text:textoCard},
+        footer:{text:`${i+1}/${videos.length} | ${CONFIG.NOME_BOT}`},
+        nativeFlowMessage:{
+          buttons:[
+            {name:"quick_reply",buttonParamsJson:JSON.stringify({display_text:"🎧 Baixar Áudio",id:`play1_mp3_${encodeURIComponent(video.url)}`})},
+            {name:"quick_reply",buttonParamsJson:JSON.stringify({display_text:"🎥 Baixar Vídeo",id:`play1_mp4_${encodeURIComponent(video.url)}`})},
+          ],
+          messageParamsJson:JSON.stringify({limited_use:true})
+        }
+      });
+    }
+
+    const contextInfo=seloBotL?{stanzaId:seloBotL.key?.id,participant:seloBotL.key?.participant||seloBotL.key?.remoteJid,quotedMessage:seloBotL.message,mentionedJid:[sender]}:{mentionedJid:[sender]};
+
+    const content={
+      viewOnceMessage:{
+        message:{
+          interactiveMessage:{
+            body:{text:`🎵 *RESULTADOS DA BUSCA:* _"${query}"_\n\nDeslize para o lado para escolher a música desejada! 👉`},
+            footer:{text:CONFIG.NOME_BOT},
+            carouselMessage:{cards},
+            contextInfo
+          }
+        }
+      }
+    };
+
+    const fullMsg=generateWAMessageFromContent(chatJid,content,{});
+    const bizNode={tag:"biz",attrs:{},content:[{tag:"interactive",attrs:{type:"native_flow",v:"1"},content:[{tag:"native_flow",attrs:{name:"mixed"}}]}]};
+    await sock.relayMessage(chatJid,fullMsg.message,{messageId:fullMsg.key.id,additionalNodes:[bizNode]});
+    await reagir(sock,msg,"🎧");
+  }catch(e){
+    console.error("❌ play1:",e.message);
+    await reagir(sock,msg,"❌");
+    await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY1",[bLine("💡","Erro ao buscar músicas!"),bLine("🔴",e.message)])},{quoted:seloBotL});
+  }
+}
+
+// ════════════════════════════════════════════════
+// ✅ PLAY BANNER + BOTÕES (mantido para compatibilidade dos botões mp3/mp4/doc)
 // ════════════════════════════════════════════════
 function montarLegendaPlay(item){return `${B_TOP}\n${bTitle("🎵 "+item.titulo)}\n${B_MID}\n${bLine("👤","Canal: "+item.autor)}\n${item.duracao?bLine("⏱️","Duração: "+item.duracao)+"\n":""}\n${bLine("✨","Selecciona o formato desejado.")}\n${B_BOT}`;}
 
@@ -884,6 +1034,51 @@ async function processarComandoPlay(sock,chatJid,msg,query){
   await sock.sendMessage(chatJid,{react:{text:"✅",key:msg.key}});
 }
 
+async function processarBotaoPlay1(sock,msg,formato,url){
+  const chatJid=msg.key.remoteJid;
+  const seloBotL=criarSeloBot(chatJid);
+  await reagir(sock,msg,formato==="mp3"?"🎧":"🎬");
+  try{
+    if(formato==="mp3"){
+      const arq=await barraCarregamento(sock,chatJid,seloBotL,"A baixar áudio",()=>downloadMusica(url,false));
+      if(!arq||!fs.existsSync(arq))throw new Error("Áudio não encontrado. Tenta outro link.");
+      await enviarAudio(sock,chatJid,arq,seloBotL);
+      await reagir(sock,msg,"✅");
+      setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+    }else{
+      const arq=await barraCarregamento(sock,chatJid,seloBotL,"A baixar vídeo",()=>downloadVideo(url,480));
+      if(!arq||!fs.existsSync(arq))throw new Error("Vídeo não encontrado. Tenta outro link.");
+      await enviarVideo(sock,chatJid,arq,bLine("🎬",`_© ${nomeBotEstilizado()}_`),[],seloBotL);
+      await reagir(sock,msg,"✅");
+      setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+    }
+  }catch(e){
+    await sock.sendMessage(chatJid,{text:bBloco("❌ ERRO",[bLine("💡",e.message||"Erro ao baixar.")])},{quoted:seloBotL});
+    await reagir(sock,msg,"❌");
+  }
+}
+
+function extrairCodigoComando(source,nomeComando){
+  const regex=new RegExp(`if\\(+comando===["'\`]${nomeComando.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}["'\`]`);
+  const match=regex.exec(source);
+  if(!match)return null;
+  const startIdx=match.index;
+  let idxParen=source.indexOf("(",startIdx);
+  let depthParen=0,j=idxParen;
+  for(;j<source.length;j++){
+    if(source[j]==="(")depthParen++;
+    else if(source[j]===")"){depthParen--;if(depthParen===0){j++;break;}}
+  }
+  while(j<source.length&&/\s/.test(source[j]))j++;
+  if(source[j]!=="{")return null;
+  let depthBrace=0,k=j;
+  for(;k<source.length;k++){
+    if(source[k]==="{")depthBrace++;
+    else if(source[k]==="}"){depthBrace--;if(depthBrace===0){k++;break;}}
+  }
+  return source.slice(startIdx,k);
+}
+
 async function processarBotaoPlay(sock,msg){
   const chatJid=msg.key.remoteJid;
   let formato=null,chave=null;
@@ -896,9 +1091,42 @@ async function processarBotaoPlay(sock,msg){
   const loadingMsg=await rodarLoadingHacker(sock,chatJid,msg,item.titulo,formato);
   let arquivoFinal=null;
   try{
-    if(formato==="mp3"){arquivoFinal=await downloadMusica(item.url||item.query,false);if(!arquivoFinal||!fs.existsSync(arquivoFinal))throw new Error("Download falhou");const buf=fs.readFileSync(arquivoFinal);try{await sock.sendMessage(chatJid,{delete:loadingMsg.key});}catch{}await sock.sendMessage(chatJid,{audio:buf,mimetype:"audio/mpeg",fileName:`${item.titulo}.mp3`},{quoted:msg});}
-    else if(formato==="mp4"){arquivoFinal=await downloadVideo(item.url||item.query,480);if(!arquivoFinal||!fs.existsSync(arquivoFinal))throw new Error("Download falhou");const buf=fs.readFileSync(arquivoFinal);try{await sock.sendMessage(chatJid,{delete:loadingMsg.key});}catch{}await sock.sendMessage(chatJid,{video:buf,caption:bLine("🎬",item.titulo),mimetype:"video/mp4"},{quoted:msg});}
-    else if(formato==="doc"){arquivoFinal=await downloadMusica(item.url||item.query,true);if(!arquivoFinal||!fs.existsSync(arquivoFinal))throw new Error("Download falhou");const buf=fs.readFileSync(arquivoFinal);try{await sock.sendMessage(chatJid,{delete:loadingMsg.key});}catch{}await sock.sendMessage(chatJid,{document:buf,mimetype:"audio/mpeg",fileName:`${item.titulo}.mp3`},{quoted:msg});}
+    if(formato==="mp3"){
+              arquivoFinal=await downloadMusica(item.url||item.query,false);
+              if(!arquivoFinal||!fs.existsSync(arquivoFinal))throw new Error("Áudio não disponível. Tenta !mp3 [nome]");
+              const thumbUrl2=item.thumbnail||null;
+              const titulo2=item.titulo||"Música";
+              const buf=fs.readFileSync(arquivoFinal);
+              try{await sock.sendMessage(chatJid,{delete:loadingMsg.key});}catch{}
+              // Envia thumbnail + título primeiro
+              if(thumbUrl2){
+                try{await sock.sendMessage(chatJid,{image:{url:thumbUrl2},caption:`🎵 *${titulo2}*`},{quoted:msg});}catch{}
+              }
+              await sock.sendMessage(chatJid,{
+                audio:buf,
+                mimetype:"audio/mpeg",
+                fileName:`${titulo2}.mp3`,
+              },{quoted:msg});
+            }
+    else if(formato==="mp4"){
+              arquivoFinal=await downloadVideo(item.url||item.query,480);
+              if(!arquivoFinal||!fs.existsSync(arquivoFinal))throw new Error("Vídeo não disponível. Tenta !mp4 [nome]");
+              const bufV=fs.readFileSync(arquivoFinal);
+              try{await sock.sendMessage(chatJid,{delete:loadingMsg.key});}catch{}
+              await sock.sendMessage(chatJid,{
+                video:bufV,
+                caption:bLine("🎬",`*${item.titulo}*`),
+                mimetype:"video/mp4",
+              },{quoted:msg});
+            }
+    else if(formato==="doc"){
+              arquivoFinal=await downloadMusica(item.url||item.query,true);
+              if(!arquivoFinal||!fs.existsSync(arquivoFinal))throw new Error("Ficheiro não disponível. Tenta !mp3 [nome]");
+              const tituloDoc=(item.titulo||"audio").replace(/[^\w\s]/g,"").trim().slice(0,50)||"audio";
+              const bufDoc=fs.readFileSync(arquivoFinal);
+              try{await sock.sendMessage(chatJid,{delete:loadingMsg.key});}catch{}
+              await sock.sendMessage(chatJid,{document:bufDoc,mimetype:"audio/mpeg",fileName:`${tituloDoc}.mp3`,caption:bLine("📄",`*${item.titulo}*`)},{quoted:msg});
+            }
     await sock.sendMessage(chatJid,{react:{text:"✅",key:msg.key}});
   }catch(e){console.error("❌ [PLAY]:",e.message);try{await sock.sendMessage(chatJid,{text:bBloco("⛔ FALHA",[bLine("❌",`_${e.message}_`)]),edit:loadingMsg.key});}catch{await sock.sendMessage(chatJid,{text:bBloco("⛔ FALHA",[bLine("❌",`_${e.message}_`)])},{quoted:msg});}await sock.sendMessage(chatJid,{react:{text:"❌",key:msg.key}});}
   finally{if(arquivoFinal&&fs.existsSync(arquivoFinal)){try{fs.removeSync(arquivoFinal);}catch{}}removerPlayCache(chave);}
@@ -908,7 +1136,7 @@ async function processarBotaoPlay(sock,msg){
 // ════════════════════════════════════════════════
 // ✅ TODOS OS COMANDOS
 // ════════════════════════════════════════════════
-const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","sticker","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","ergue-se","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","rpgstart","rpgstatus","rpgataque","rpgcurar","rpgsorte","rpgclasse","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase"]);
+const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","ergue-se","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","rpgstart","rpgstatus","rpgataque","rpgcurar","rpgsorte","rpgclasse","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -922,6 +1150,26 @@ async function startBot(){
     const{state,saveCreds}=await useMultiFileAuthState("./sessao");
     const sock=makeWASocket({version,auth:state,printQRInTerminal:false,getMessage:async()=>({conversation:""}),generateHighQualityLinkPreview:false,fetchAgent:httpsAgent,logger:silentLogger,connectTimeoutMs:60000,keepAliveIntervalMs:10000,retryRequestDelayMs:2000,maxMsgRetryCount:3,defaultQueryTimeoutMs:180000});
     sock.ev.on("creds.update",saveCreds);
+
+    // ✅ Aplica a letra/fonte escolhida (!setletra) a TODAS as mensagens de texto do bot
+    function protegerEEstilizar(texto){
+      if(FONTE_ATUAL==="Abadi"||typeof texto!=="string"||!texto)return texto;
+      try{
+        const partes=texto.split(/(https?:\/\/[^\s]+|@[0-9]{5,})/g);
+        return partes.map(p=>(/^https?:\/\//.test(p)||/^@[0-9]{5,}$/.test(p))?p:aplicarFonte(FONTE_ATUAL,p)).join("");
+      }catch{return texto;}
+    }
+    const _sendMessageOriginal=sock.sendMessage.bind(sock);
+    sock.sendMessage=(destJid,content,options)=>{
+      try{
+        if(content&&typeof content==="object"&&!Buffer.isBuffer(content)){
+          if(typeof content.text==="string")content.text=protegerEEstilizar(content.text);
+          if(typeof content.caption==="string")content.caption=protegerEEstilizar(content.caption);
+        }
+      }catch{}
+      return _sendMessageOriginal(destJid,content,options);
+    };
+
     setInterval(()=>{try{const now=Date.now();for(const[k,v] of playCacheMap.entries()){if(now-v.criadoEm>15*60*1000)playCacheMap.delete(k);}}catch{}},5*60*1000);
 
     if(!sock.authState.creds.registered){
@@ -941,7 +1189,31 @@ async function startBot(){
 
     sock.ev.on("group-participants.update",async(update)=>{
       try{const{id,participants,action}=update;if(!participants||!Array.isArray(participants))return;
-        if(action==="add"){for(const participante of participants){const p=extrairJid(participante);if(!p||!p.includes("@"))continue;try{const meta=await sock.groupMetadata(id);const admins=meta.participants.filter(m=>m.admin).map(m=>extrairJid(m.id||m));const mentions=[p,...admins];let ppUser=null;try{ppUser=await sock.profilePictureUrl(p,"image");}catch{}const listaAdm=admins.length>0?admins.map(a=>bLine("👮",`@${a.split("@")[0]}`)).join("\n"):"_(sem admins)_";const texto=`${B_TOP}\n${bTitle("🎉 BEM-VINDO!")}\n${B_MID}\n${bLine("👋",`Olá @${p.split("@")[0]}! 🤗`)}\n${bLine("🏘️",`Bem-vindo(a) ao *${meta.subject}*!`)}\n${B_MID}\n${bLine("📋","*REGRAS:*")}\n${bLine("❌","Sem links | Sem spam")}\n${bLine("✅","Respeita todos")}\n${B_MID}\n${bLine("🤖",`Chama *Isaías* para me falar!\n   _"Isaías, ..."_`)}\n${bLine("⌨️",`Ou usa *${CONFIG.PREFIXO}menu*`)}\n${B_BOT}`;if(ppUser)await sock.sendMessage(id,{image:{url:ppUser},caption:texto,mentions});else await sock.sendMessage(id,{text:texto,mentions});}catch(e){console.log("❌ Boas-vindas:",e.message);}}}
+        if(action==="add"){
+          if(bemVindoDesativado.has(id))return;
+          const modoBv=bemVindoModo.get(id)||2;
+          for(const participante of participants){
+            const p=extrairJid(participante);
+            if(!p||!p.includes("@"))continue;
+            try{
+              if(modoBv===1){
+                // ✅ BEMVINDO 1 — simples, sem foto, sem muitas informações
+                const meta1=await sock.groupMetadata(id).catch(()=>null);
+                const nomeGrupo=meta1?.subject||"grupo";
+                await sock.sendMessage(id,{text:`👋 Olá @${p.split("@")[0]}! Seja bem-vindo(a) ao *${nomeGrupo}*! 🎉`,mentions:[p]});
+              }else{
+                // ✅ BEMVINDO 2 — completo, com foto e informações
+                const meta=await sock.groupMetadata(id);
+                const admins=meta.participants.filter(m=>m.admin).map(m=>extrairJid(m.id||m));
+                const mentions=[p,...admins];
+                let ppUser=null;try{ppUser=await sock.profilePictureUrl(p,"image");}catch{}
+                const texto=`${B_TOP}\n${bTitle("🎉 BEM-VINDO!")}\n${B_MID}\n${bLine("👋",`Olá @${p.split("@")[0]}! 🤗`)}\n${bLine("🏘️",`Bem-vindo(a) ao *${meta.subject}*!`)}\n${bLine("👥",`Membros: *${meta.participants.length}*`)}\n${B_MID}\n${bLine("📋","*REGRAS:*")}\n${bLine("❌","Sem links | Sem spam")}\n${bLine("✅","Respeita todos")}\n${B_MID}\n${bLine("🤖",`Chama *Isaías* para me falar!\n   _"Isaías, ..."_`)}\n${bLine("⌨️",`Ou usa *${CONFIG.PREFIXO}menu*`)}\n${B_BOT}`;
+                if(ppUser)await sock.sendMessage(id,{image:{url:ppUser},caption:texto,mentions});
+                else await sock.sendMessage(id,{text:texto,mentions});
+              }
+            }catch(e){console.log("❌ Boas-vindas:",e.message);}
+          }
+        }
         if(action==="remove"){for(const participante of participants){const p=extrairJid(participante);if(!p||!p.includes("@"))continue;try{await sock.sendMessage(id,{text:bLine("👋",`@${p.split("@")[0]} BAZAAA... 😂💨`),mentions:[p]});}catch{}}}
       }catch(e){console.log("❌ group-participants:",e.message);}
     });
@@ -954,9 +1226,9 @@ async function startBot(){
         if(jid==="status@broadcast")return;
         if(msg.key.fromMe)return;
         // ✅ SKIP REACÇÕES DE EMOJI, POLLS, E SYSTEM MSGS
-        const tipoMsg=Object.keys(msg.message||{})[0]||"";
-        const TIPOS_IGNORAR=["reactionMessage","pollUpdateMessage","senderKeyDistributionMessage","protocolMessage","ephemeralMessage","callLogMessage","groupInviteMessage","requestPhoneNumberMessage","keepInMessageList","pinInChatMessage","orderMessage","invoiceMessage","productMessage","botInvokeMessage","interactiveResponseMessage"];
-        if(TIPOS_IGNORAR.includes(tipoMsg))return;
+        const chavesMsg=Object.keys(msg.message||{});
+        const TIPOS_IGNORAR=["reactionMessage","pollUpdateMessage","senderKeyDistributionMessage","protocolMessage","ephemeralMessage","callLogMessage","groupInviteMessage","requestPhoneNumberMessage","keepInMessageList","pinInChatMessage","orderMessage","invoiceMessage","productMessage","botInvokeMessage"];
+        if(chavesMsg.some(k=>TIPOS_IGNORAR.includes(k)))return;
         // ✅ SKIP mensagens de bots externos (Meta AI, etc.)
         if(msg.message?.botInvokeMessage)return;
         if(msg.verifiedBizName)return; // ignora mensagens de bots verificados
@@ -971,7 +1243,9 @@ async function startBot(){
 
         const seloBot=criarSeloBot(jid);
         const sender=extrairJid(isGrupo?(msg.key.participant||""):msg.key.remoteJid);
-        const isDono=ehDono(sender);
+        const isDonoReal=ehDono(sender);
+        const isSub=ehSubdono(sender);
+        const isDono=isDonoReal||isSub; // ✅ subdono tem acesso a quase tudo, excepto adddono/removedono/addsubdono/removesubdono
         const texto=getTexto(msg);
         // ✅ Nome de exibição: usa pushName (nome do WhatsApp) ou número
         const nomeExibicao=(msg.pushName||"").trim()||sender.split("@")[0].split(":")[0];
@@ -999,7 +1273,11 @@ async function startBot(){
         if(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage||msg.message?.templateButtonReplyMessage){
           const btnId=extrairBotaoClicado(msg);
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
+          if(btnId&&btnId.startsWith("play1_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
           if(btnId&&btnId.startsWith("cat_")){await enviarSubmenu(sock,jid,msg,btnId,seloBot,sender,isDono);return;}
+          if(btnId&&btnId.startsWith("use_prefix_"))return;
+          // ✅ Botão não reconhecido (provavelmente de OUTRO bot no grupo) — ignora silenciosamente
+          if(btnId!==null)return;
         }
 
         // List response (menu carrossel)
@@ -1008,7 +1286,19 @@ async function startBot(){
 
         // Interactive response
         const interResp=msg.message?.interactiveResponseMessage;
-        if(interResp){let catId=null;try{const nf=interResp.nativeFlowResponseMessage;if(nf?.paramsJson){const params=JSON.parse(nf.paramsJson);catId=params.id||params.selectedId||params.rowId||null;}}catch{}if(!catId)catId=interResp.body||null;if(catId){if(catId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!gruposAtivados.has(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}}}
+        if(interResp){
+          let catId=null;
+          try{const nf=interResp.nativeFlowResponseMessage;if(nf?.paramsJson){const params=JSON.parse(nf.paramsJson);catId=params.id||params.selectedId||params.rowId||null;}}catch{}
+          if(!catId)catId=interResp.body||null;
+          if(catId){
+            if(catId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
+            if(catId.startsWith("play1_")){const partes=catId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
+            if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!gruposAtivados.has(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}
+            if(catId.startsWith("use_prefix_"))return;
+          }
+          // ✅ Resposta interactiva não reconhecida (provavelmente de OUTRO bot no grupo) — ignora
+          return;
+        }
 
         // !ergue-se
         if(isDono&&isGrupo&&texto===`${CONFIG.PREFIXO}ergue-se`){gruposAtivados.add(jid);const caption=bBloco("✅ ERGUE-TE! 🤴🏽",[bLine("🔒","Anti-link: *ACTIVO*"),bLine("🤖","Isaías: Menciona o nome dele!"),bLine("🌐",CONFIG.IS_SERVER?"☁️ Servidor":"📱 Local"),bLine("💡",`Usa *${CONFIG.PREFIXO}menu*!`)]);await reagir(sock,msg,"✅");if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption},{quoted:seloBot});else await sock.sendMessage(jid,{text:caption},{quoted:seloBot});return;}
@@ -1029,6 +1319,17 @@ async function startBot(){
           await verificarExpiracaoAluguel(sock,jid);
         }
         // No PRIVADO — a senha (!pp) ainda é necessária (tratada abaixo)
+        // ✅ GRUPOS: ignorar TUDO que não seja prefixo, Isaías ou botões
+        // Nenhuma resposta a mensagens de outros, reacções, contactos, etc.
+        if(isGrupo&&!isDono){
+          const temPrefixo=texto&&texto.startsWith(CONFIG.PREFIXO);
+          const temIsaias=texto&&detectarChamadaAssistente(texto);
+          const temBotao=!!(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage||msg.message?.listResponseMessage||msg.message?.templateButtonReplyMessage);
+          const temRevelar=texto&&(texto.toLowerCase().trim()==="#revelar"||texto.toLowerCase().trim()==="revelar");
+          if(!temPrefixo&&!temIsaias&&!temBotao&&!temRevelar){
+            return; // ✅ SILÊNCIO TOTAL — ignora tudo o resto
+          }
+        }
         if(chatsDesativados.has(jid)&&!isDono)return;
 
         let isAdmin=isDono;
@@ -1036,7 +1337,16 @@ async function startBot(){
 
         if(isGrupo&&!isAdmin&&(membrosSilenciados[jid]||[]).includes(sender)){try{await sock.sendMessage(jid,{delete:msg.key});}catch{};return;}
         if(isGrupo&&!isAdmin&&ehMencaoStatus(msg,texto)){banirComContagem(sock,jid,sender,msg.key,"Menção de status ⛔");return;}
-        if(isGrupo&&!isAdmin&&!antiLinkDesativado.has(jid)&&LINK_RX.test(texto)){banirComContagem(sock,jid,sender,msg.key,"Link proibido 🔗❌");return;}
+        if(isGrupo&&!isAdmin&&!antiLinkDesativado.has(jid)&&LINK_RX.test(texto)){
+          const modoLink=antiLinkModo.get(jid)||"easy";
+          if(modoLink==="hard"){
+            banirComContagem(sock,jid,sender,msg.key,"Link proibido 🔗❌ (Antilink Hard)");
+          }else{
+            try{await sock.sendMessage(jid,{delete:msg.key});}catch{}
+            try{await sock.sendMessage(jid,{text:bLine("🔗",`Links não são permitidos aqui, @${sender.split("@")[0]}! _(Antilink Easy)_`),mentions:[sender]});}catch{}
+          }
+          return;
+        }
         if(isGrupo&&!isAdmin&&mencoes.length>5){banirComContagem(sock,jid,sender,msg.key,"Spam de menções 📢❌");return;}
 
         // ✅ GATE !pp — antes de tudo
@@ -1064,18 +1374,19 @@ async function startBot(){
             return;
           }
 
-          // ✅ Detectar palavra "prefixo" sem prefixo → mostra prefixo actual
-          if(/^prefixo$/i.test(texto.trim())){
-            await sock.sendMessage(jid,{
-              text:bBloco("⌨️ PREFIXO",[
-                bLine("⌨️","Este é o meu prefixo actual:"),
-                B_SEP,
-                `\`\`\`${CONFIG.PREFIXO}\`\`\``,
-                B_SEP,
-                bLine("💡","Copia e usa antes dos comandos:"),
-                bLine("📋",`${CONFIG.PREFIXO}menu | ${CONFIG.PREFIXO}play | ${CONFIG.PREFIXO}mp3`),
-              ])
-            },{quoted:seloBot});
+          // ✅ Detectar palavra "prefixo" sem prefixo → mostra só o prefixo com botão copiar
+          if(/^prefixo$/i.test(texto.trim())||/^prefix$/i.test(texto.trim())){
+            const msgPref=`*${CONFIG.PREFIXO}*`;
+            try{
+              await sock.sendMessage(jid,{
+                text:msgPref,
+                footer:`Prefixo do ${CONFIG.NOME_BOT}`,
+                buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
+                headerType:1
+              },{quoted:seloBot});
+            }catch{
+              await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
+            }
             return;
           }
 
@@ -1125,22 +1436,6 @@ ${nomeEnviou}`;
                   return;
                 }catch{}
               }
-            }
-            return;
-          }
-
-          // ✅ Detectar "prefixo" escrito sem ! (texto puro)
-          const textoLowerTrim=texto.toLowerCase().trim();
-          if(textoLowerTrim==="prefixo"||textoLowerTrim==="prefix"){
-            try{
-              await sock.sendMessage(jid,{
-                text:`*${CONFIG.PREFIXO}*`,
-                footer:`Prefixo do ${CONFIG.NOME_BOT}`,
-                buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
-                headerType:1
-              },{quoted:seloBot});
-            }catch{
-              await sock.sendMessage(jid,{text:`O prefixo é: *${CONFIG.PREFIXO}*`},{quoted:seloBot});
             }
             return;
           }
@@ -1253,9 +1548,9 @@ ${nomeEnviou}`;
           return;
         }
 
-        const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","bot","link","sorteio","verifica","silenciar","dessilenciar","silenciados","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai","addvip","removevip","vips"];
+        const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","bot","link","sorteio","verifica","silenciar","dessilenciar","silenciados","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai","addvip","removevip","vips","bemvindo","bemvindo1","bemvindo2","grupoinfo","inactivos","marcaradmins","adms","status"];
         if(CMDS_ADMIN.includes(comando)&&!isAdmin){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas administradores.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
-        const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto"];
+        const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto","adddono","removedono","addsubdono","removesubdono","setletra","downcase"];
         if(CMDS_DONO.includes(comando)&&!isDono){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas o dono.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
         const CMDS_18=["piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal"];
         if(CMDS_18.includes(comando)&&!isDono&&!isVip(sender)){await sock.sendMessage(jid,{text:bBloco("🔞 VIP EXCLUSIVO",[bLine("💡",`Usa *${CONFIG.PREFIXO}alugar* para ser VIP 💎`)])},{quoted:seloBot});await reagir(sock,msg,"🔞");return;}
@@ -1334,7 +1629,30 @@ ${nomeEnviou}`;
           await sock.sendMessage(jid,{text:`✅ Prefixo alterado para *${novoPref}*`},{quoted:seloBot});
           return;
         }
-        if(comando==="ping"){const ini=Date.now();await sock.sendMessage(jid,{text:"⏳"});await sock.sendMessage(jid,{text:bBloco("📡 PING",[bLine("🏓",`*${Date.now()-ini}ms*`),bLine("⏱️",`${Math.floor(process.uptime()/60)} min`),bLine("💾",`${(process.memoryUsage().heapUsed/1024/1024).toFixed(1)}MB`),bLine("🌐",CONFIG.IS_SERVER?"☁️ Servidor":"📱 Local")])},{quoted:seloBot});return;}
+        if(comando==="ping"){
+          const tsMsg=(msg.messageTimestamp?Number(msg.messageTimestamp)*1000:Date.now());
+          const latencia=Math.max(0,Date.now()-tsMsg);
+          const upSec=Math.floor(process.uptime());
+          const diasAtivo=Math.floor(upSec/86400);
+          const horasP=Math.floor((upSec%86400)/3600);
+          const minsP=Math.floor((upSec%3600)/60);
+          const segsP=upSec%60;
+          const diasSemana=["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+          const diaHoje=diasSemana[new Date().getDay()];
+          const ramMB=(process.memoryUsage().heapUsed/1024/1024).toFixed(1);
+          await sock.sendMessage(jid,{text:bBloco("🏓 PONG",[
+            bLine("📅",`Dia: *${diaHoje}*`),
+            B_SEP,
+            bLine("🟢","*Ativo:*"),
+            bLine("🕐","Hora : Min : Seg"),
+            bLine("🕐",`*${String(horasP).padStart(2,"0")}h:${String(minsP).padStart(2,"0")}m:${String(segsP).padStart(2,"0")}s*`),
+            bLine("📡",`Latência: *${latencia}ms*`),
+            bLine("💻",`RAM: *${ramMB}MB*`),
+            B_SEP,
+            bLine("📆",`Dias ativo: *${diasAtivo}* dia(s)`),
+          ])},{quoted:seloBot});
+          return;
+        }
         if(comando==="stats"){const s=fs.readJsonSync(ARQUIVO_STATS);const top=Object.entries(s.comandos||{}).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([c,n],i)=>`◎ ${i+1}. *${CONFIG.PREFIXO}${c}* — ${n}x`).join("\n");await sock.sendMessage(jid,{text:bBloco("📊 STATS",[bLine("🔢",`Total: *${s.total||0}*`),B_SEP,top])},{quoted:seloBot});return;}
         if(comando==="regras"){await sock.sendMessage(jid,{text:bBloco("📋 REGRAS",[bLine("❌","Sem links"),bLine("❌","Sem spam"),bLine("❌","Sem ofensas"),bLine("❌","Sem status"),bLine("✅","Respeita todos"),B_SEP,bLine("⚡","Ban automático 5→0!")])},{quoted:seloBot});return;}
         if(comando==="dono"||comando==="criador"){let ppD=null;try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}const tD=bBloco("👑 CRIADOR",[bLine("🏷️",`*${CONFIG.DONO_NOME}*`),bLine("📞",CONFIG.DONO_NUM),bLine("💰",`*!alugar* para alugar o bot!`)]);if(ppD)await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:seloBot});else await sock.sendMessage(jid,{text:tD},{quoted:seloBot});await reagir(sock,msg,"👑");return;}
@@ -1347,10 +1665,11 @@ ${nomeEnviou}`;
 
         // ─── PLAY ───
         if(comando==="play"){await processarComandoPlay(sock,jid,msg,args.join(" ").trim());return;}
+        if(comando==="play1"){await processarComandoPlay1(sock,jid,msg,sender,args.join(" ").trim());return;}
         if(comando==="mp3"&&args.length>0){
           const entrada=args.join(" ");
           await reagir(sock,msg,"🎵");
-          await sock.sendMessage(jid,{text:"🎵 A buscar música... Aguarda 👀"},{quoted:seloBot});
+          // silent processing
           try{
             // Busca thumbnail e título em paralelo com o download
             const [thumbUrl,titulo,arqFinal]=await Promise.all([
@@ -1447,7 +1766,7 @@ ${nomeEnviou}`;
         if(comando==="tourl"){const midia=await downloadQualquerMidia(msg);if(!midia){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde mídia com *${CONFIG.PREFIXO}tourl*`)},{quoted:seloBot});return;}let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("🔗 A GERAR LINK",[FRAMES_LOADING[0]])},{quoted:seloBot});}catch{}try{let url;if(midia.mime.startsWith("image/")&&!midia.mime.includes("webp")){try{url=await uploadParaTelegraph(midia.buffer);}catch{url=await uploadParaCatbox(midia.buffer,midia.nome,midia.mime);}}else{url=await uploadParaCatbox(midia.buffer,midia.nome,midia.mime);}if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("🔗 LINK GERADO",[FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));await sock.sendMessage(jid,{text:bBloco("🔗 LINK GERADO",[bLine("📎",`*${midia.nome}*`),bLine("🌐",url)])},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message.slice(0,80))},{quoted:seloBot});}return;}
 
         // ─── FIGURINHAS ───
-        if(comando==="sticker"){const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;const iM=quotedMsg?.imageMessage,vM=quotedMsg?.videoMessage;if(!iM&&!vM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde imagem/vídeo com *${CONFIG.PREFIXO}sticker*`)},{quoted:seloBot});return;}const isAnim=!!vM;await sock.sendMessage(jid,{text:bLine("🎭","A criar sticker... ⏳")},{quoted:seloBot});try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});const webpBuf=await criarSticker(buf,isAnim);await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}}return;}
+        if(comando==="s"){const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;const iM=quotedMsg?.imageMessage,vM=quotedMsg?.videoMessage;if(!iM&&!vM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde imagem/vídeo com *${CONFIG.PREFIXO}s*`)},{quoted:seloBot});return;}const isAnim=!!vM;await sock.sendMessage(jid,{text:bLine("🎭","A criar sticker... ⏳")},{quoted:seloBot});try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});const webpBuf=await criarSticker(buf,isAnim);await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}}return;}
         if(comando==="sf"){const ctx=msg.message?.extendedTextMessage?.contextInfo,quotedMsg=ctx?.quotedMessage,stickerMsgD=msg.message?.stickerMessage,stickerMsgQ=quotedMsg?.stickerMessage,stickerMsg=stickerMsgD||stickerMsgQ;if(!stickerMsg){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde sticker com *${CONFIG.PREFIXO}sf*`)},{quoted:seloBot});return;}const isAnimated=stickerMsg.isAnimated||false;try{let buf;if(stickerMsgD)buf=await downloadMediaMessage(msg,"buffer",{});else{const qm={key:{remoteJid:jid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:quotedMsg};buf=await downloadMediaMessage(qm,"buffer",{});}if(!buf||buf.length<100)throw new Error("Sticker inválido");const resultado=await stickerParaFoto(buf,isAnimated);if(resultado.isVideo)await sock.sendMessage(jid,{video:resultado.buffer,mimetype:"video/mp4",caption:bLine("🎥","Convertido!")},{quoted:seloBot});else await sock.sendMessage(jid,{image:resultado.buffer,caption:bLine("🖼️","Convertido!")},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="brat"){const textoBrat=args.join(" ")||"brat";try{const url=`https://api.memegen.link/images/custom/~p${encodeURIComponent(textoBrat)}/_.jpg?background=d4c5a0&width=512&height=512`;const{data}=await axios.get(url,{responseType:"arraybuffer",timeout:15000,httpsAgent});const buf=await criarSticker(Buffer.from(data),false);await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="figurinha"||comando==="figu"){const quantidade=Math.min(parseInt(args[0])||1,5);await reagir(sock,msg,"🎭");const emojis=["😂","😍","🔥","💀","😭","🤣","😎","🥺","😤","💪"];for(let i=0;i<quantidade;i++){try{const emoji=emojis[Math.floor(Math.random()*emojis.length)];const url=`https://api.memegen.link/images/custom/~p${encodeURIComponent(emoji)}/_.png?width=512&height=512`;const{data}=await axios.get(url,{responseType:"arraybuffer",timeout:10000,httpsAgent});const buf=await criarSticker(Buffer.from(data),false);await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await new Promise(r=>setTimeout(r,500));}catch{}}return;}
@@ -1616,7 +1935,22 @@ ${nomeEnviou}`;
         if(comando==="truth"){const t=VERDADES_18[Math.floor(Math.random()*VERDADES_18.length)];await sock.sendMessage(jid,{text:bBloco("🎯 TRUTH",[bLine("❓",t)])},{quoted:seloBot});return;}
         if(comando==="dare"){const d=DESAFIOS_18[Math.floor(Math.random()*DESAFIOS_18.length)];await sock.sendMessage(jid,{text:bBloco("🎲 DARE",[bLine("🔥",d)])},{quoted:seloBot});return;}
         if(comando==="crush"){const membros=isGrupo?(await sock.groupMetadata(jid).catch(()=>({participants:[]}))).participants.filter(p=>!p.admin).map(p=>extrairJid(p.id||p)).filter(m=>m!==sender):[];const alvo=membros.length>0?membros[Math.floor(Math.random()*membros.length)]:null;await sock.sendMessage(jid,{text:bBloco("💘 CRUSH",[bLine("💘",alvo?`Teu crush secreto é @${alvo.split("@")[0]}! 😍`:"Sem membros!")]),mentions:alvo?[alvo]:[]},{quoted:seloBot});return;}
-        if(["seduzir","beijo","abraco","tapa","flirt","casal"].includes(comando)){const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}${comando}* @user`)},{quoted:seloBot});return;}const emojisAcao={seduzir:"😏",beijo:"😘",abraco:"🤗",tapa:"👋",flirt:"💋",casal:"💑"};const frasesAcao={seduzir:`😏 @${sender.split("@")[0]} está a seduzir @${alvo.split("@")[0]}! 🔥`,beijo:`😘 @${sender.split("@")[0]} deu um beijo em @${alvo.split("@")[0]}! 💋`,abraco:`🤗 @${sender.split("@")[0]} abraçou @${alvo.split("@")[0]}! ❤️`,tapa:`👋 @${sender.split("@")[0]} deu um tapa em @${alvo.split("@")[0]}! 💥`,flirt:`💋 @${sender.split("@")[0]} está a flirtar com @${alvo.split("@")[0]}! 😍`,casal:`💑 @${sender.split("@")[0]} e @${alvo.split("@")[0]} estão juntos! ❤️`};await sock.sendMessage(jid,{text:bBloco(emojisAcao[comando]+" "+comando.toUpperCase(),[bLine(emojisAcao[comando],frasesAcao[comando])]),mentions:[sender,alvo]},{quoted:seloBot});await reagir(sock,msg,emojisAcao[comando]);return;}
+        if(["seduzir","beijo","abraco","tapa","flirt","casal"].includes(comando)){
+          const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);
+          if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}${comando}* @user`)},{quoted:seloBot});return;}
+          const emojisAcao={seduzir:"😏",beijo:"😘",abraco:"🤗",tapa:"👋",flirt:"💋",casal:"💑"};
+          const frasesAcao={seduzir:`😏 @${sender.split("@")[0]} está a seduzir @${alvo.split("@")[0]}! 🔥`,beijo:`😘 @${sender.split("@")[0]} deu um beijo em @${alvo.split("@")[0]}! 💋`,abraco:`🤗 @${sender.split("@")[0]} abraçou @${alvo.split("@")[0]}! ❤️`,tapa:`👋 @${sender.split("@")[0]} deu um tapa em @${alvo.split("@")[0]}! 💥`,flirt:`💋 @${sender.split("@")[0]} está a flirtar com @${alvo.split("@")[0]}! 😍`,casal:`💑 @${sender.split("@")[0]} e @${alvo.split("@")[0]} estão juntos! ❤️`};
+          const GIF_ACAO={seduzir:"wink",beijo:"kiss",abraco:"hug",tapa:"slap",flirt:"cuddle",casal:"cuddle"};
+          const legenda=bBloco(emojisAcao[comando]+" "+comando.toUpperCase(),[bLine(emojisAcao[comando],frasesAcao[comando])]);
+          let gifUrl=null;
+          try{const{data}=await axios.get(`https://nekos.best/api/v2/${GIF_ACAO[comando]}`,{timeout:10000,httpsAgent});gifUrl=data?.results?.[0]?.url||null;}catch(e){console.log(`❌ GIF ${comando}:`,e.message);}
+          if(gifUrl){
+            try{await sock.sendMessage(jid,{video:{url:gifUrl},gifPlayback:true,caption:legenda,mentions:[sender,alvo]},{quoted:seloBot});await reagir(sock,msg,emojisAcao[comando]);return;}catch(e){console.log(`❌ envio GIF ${comando}:`,e.message);}
+          }
+          await sock.sendMessage(jid,{text:legenda,mentions:[sender,alvo]},{quoted:seloBot});
+          await reagir(sock,msg,emojisAcao[comando]);
+          return;
+        }
 
         // ─── BRINCADEIRAs EXTRAS ───
 
@@ -2143,6 +2477,41 @@ ${B_BOT}`},{quoted:seloBot});return;
 
         // ─── !delcase [nome] ───
         // Remove uma case
+        if(comando==="downcase"){
+          if(!isDono){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono pode extrair as cases nativas.")},{quoted:seloBot});return;}
+          const alvo=(args[0]||"").toLowerCase().trim();
+          await reagir(sock,msg,"📦");
+          try{
+            fs.ensureDirSync("./temp");
+            const source=fs.readFileSync(__filename,"utf8");
+            if(!alvo||alvo==="all"||alvo==="todos"){
+              let saida=`// ════════════════════════════════════════════════\n// © CASES NATIVAS — TODOS OS COMANDOS DO ${CONFIG.NOME_BOT}\n// Exportado automaticamente por !downcase\n// ⚠️ Podem depender de módulos/variáveis internas do index.js\n// ════════════════════════════════════════════════\n\n`;
+              let total=0;
+              for(const c of TODOS_COMANDOS){
+                const bloco=extrairCodigoComando(source,c);
+                if(bloco){saida+=`// ─── !${c} ───\n${bloco}\n\n`;total++;}
+              }
+              const linhas=saida.split("\n").length;
+              const nomeArq=`./temp/downcase_all_${Date.now()}.js`;
+              fs.writeFileSync(nomeArq,saida);
+              await sock.sendMessage(jid,{document:fs.readFileSync(nomeArq),fileName:"todos_comandos_case.js",mimetype:"application/javascript",caption:bBloco("©️ TODOS OS COMANDOS",[bLine("📄","©downcase — Cases (nativo)"),bLine("📊",`Comandos extraídos: *${total}*`),bLine("📊",`Linhas: *${linhas}*`),B_SEP,bLine("♻️",`Pronto para *${CONFIG.PREFIXO}addcase* [nome]`),bLine("⚠️","Pode depender de módulos internos (ver notas no topo).")])},{quoted:seloBot});
+              try{fs.removeSync(nomeArq);}catch{}
+              await reagir(sock,msg,"✅");
+              return;
+            }
+            if(!TODOS_COMANDOS.has(alvo)){await sock.sendMessage(jid,{text:bLine("❌",`Comando *${alvo}* não existe no menu.`)},{quoted:seloBot});await reagir(sock,msg,"❌");return;}
+            const bloco=extrairCodigoComando(source,alvo);
+            if(!bloco){await sock.sendMessage(jid,{text:bLine("❌",`Não consegui extrair o código de *${alvo}* automaticamente.`)},{quoted:seloBot});await reagir(sock,msg,"❌");return;}
+            const linhas=bloco.split("\n").length;
+            const nomeArq=`./temp/${alvo}_case_${Date.now()}.js`;
+            fs.writeFileSync(nomeArq,`// © ${alvo} — Case (nativo), extraído automaticamente do ${CONFIG.NOME_BOT}\n${bloco}\n`);
+            await sock.sendMessage(jid,{document:fs.readFileSync(nomeArq),fileName:`${alvo}_case.js`,mimetype:"application/javascript",caption:bBloco(`©${alvo.toUpperCase()} — CASE (NATIVO)`,[bLine("📄",`©${alvo} — Case (nativo)`),bLine("📊",`Linhas: *${linhas}*`),B_SEP,bLine("♻️",`Pronto para *${CONFIG.PREFIXO}addcase* ${alvo}`),bLine("⚠️","Pode depender de módulos internos (ver notas no topo).")])},{quoted:seloBot});
+            try{fs.removeSync(nomeArq);}catch{}
+            await reagir(sock,msg,"✅");
+          }catch(e){console.log("❌ downcase:",e.message);await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+
         if(comando==="delcase"){
           if(!isDono&&!isAdmin){await sock.sendMessage(jid,{text:"❌ Apenas *dono/admin* pode remover cases."},{quoted:seloBot});return;}
           const nomeCase=nomeCaseLimpo(args.join(" "));
@@ -2160,7 +2529,15 @@ ${B_BOT}`},{quoted:seloBot});return;
         if(comando==="bloq"){comandosBloqueados.add(jid);await sock.sendMessage(jid,{text:bLine("🔒","*Comandos bloqueados!*")},{quoted:seloBot});return;}
         if(comando==="desbloq"){comandosBloqueados.delete(jid);await sock.sendMessage(jid,{text:bLine("🔓","*Comandos desbloqueados!*")},{quoted:seloBot});return;}
         if(comando==="bot"){const op=args.join(" ").toLowerCase();if(op.includes("off")){chatsDesativados.add(jid);await sock.sendMessage(jid,{text:bLine("🔴","*BOT OFF!*")},{quoted:seloBot});}else if(op.includes("on")){chatsDesativados.delete(jid);await sock.sendMessage(jid,{text:bLine("✅","*BOT ON!*")},{quoted:seloBot});}return;}
-        if(comando==="anti-link"){const op=args[0]?.toLowerCase();if(op==="off"){antiLinkDesativado.add(jid);await sock.sendMessage(jid,{text:bLine("⚠️","*Anti-link DESACTIVADO!*")},{quoted:seloBot});}else{antiLinkDesativado.delete(jid);await sock.sendMessage(jid,{text:bLine("✅","*Anti-link ACTIVADO!*")},{quoted:seloBot});}return;}
+        if(comando==="anti-link"){
+          const op=args[0]?.toLowerCase();
+          if(op==="off"){antiLinkDesativado.add(jid);await sock.sendMessage(jid,{text:bLine("⚠️","*Anti-link DESACTIVADO!*")},{quoted:seloBot});return;}
+          if(op==="easy"){antiLinkDesativado.delete(jid);antiLinkModo.set(jid,"easy");await sock.sendMessage(jid,{text:bBloco("🟢 ANTI-LINK EASY",[bLine("✅","*ACTIVADO!*"),bLine("💡","Remove o link, *não bane* e sem contagem.")])},{quoted:seloBot});return;}
+          if(op==="hard"){antiLinkDesativado.delete(jid);antiLinkModo.set(jid,"hard");await sock.sendMessage(jid,{text:bBloco("🔴 ANTI-LINK HARD",[bLine("✅","*ACTIVADO!*"),bLine("💡","Remove o link *e BANE* quem enviar.")])},{quoted:seloBot});return;}
+          antiLinkDesativado.delete(jid);if(!antiLinkModo.has(jid))antiLinkModo.set(jid,"easy");
+          await sock.sendMessage(jid,{text:bBloco("✅ ANTI-LINK",[bLine("✅",`*ACTIVADO!* Modo actual: *${(antiLinkModo.get(jid)||"easy").toUpperCase()}*`),bLine("💡",`*${CONFIG.PREFIXO}anti-link easy* → só remove`),bLine("💡",`*${CONFIG.PREFIXO}anti-link hard* → remove e bane`),bLine("💡",`*${CONFIG.PREFIXO}anti-link off* → desliga`)])},{quoted:seloBot});
+          return;
+        }
         if(comando==="vozbot"){const op=args[0]?.toLowerCase();if(op==="off"){vozBotDesativado.add(jid);await sock.sendMessage(jid,{text:bLine("🔇","*Voz desactivada!*")},{quoted:seloBot});}else if(op==="on"){vozBotDesativado.delete(jid);await sock.sendMessage(jid,{text:bLine("🎙️","*Voz activada!*")},{quoted:seloBot});}else{await sock.sendMessage(jid,{text:bBloco("🎙️ VOZ BOT",[bLine("📊",`Estado: ${vozBotDesativado.has(jid)?"🔇 OFF":"🟢 ON"}`),bLine("💡",`*${CONFIG.PREFIXO}vozbot on/off*`)])},{quoted:seloBot});}return;}
         if(comando==="silenciar"&&isGrupo){const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Menciona com *${CONFIG.PREFIXO}silenciar*`)},{quoted:seloBot});return;}if(!membrosSilenciados[jid])membrosSilenciados[jid]=[];if(!membrosSilenciados[jid].includes(alvo)){membrosSilenciados[jid].push(alvo);salvarSilenciados();}await sock.sendMessage(jid,{text:bLine("🔇",`@${alvo.split("@")[0]} silenciado!`),mentions:[alvo]},{quoted:seloBot});return;}
         if(comando==="dessilenciar"&&isGrupo){const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Menciona com *${CONFIG.PREFIXO}dessilenciar*`)},{quoted:seloBot});return;}if(membrosSilenciados[jid]){membrosSilenciados[jid]=membrosSilenciados[jid].filter(m=>m!==alvo);salvarSilenciados();}await sock.sendMessage(jid,{text:bLine("🔊",`@${alvo.split("@")[0]} dessilenciado!`),mentions:[alvo]},{quoted:seloBot});return;}
@@ -2188,6 +2565,165 @@ ${B_BOT}`},{quoted:seloBot});return;
         if(comando==="sms"){const ativos=[...gruposAtivados];if(!ativos.length||!args.length){if(!ativos.length){await sock.sendMessage(jid,{text:bLine("❌","Nenhum grupo activo.")},{quoted:seloBot});return;}try{const grupos=await sock.groupFetchAllParticipating();const lista=ativos.map((gJid,i)=>bLine("📋",`*${i+1}.* ${grupos[gJid]?.subject||gJid}`)).join("\n");await sock.sendMessage(jid,{text:bBloco("📢 SMS PRIVADA",[lista,B_SEP,bLine("💡",`*${CONFIG.PREFIXO}sms [nº] [msg]*`)])},{quoted:seloBot});}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}const idx=parseInt(args[0]);if(isNaN(idx)||idx<1||idx>ativos.length){await sock.sendMessage(jid,{text:bLine("❌","Número de grupo inválido.")},{quoted:seloBot});return;}const grupoJid=ativos[idx-1];const mensagem=args.slice(1).join(" ").trim();if(!mensagem){await sock.sendMessage(jid,{text:bLine("❌","Escreve a mensagem!")},{quoted:seloBot});return;}try{const grupos=await sock.groupFetchAllParticipating();const nomeGrupo=grupos[grupoJid]?.subject||"Grupo";const meta=await sock.groupMetadata(grupoJid);const membros=meta.participants.map(p=>extrairJid(p.id||p));await sock.sendMessage(jid,{text:bLine("📤",`A enviar para *${membros.length}* membros... ⏳`)},{quoted:seloBot});let enviados=0,erros=0;for(const membro of membros){if(ehDono(membro))continue;try{await sock.sendMessage(membro,{text:bBloco("📢 MENSAGEM PRIVADA",[mensagem,B_SEP,bLine("👑",CONFIG.DONO_NOME),bLine("🏘️",nomeGrupo)])});enviados++;await new Promise(r=>setTimeout(r,600));}catch{erros++;}}await sock.sendMessage(jid,{text:bBloco("✅ SMS ENVIADA!",[bLine("📊",`${enviados} enviados | ❌ ${erros} erros`)])},{quoted:seloBot});await reagir(sock,msg,"📢");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="gsms"){const ativos=[...gruposAtivados];if(!ativos.length){await sock.sendMessage(jid,{text:bLine("❌","Nenhum grupo activo.")},{quoted:seloBot});return;}if(!args.length){try{const grupos=await sock.groupFetchAllParticipating();const lista=ativos.map((gJid,i)=>bLine("📋",`*${i+1}.* ${grupos[gJid]?.subject||gJid}`)).join("\n");await sock.sendMessage(jid,{text:bBloco("📣 AVISO NO GRUPO",[lista,B_SEP,bLine("💡",`*${CONFIG.PREFIXO}gsms [nº] [msg]*`)])},{quoted:seloBot});}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}const idx=parseInt(args[0]);if(isNaN(idx)||idx<1||idx>ativos.length){await sock.sendMessage(jid,{text:bLine("❌","Número inválido.")},{quoted:seloBot});return;}const grupoJid=ativos[idx-1];const mensagem=args.slice(1).join(" ").trim();if(!mensagem){await sock.sendMessage(jid,{text:bLine("❌","Escreve a mensagem!")},{quoted:seloBot});return;}try{const meta=await sock.groupMetadata(grupoJid);const todos=meta.participants.map(p=>extrairJid(p.id||p));await sock.sendMessage(grupoJid,{text:bBloco("📣 AVISO!",[mensagem,B_SEP,`${todos.map(()=>"\u200B").join("")}`]),mentions:todos});await sock.sendMessage(jid,{text:bBloco("✅ AVISO ENVIADO!",[bLine("👥",`${todos.length} mencionados`)])},{quoted:seloBot});}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="info"){await sock.sendMessage(jid,{text:bBloco("ℹ️ INFO",[bLine("💡",`Usa *${CONFIG.PREFIXO}menu*`),bLine("🤖","Ou chama _Isaías_ no grupo!")])},{quoted:seloBot});return;}
+
+        // ─── SUBDONOS / DONOS EXTRA ───
+        if(comando==="addsubdono"){
+          if(!isDonoReal){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono principal pode fazer isto.")},{quoted:seloBot});return;}
+          const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant)||(args[0]?`${args[0].replace(/\D/g,"")}@s.whatsapp.net`:"");
+          if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}addsubdono* @user _ou_ número`)},{quoted:seloBot});return;}
+          const subs=carregarSubdonos();subs[alvo]=true;salvarSubdonos(subs);senhasAprovadas.add(alvo);
+          await sock.sendMessage(jid,{text:bBloco("👑 SUBDONO ADICIONADO",[bLine("👑",`@${alvo.split("@")[0]} agora é *subdono*!`),bLine("💡","Acesso a quase tudo, excepto add/remover dono.")]),mentions:[alvo]},{quoted:seloBot});await reagir(sock,msg,"👑");return;
+        }
+        if(comando==="removesubdono"){
+          if(!isDonoReal){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono principal pode fazer isto.")},{quoted:seloBot});return;}
+          const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant)||(args[0]?`${args[0].replace(/\D/g,"")}@s.whatsapp.net`:"");
+          if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}removesubdono* @user`)},{quoted:seloBot});return;}
+          const subs=carregarSubdonos();delete subs[alvo];salvarSubdonos(subs);
+          await sock.sendMessage(jid,{text:bLine("❌",`@${alvo.split("@")[0]} removido dos subdonos.`),mentions:[alvo]},{quoted:seloBot});return;
+        }
+        if(comando==="subdonos"){
+          const subs=carregarSubdonos();const lista=Object.keys(subs);
+          if(!lista.length){await sock.sendMessage(jid,{text:bLine("📭","Nenhum subdono.")},{quoted:seloBot});return;}
+          await sock.sendMessage(jid,{text:bBloco("👑 SUBDONOS",lista.map((s,i)=>bLine("👑",`*${i+1}.* @${s.split("@")[0]}`))),mentions:lista},{quoted:seloBot});return;
+        }
+        if(comando==="adddono"){
+          if(!isDonoReal){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono principal pode fazer isto.")},{quoted:seloBot});return;}
+          const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant)||(args[0]?`${args[0].replace(/\D/g,"")}@s.whatsapp.net`:"");
+          if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}adddono* @user _ou_ número`)},{quoted:seloBot});return;}
+          const extra=carregarDonosExtra();extra[alvo]=true;salvarDonosExtra(extra);senhasAprovadas.add(alvo);
+          await sock.sendMessage(jid,{text:bBloco("👑 NOVO DONO",[bLine("👑",`@${alvo.split("@")[0]} agora é DONO!`)]),mentions:[alvo]},{quoted:seloBot});await reagir(sock,msg,"👑");return;
+        }
+        if(comando==="removedono"){
+          if(!isDonoReal){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono principal pode fazer isto.")},{quoted:seloBot});return;}
+          const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant)||(args[0]?`${args[0].replace(/\D/g,"")}@s.whatsapp.net`:"");
+          if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}removedono* @user`)},{quoted:seloBot});return;}
+          const extra=carregarDonosExtra();delete extra[alvo];salvarDonosExtra(extra);
+          await sock.sendMessage(jid,{text:bLine("❌",`@${alvo.split("@")[0]} removido dos donos.`),mentions:[alvo]},{quoted:seloBot});return;
+        }
+
+        // ─── BEM-VINDO ON/OFF/1/2 ───
+        if(comando==="bemvindo"&&isGrupo){
+          const sub=args[0]?.toLowerCase();
+          if(sub==="off"){bemVindoDesativado.add(jid);await sock.sendMessage(jid,{text:bLine("🔕","Saudações de novos membros *DESACTIVADAS*.")},{quoted:seloBot});await reagir(sock,msg,"🔕");return;}
+          if(sub==="on"){bemVindoDesativado.delete(jid);await sock.sendMessage(jid,{text:bLine("🔔","Saudações de novos membros *ACTIVADAS*.")},{quoted:seloBot});await reagir(sock,msg,"🔔");return;}
+          await sock.sendMessage(jid,{text:bBloco("💡 BEMVINDO",[bLine("💡",`*${CONFIG.PREFIXO}bemvindo on* _ou_ *${CONFIG.PREFIXO}bemvindo off*`),bLine("1️⃣",`*${CONFIG.PREFIXO}bemvindo1* → _saudação simples, sem foto_`),bLine("2️⃣",`*${CONFIG.PREFIXO}bemvindo2* → _saudação completa, com foto e info_`)])},{quoted:seloBot});return;
+        }
+        if((comando==="bemvindo1"||comando==="bemvindo2")&&isGrupo){
+          const modo=comando==="bemvindo1"?1:2;
+          bemVindoModo.set(jid,modo);bemVindoDesativado.delete(jid);
+          await sock.sendMessage(jid,{text:bBloco("✅ BEM-VINDO ACTUALIZADO",[bLine(modo===1?"1️⃣":"2️⃣",`Modo *${modo}* activado: _${modo===1?"saudação simples, sem foto e sem muitas informações":"saudação completa, com foto e todas as informações"}_`)])},{quoted:seloBot});
+          await reagir(sock,msg,"🔔");
+          return;
+        }
+
+        // ─── LETRAS / FONTES DO BOT ───
+        if(comando==="setletra"){
+          if(!isDono){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono pode mudar a letra do bot.")},{quoted:seloBot});return;}
+          const nomeBusca=args.join(" ").trim();
+          const chave=encontrarFonte(nomeBusca);
+          if(!chave){await sock.sendMessage(jid,{text:bBloco("⚠️ SETLETRA",[bLine("💡",`*${CONFIG.PREFIXO}setletra* [nome da letra]`),bLine("💡",`Usa *${CONFIG.PREFIXO}verletras* para ver todas.`)])},{quoted:seloBot});return;}
+          salvarFonteAtual(chave);
+          await sock.sendMessage(jid,{text:bBloco("✅ LETRA ALTERADA",[bLine("🔤",`Letra actual: *${chave}*`),bLine("👀",`Pré-visualização: ${aplicarFonte(chave,CONFIG.NOME_BOT)}`)])},{quoted:seloBot});
+          await reagir(sock,msg,"🔤");
+          return;
+        }
+        if(comando==="verletras"){
+          const linhas=NOMES_FONTES.map(n=>`${n===FONTE_ATUAL?"✅":"◎"} *${n}* → ${aplicarFonte(n,CONFIG.NOME_BOT)}`);
+          await sock.sendMessage(jid,{text:bBloco("🔤 TIPOS DE LETRA",[...linhas,B_SEP,bLine("💡",`Usa *${CONFIG.PREFIXO}setletra* [nome] para mudar.`)])},{quoted:seloBot});
+          return;
+        }
+
+        // ─── STATUS (GRUPO) ───
+        if(comando==="status"&&isGrupo){
+          const al=infoAluguel(jid);const ativo=verificarAluguel(jid);const diasR=diasRestantes(jid);
+          const upSec=Math.floor(process.uptime());
+          const horasBot=Math.floor(upSec/3600),minsBot=Math.floor((upSec%3600)/60);
+          const modoBv=bemVindoDesativado.has(jid)?"Desactivadas":`Activadas (modo ${bemVindoModo.get(jid)||2})`;
+          const modoLinkStatus=antiLinkDesativado.has(jid)?"Desactivado":(antiLinkModo.get(jid)||"easy").toUpperCase();
+          await sock.sendMessage(jid,{text:bBloco("📊 STATUS DO BOT",[
+            bLine("🤖",`*${nomeBotEstilizado()}*`),
+            bLine("⌨️",`Prefixo: *${CONFIG.PREFIXO}*`),
+            bLine(ativo?"✅":"❌",`Aluguel neste grupo: *${ativo?"ACTIVO 🟢":"INACTIVO 🔴"}*`),
+            ...(ativo&&al?[bLine("📅",`Restam: *${diasR} dia(s)*`)]:[]),
+            bLine("🔔",`Boas-vindas: *${modoBv}*`),
+            bLine("🔗",`Anti-link: *${modoLinkStatus}*`),
+            bLine("⏱️",`Bot ligado há: *${horasBot}h${minsBot}m*`),
+            bLine("🔤",`Letra actual: *${FONTE_ATUAL}*`),
+          ])},{quoted:seloBot});
+          return;
+        }
+
+        // ─── NOVOS COMANDOS DE GRUPO ───
+        if(comando==="grupoinfo"&&isGrupo){
+          try{
+            const meta=await sock.groupMetadata(jid);
+            const admins=meta.participants.filter(p=>p.admin).length;
+            const dataCriacao=meta.creation?new Date(meta.creation*1000).toLocaleDateString("pt-PT"):"N/A";
+            await sock.sendMessage(jid,{text:bBloco("🏘️ INFO DO GRUPO",[
+              bLine("📛",`*${meta.subject}*`),
+              bLine("📝",meta.desc?meta.desc.slice(0,150):"_sem descrição_"),
+              bLine("👥",`Membros: *${meta.participants.length}*`),
+              bLine("👮",`Admins: *${admins}*`),
+              bLine("📅",`Criado em: *${dataCriacao}*`),
+              bLine("🔒",`Aluguel: ${gruposAtivados.has(jid)||verificarAluguel(jid)?"✅ Activo":"❌ Inactivo"}`),
+              bLine("🔔",`Boas-vindas: ${bemVindoDesativado.has(jid)?"❌ Desactivadas":"✅ Activadas"}`),
+            ])},{quoted:seloBot});
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="inactivos"&&isGrupo){
+          try{
+            const dias=parseInt(args[0])||7;
+            const meta=await sock.groupMetadata(jid);
+            const membros=meta.participants.map(p=>extrairJid(p.id||p));
+            const ativos=fs.readJsonSync(ARQUIVO_ATIVOS)[jid]||{};
+            const limite=Date.now()-(dias*24*60*60*1000);
+            const inativos=membros.filter(m=>!ehDono(m)&&(!ativos[m]||ativos[m]<limite));
+            if(!inativos.length){await sock.sendMessage(jid,{text:bLine("✅",`Ninguém inactivo há mais de *${dias}* dias!`)},{quoted:seloBot});return;}
+            await sock.sendMessage(jid,{text:bBloco(`😴 INACTIVOS (+${dias}d)`,[inativos.slice(0,50).map((m,i)=>`◎ ${i+1}. @${m.split("@")[0]}`).join("\n"),B_SEP,bLine("👥",`Total: *${inativos.length}*`)]),mentions:inativos.slice(0,50)},{quoted:seloBot});
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}
+          return;
+        }
+        if((comando==="marcaradmins"||comando==="adms")&&isGrupo){
+          try{
+            const meta=await sock.groupMetadata(jid);
+            const admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));
+            if(!admins.length){await sock.sendMessage(jid,{text:bLine("📭","Sem admins.")},{quoted:seloBot});return;}
+            await sock.sendMessage(jid,{text:bBloco("👮 ADMINS",[admins.map(a=>`@${a.split("@")[0]}`).join(" ")]),mentions:admins},{quoted:seloBot});
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}
+          return;
+        }
+
+        // ─── DINO / PIANO ───
+        if(comando==="dino"){
+          try{await enviarDino(sock,jid);await reagir(sock,msg,"🦖");}
+          catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar o Dino Runner."),bLine("🔴",e.message)])},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="piano"||comando==="teclado"){
+          try{await enviarPiano(sock,jid);await reagir(sock,msg,"🎹");}
+          catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar o Piano."),bLine("🔴",e.message)])},{quoted:seloBot});}
+          return;
+        }
+
+        // ─── TIKTOK (!tt) ───
+        if(comando==="tt"){
+          const link=args[0];
+          if(!link||!link.includes("tiktok")){await sock.sendMessage(jid,{text:bLine("💡",`Uso: *${CONFIG.PREFIXO}tt* [link do tiktok]`)},{quoted:seloBot});return;}
+          await sock.sendMessage(jid,{text:bLine("⏳","*Baixando TikTok...*")},{quoted:seloBot});
+          const apis=[`https://www.tikwm.com/api/?url=${link}`,`https://api.tiktokio.com/video?url=${link}`,`https://api.ssstik.io/abc?url=${link}`];
+          let data=null;
+          for(const api of apis){try{const res=await fetch(api);const json=await res.json();data=json.data||json;if((data&&data.play)||(data&&data.video))break;}catch{}}
+          if(!data){await sock.sendMessage(jid,{text:bLine("❌","Todas as APIs falharam. Link privado?")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}
+          const videoUrl=data.play||data.video||data.wmplay;
+          const title=data.title||data.desc||"TikTok";
+          const author=data.author?.unique_id||data.author||"desconhecido";
+          try{
+            await sock.sendMessage(jid,{video:{url:videoUrl},caption:`✅ *VIDEO TIKTOK BAIXADO POR ${CONFIG.NOME_BOT}*\n👤 @${author}\n📝 ${title}`},{quoted:seloBot});
+            await reagir(sock,msg,"✅");addXP(sender,5);
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
 
       }catch(e){console.error("❌ Erro handler:",e.message);try{await reagir(sock,msg,"❌");}catch{}}
     });
