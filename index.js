@@ -30,7 +30,7 @@ const CONFIG = {
   NUMERO_BOT:      "244954260707",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
   GROQ_KEY: process.env.GROQ_KEY || "",
-  GEMINI_KEY: process.env.GEMINI_KEY || "",
+  GEMINI_KEY: process.env.GEMINI_KEY || "", 
   DONO_JID:        "169853876965546@lid",
   DONO_NOME:       "ISAÍAS PEDRO",
   DONO_NUM:        "926 612 801",
@@ -63,6 +63,29 @@ const B_SEP="╎";
 function bTitle(t){return `┋𝄪°⠡⸗𝄪﹝${t}﹞`;}
 function bLine(emoji,texto){return `┋°‧․ˑ${emoji}⃟⠥ʿ⇢ ${texto}`;}
 function bBloco(titulo,linhas){return [B_TOP,bTitle(titulo),B_MID,...linhas,B_BOT].join("\n");}
+function gerarBlocoPing(msg){
+  const tsMsg=(msg?.messageTimestamp?Number(msg.messageTimestamp)*1000:Date.now());
+  const latencia=Math.max(0,Date.now()-tsMsg);
+  const upSec=Math.floor(process.uptime());
+  const diasAtivo=Math.floor(upSec/86400);
+  const horasP=Math.floor((upSec%86400)/3600);
+  const minsP=Math.floor((upSec%3600)/60);
+  const segsP=upSec%60;
+  const diasSemana=["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+  const diaHoje=diasSemana[new Date().getDay()];
+  const ramMB=(process.memoryUsage().heapUsed/1024/1024).toFixed(1);
+  return bBloco("🏓 PONG",[
+    bLine("📅",`Dia: *${diaHoje}*`),
+    B_SEP,
+    bLine("🟢","*Ativo:*"),
+    bLine("🕐","Hora : Min : Seg"),
+    bLine("🕐",`*${String(horasP).padStart(2,"0")}h:${String(minsP).padStart(2,"0")}m:${String(segsP).padStart(2,"0")}s*`),
+    bLine("📡",`Latência: *${latencia}ms*`),
+    bLine("💻",`RAM: *${ramMB}MB*`),
+    B_SEP,
+    bLine("📆",`Dias ativo: *${diasAtivo}* dia(s)`),
+  ]);
+}
 
 // ════════════════════════════════════════════════
 // ✅ EMOJIS DO MENU
@@ -385,12 +408,22 @@ function buildSecoes(isDono){
     {header:"👑 DONOS",title:"_lista de donos._",id:"cat_donos"},
     {header:"💰 ALUGAR BOT",title:"_planos de aluguel._",id:"cat_alugar_info"},
   ]};
-  return[principal,extras];
+  const secoes=[principal,extras];
+  if(FONTE_ATUAL!=="Abadi"){
+    for(const sec of secoes){
+      if(sec.title)sec.title=aplicarFonte(FONTE_ATUAL,sec.title);
+      for(const row of sec.rows){
+        if(row.header)row.header=aplicarFonte(FONTE_ATUAL,row.header);
+        if(row.title)row.title=aplicarFonte(FONTE_ATUAL,row.title);
+      }
+    }
+  }
+  return secoes;
 }
 
 function gerarSubmenu(catId,P){
   const E=ME;const em=E.e||E.principal||"🌀";
-  if(catId==="cat_principal")return bBloco(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 【${em}】`,[bLine("🤖",`*Bot:* ${CONFIG.NOME_BOT}`),bLine("👑",`*Criador:* ${CONFIG.DONO_NOME}`),bLine("📞",CONFIG.DONO_NUM),B_SEP,bLine(em,`*${P}menu* / *${P}ping* / *${P}stats* / *${P}sobre*`),bLine(em,`*${P}id* / *${P}regras* / *${P}dono* / *${P}alugar*`),bLine(em,`*${P}pp* [código] → _acesso_`),bLine(em,`*${P}setmenu* [emoji] → _mudar emojis_`)]);
+  if(catId==="cat_principal")return bBloco(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 【${em}】`,[bLine("🤖",`*Bot:* ${CONFIG.NOME_BOT}`),bLine("👑",`*Criador:* ${CONFIG.DONO_NOME}`),bLine("📞",CONFIG.DONO_NUM),B_SEP,bLine(em,`*${P}menu* / *${P}ping* / *${P}stats* / *${P}sobre*`),bLine(em,`*${P}id* / *${P}regras* / *${P}dono* / *${P}alugar*`),bLine(em,`*${P}pp* [código] → _acesso_`),bLine(em,`*${P}setmenu* [emoji] → _mudar emojis_`),bLine(em,`*${P}totalcmd* → _total de comandos_`)]);
   if(catId==="cat_assistente")return bBloco(`𝑰𝑺𝑨Í𝑨𝑺 𝑰𝑨 【${em}】`,[bLine("💡","*Em grupos:* menciona o nome!"),bLine("📱","*No privado:* fala directamente!"),B_SEP,bLine("💬","_\"Isaías, baixa Calema te amo\"_"),bLine("💬","_\"Isaías, que tempo em Luanda?\"_"),bLine("💬","_\"Isaías, faz uma piada\"_"),B_SEP,bLine(em,`*${P}assistente* → _activar no grupo_`),bLine(em,`*${P}isaias-off* → _desactivar_`)]);
   if(catId==="cat_downloads")return bBloco(`𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃'𝐬 【${em}】`,[bLine("🎵","*YOUTUBE*"),bLine(em,`*${P}play* [música] → _baixa e envia directo_`),bLine(em,`*${P}play1* [música] → _carrossel com 5 opções_`),bLine(em,`*${P}mp3* / *${P}mp4* / *${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),B_SEP,bLine("📱","*REDES SOCIAIS*"),bLine(em,`*${P}tiktok* / *${P}tt* [link] → _download rápido_`),bLine(em,`*${P}instagram* / *${P}twitter*`),bLine(em,`*${P}facebook* / *${P}kwai* / *${P}spotify*`),bLine(em,`*${P}soundcloud*`),B_SEP,bLine("📌","*PINTEREST*"),bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pin* [busca] | [qtd] → _até 10 imagens_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),B_SEP,bLine("🖼️","*FICHEIROS*"),bLine(em,`*${P}mediafire* / *${P}apk*`),bLine(em,`*${P}qr* / *${P}tourl* / *${P}mostre*`)]);
   if(catId==="cat_musicas")return bBloco(`𝐌Ú𝐒𝐈𝐂𝐀𝐬 【${em}】`,[bLine("🎙️","*IDENTIFICAÇÃO*"),bLine(em,`*${P}busca* ↩️ áudio → _reconhece música_`),bLine(em,`*${P}shazam* → _diversão ⚡⚡_`),B_SEP,bLine("📝","*INFORMAÇÃO*"),bLine(em,`*${P}letra* / *${P}cifra* / *${P}bio* / *${P}album*`),B_SEP,bLine("📻","*DESCOBERTA*"),bLine(em,`*${P}recomenda* [género] / *${P}top10* [país]`)]);
@@ -420,7 +453,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const em=ME.e||ME.principal||"🌀";
   const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
   try{
-    const payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:"≡ Categorias",sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
+    const payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Categorias"),sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
     if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
     await sock.sendMessage(jid,payload,{quoted:seloBot});return;
   }catch(e){console.log("⚠️ NativeFlow:",e.message);}
@@ -429,7 +462,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
     else if(ppBotUrl)await sock.sendMessage(jid,{image:{url:ppBotUrl},caption:textoMenu},{quoted:seloBot});
     else await sock.sendMessage(jid,{text:textoMenu},{quoted:seloBot});
     await new Promise(r=>setTimeout(r,600));
-    await sock.sendMessage(jid,{listMessage:{title:`🌀 ${CONFIG.NOME_BOT}`,description:"Selecciona uma categoria:",footerText:`© ${CONFIG.NOME_BOT}`,buttonText:"≡ MENU",listType:1,sections:secoes}});return;
+    await sock.sendMessage(jid,{listMessage:{title:aplicarFonte(FONTE_ATUAL,`🌀 ${CONFIG.NOME_BOT}`),description:aplicarFonte(FONTE_ATUAL,"Selecciona uma categoria:"),footerText:aplicarFonte(FONTE_ATUAL,`© ${CONFIG.NOME_BOT}`),buttonText:aplicarFonte(FONTE_ATUAL,"≡ MENU"),listType:1,sections:secoes}});return;
   }catch{}
   try{await sock.sendMessage(jid,{text:textoMenu},{quoted:seloBot});}catch{}
   const menu=`${B_TOP}\n${bTitle("📂 CATEGORIAS")}\n${B_MID}\n${bLine(em,"*1*→Principal | *2*→Downloads | *3*→Músicas")}\n${bLine(em,"*4*→Figurinhas | *5*→Brincadeiras | *6*→Coins")}\n${bLine(em,"*7*→Alteradores | *8*→Logos | *9*→Pesquisas")}\n${bLine(em,"*0*→+18 (VIP)")}\n${B_BOT}`;
@@ -441,7 +474,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
 
 async function enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono){
   if(catId==="cat_assistente"){await sock.sendMessage(jid,{text:bBloco("🤖 ISAÍAS IA",[bLine("💡","*Em grupos:* menciona o nome dele!"),bLine("💡","*No privado:* fala directamente!"),B_SEP,bLine("💬","_\"Isaías, baixa música do Calema\"_"),bLine("💬","_\"Isaías, que tempo em Luanda?\"_"),bLine("💡",`*!isaias-off* para desactivar no grupo`)])},{quoted:seloBot});return;}
-  if(catId==="cat_ping"){const ini=Date.now();await sock.sendMessage(jid,{text:"⏳"});await sock.sendMessage(jid,{text:bBloco("📡 PING",[bLine("🏓",`*${Date.now()-ini}ms*`),bLine("⏱️",`${Math.floor(process.uptime()/60)} min`),bLine("💾",`${(process.memoryUsage().heapUsed/1024/1024).toFixed(1)}MB`),bLine("🌐",CONFIG.IS_SERVER?"☁️ Servidor":"📱 Local")])},{quoted:seloBot});return;}
+  if(catId==="cat_ping"){await sock.sendMessage(jid,{text:gerarBlocoPing(msg)},{quoted:seloBot});return;}
   if(catId==="cat_donos"){await sock.sendMessage(jid,{text:bBloco("👑 DONOS",[bLine("👑",`*${CONFIG.DONO_NOME}*`),bLine("📞",CONFIG.DONO_NUM)])},{quoted:seloBot});return;}
   if(catId==="cat_alugar_info"||catId==="cat_alugar"){await sock.sendMessage(jid,{text:gerarTextoAlugar()},{quoted:seloBot});return;}
   if(catId==="cat_criador"){let ppD=null;try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}const tD=bBloco("👨‍💻 CRIADOR",[bLine("🏷️",`*${CONFIG.DONO_NOME}*`),bLine("📞",CONFIG.DONO_NUM)]);if(ppD)await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:seloBot});else await sock.sendMessage(jid,{text:tD},{quoted:seloBot});return;}
@@ -701,7 +734,42 @@ async function buscarPinterest(busca,qtd=5){
 // ════════════════════════════════════════════════
 // ✅ STICKER / ÁUDIO
 // ════════════════════════════════════════════════
+let _webpmux=null;try{_webpmux=require("node-webpmux");}catch{console.log("⚠️ node-webpmux não instalado — packs de sticker ficarão sem metadata de pack. Corre: npm i node-webpmux");}
+async function adicionarExifPack(webpBuffer,packName,authorName,packId){
+  if(!_webpmux)return webpBuffer;
+  try{
+    const{Image}=_webpmux;
+    const img=new Image();
+    await img.load(webpBuffer);
+    const json={"sticker-pack-id":packId,"sticker-pack-name":packName,"sticker-pack-publisher":authorName,"emojis":["🎭"]};
+    const exifAttr=Buffer.from([0x49,0x49,0x2A,0x00,0x08,0x00,0x00,0x00,0x01,0x00,0x41,0x57,0x07,0x00,0x00,0x00,0x00,0x00,0x16,0x00,0x00,0x00]);
+    const jsonBuff=Buffer.from(JSON.stringify(json),"utf-8");
+    const exif=Buffer.concat([exifAttr,jsonBuff]);
+    exif.writeUIntLE(jsonBuff.length,14,4);
+    img.exif=exif;
+    return await img.save(null);
+  }catch(e){console.log("⚠️ EXIF pack:",e.message);return webpBuffer;}
+}
 async function criarSticker(imagemBuffer,isAnimated=false){const tempId=Date.now(),tempIn=`./downloads/stk_in_${tempId}.tmp`,tempOut=`./downloads/stk_out_${tempId}.webp`;try{fs.writeFileSync(tempIn,imagemBuffer);const cmd=isAnimated?`${FFMPEG_CMD} -i "${tempIn}" -t 5 -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=12" -c:v libwebp -quality 70 -preset default -loop 0 -an -vsync 0 "${tempOut}" -y -loglevel error`:`${FFMPEG_CMD} -i "${tempIn}" -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512" -c:v libwebp -quality 90 "${tempOut}" -y -loglevel error`;await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000,env:{...process.env}},(err)=>err?reject(err):resolve());});if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100)throw new Error("WebP inválido");return fs.readFileSync(tempOut);}finally{try{fs.removeSync(tempIn);}catch{}try{fs.removeSync(tempOut);}catch{}}}
+
+// ✅ Baixa um GIF/vídeo de uma URL e converte para MP4 (necessário para o WhatsApp reproduzir como "GIF")
+async function baixarGifComoMp4(gifUrl){
+  const tempId=Date.now();
+  const ext=(gifUrl.split("?")[0].split(".").pop()||"gif").toLowerCase();
+  const tempIn=`./downloads/gif_in_${tempId}.${ext.length<=4?ext:"gif"}`;
+  const tempOut=`./downloads/gif_out_${tempId}.mp4`;
+  try{
+    const{data}=await axios.get(gifUrl,{responseType:"arraybuffer",timeout:20000,httpsAgent});
+    fs.writeFileSync(tempIn,Buffer.from(data));
+    const cmd=`${FFMPEG_CMD} -i "${tempIn}" -movflags faststart+frag_keyframe+empty_moov -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -an "${tempOut}" -y -loglevel error`;
+    await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000,env:{...process.env}},(err)=>err?reject(err):resolve());});
+    if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100)throw new Error("Conversão de GIF falhou.");
+    return fs.readFileSync(tempOut);
+  }finally{
+    try{fs.removeSync(tempIn);}catch{}
+    try{fs.removeSync(tempOut);}catch{}
+  }
+}
 async function stickerParaFoto(buf,isAnimated=false){const tempId=Date.now(),tempIn=`./downloads/sf_in_${tempId}.webp`,tempOut=`./downloads/sf_out_${tempId}.${isAnimated?"mp4":"jpg"}`;try{fs.writeFileSync(tempIn,buf);const cmd=isAnimated?`${FFMPEG_CMD} -i "${tempIn}" -c:v libx264 -pix_fmt yuv420p -movflags faststart "${tempOut}" -y -loglevel error`:`${FFMPEG_CMD} -i "${tempIn}" -frames:v 1 -q:v 2 "${tempOut}" -y -loglevel error`;await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000,env:{...process.env}},(err)=>err?reject(err):resolve());});if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100)throw new Error("Conversão inválida");return{buffer:fs.readFileSync(tempOut),isVideo:isAnimated};}catch(e){return{buffer:buf,isVideo:false,isWebP:true};}finally{try{fs.removeSync(tempIn);}catch{}try{fs.removeSync(tempOut);}catch{}}}
 
 async function enviarAudio(sock,jid,filePath,msgCitada){
@@ -1136,7 +1204,7 @@ async function processarBotaoPlay(sock,msg){
 // ════════════════════════════════════════════════
 // ✅ TODOS OS COMANDOS
 // ════════════════════════════════════════════════
-const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","ergue-se","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","rpgstart","rpgstatus","rpgataque","rpgcurar","rpgsorte","rpgclasse","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase"]);
+const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","ergue-se","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","rpgstart","rpgstatus","rpgataque","rpgcurar","rpgsorte","rpgclasse","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -1191,6 +1259,7 @@ async function startBot(){
       try{const{id,participants,action}=update;if(!participants||!Array.isArray(participants))return;
         if(action==="add"){
           if(bemVindoDesativado.has(id))return;
+          if(!gruposAtivados.has(id)&&!verificarAluguel(id))return; // ✅ sem aluguel activo, sem boas-vindas
           const modoBv=bemVindoModo.get(id)||2;
           for(const participante of participants){
             const p=extrairJid(participante);
@@ -1318,23 +1387,12 @@ async function startBot(){
           // Verificar se expirou durante sessão
           await verificarExpiracaoAluguel(sock,jid);
         }
-        // No PRIVADO — a senha (!pp) ainda é necessária (tratada abaixo)
-        // ✅ GRUPOS: ignorar TUDO que não seja prefixo, Isaías ou botões
-        // Nenhuma resposta a mensagens de outros, reacções, contactos, etc.
-        if(isGrupo&&!isDono){
-          const temPrefixo=texto&&texto.startsWith(CONFIG.PREFIXO);
-          const temIsaias=texto&&detectarChamadaAssistente(texto);
-          const temBotao=!!(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage||msg.message?.listResponseMessage||msg.message?.templateButtonReplyMessage);
-          const temRevelar=texto&&(texto.toLowerCase().trim()==="#revelar"||texto.toLowerCase().trim()==="revelar");
-          if(!temPrefixo&&!temIsaias&&!temBotao&&!temRevelar){
-            return; // ✅ SILÊNCIO TOTAL — ignora tudo o resto
-          }
-        }
         if(chatsDesativados.has(jid)&&!isDono)return;
 
         let isAdmin=isDono;
         if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));isAdmin=admins.includes(sender);}catch{}}
 
+        // ✅ MODERAÇÃO — corre em TODAS as mensagens do grupo, mesmo sem prefixo (senão o anti-link nunca vê a mensagem)
         if(isGrupo&&!isAdmin&&(membrosSilenciados[jid]||[]).includes(sender)){try{await sock.sendMessage(jid,{delete:msg.key});}catch{};return;}
         if(isGrupo&&!isAdmin&&ehMencaoStatus(msg,texto)){banirComContagem(sock,jid,sender,msg.key,"Menção de status ⛔");return;}
         if(isGrupo&&!isAdmin&&!antiLinkDesativado.has(jid)&&LINK_RX.test(texto)){
@@ -1346,6 +1404,19 @@ async function startBot(){
             try{await sock.sendMessage(jid,{text:bLine("🔗",`Links não são permitidos aqui, @${sender.split("@")[0]}! _(Antilink Easy)_`),mentions:[sender]});}catch{}
           }
           return;
+        }
+
+        // No PRIVADO — a senha (!pp) ainda é necessária (tratada abaixo)
+        // ✅ GRUPOS: ignorar TUDO que não seja prefixo, Isaías ou botões
+        // Nenhuma resposta a mensagens de outros, reacções, contactos, etc.
+        if(isGrupo&&!isDono){
+          const temPrefixo=texto&&texto.startsWith(CONFIG.PREFIXO);
+          const temIsaias=texto&&detectarChamadaAssistente(texto);
+          const temBotao=!!(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage||msg.message?.listResponseMessage||msg.message?.templateButtonReplyMessage);
+          const temRevelar=texto&&(texto.toLowerCase().trim()==="#revelar"||texto.toLowerCase().trim()==="revelar");
+          if(!temPrefixo&&!temIsaias&&!temBotao&&!temRevelar){
+            return; // ✅ SILÊNCIO TOTAL — ignora tudo o resto
+          }
         }
         if(isGrupo&&!isAdmin&&mencoes.length>5){banirComContagem(sock,jid,sender,msg.key,"Spam de menções 📢❌");return;}
 
@@ -1630,27 +1701,7 @@ ${nomeEnviou}`;
           return;
         }
         if(comando==="ping"){
-          const tsMsg=(msg.messageTimestamp?Number(msg.messageTimestamp)*1000:Date.now());
-          const latencia=Math.max(0,Date.now()-tsMsg);
-          const upSec=Math.floor(process.uptime());
-          const diasAtivo=Math.floor(upSec/86400);
-          const horasP=Math.floor((upSec%86400)/3600);
-          const minsP=Math.floor((upSec%3600)/60);
-          const segsP=upSec%60;
-          const diasSemana=["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
-          const diaHoje=diasSemana[new Date().getDay()];
-          const ramMB=(process.memoryUsage().heapUsed/1024/1024).toFixed(1);
-          await sock.sendMessage(jid,{text:bBloco("🏓 PONG",[
-            bLine("📅",`Dia: *${diaHoje}*`),
-            B_SEP,
-            bLine("🟢","*Ativo:*"),
-            bLine("🕐","Hora : Min : Seg"),
-            bLine("🕐",`*${String(horasP).padStart(2,"0")}h:${String(minsP).padStart(2,"0")}m:${String(segsP).padStart(2,"0")}s*`),
-            bLine("📡",`Latência: *${latencia}ms*`),
-            bLine("💻",`RAM: *${ramMB}MB*`),
-            B_SEP,
-            bLine("📆",`Dias ativo: *${diasAtivo}* dia(s)`),
-          ])},{quoted:seloBot});
+          await sock.sendMessage(jid,{text:gerarBlocoPing(msg)},{quoted:seloBot});
           return;
         }
         if(comando==="stats"){const s=fs.readJsonSync(ARQUIVO_STATS);const top=Object.entries(s.comandos||{}).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([c,n],i)=>`◎ ${i+1}. *${CONFIG.PREFIXO}${c}* — ${n}x`).join("\n");await sock.sendMessage(jid,{text:bBloco("📊 STATS",[bLine("🔢",`Total: *${s.total||0}*`),B_SEP,top])},{quoted:seloBot});return;}
@@ -1945,7 +1996,12 @@ ${nomeEnviou}`;
           let gifUrl=null;
           try{const{data}=await axios.get(`https://nekos.best/api/v2/${GIF_ACAO[comando]}`,{timeout:10000,httpsAgent});gifUrl=data?.results?.[0]?.url||null;}catch(e){console.log(`❌ GIF ${comando}:`,e.message);}
           if(gifUrl){
-            try{await sock.sendMessage(jid,{video:{url:gifUrl},gifPlayback:true,caption:legenda,mentions:[sender,alvo]},{quoted:seloBot});await reagir(sock,msg,emojisAcao[comando]);return;}catch(e){console.log(`❌ envio GIF ${comando}:`,e.message);}
+            try{
+              const mp4Buf=await baixarGifComoMp4(gifUrl);
+              await sock.sendMessage(jid,{video:mp4Buf,gifPlayback:true,caption:legenda,mentions:[sender,alvo]},{quoted:seloBot});
+              await reagir(sock,msg,emojisAcao[comando]);
+              return;
+            }catch(e){console.log(`❌ envio GIF ${comando}:`,e.message);}
           }
           await sock.sendMessage(jid,{text:legenda,mentions:[sender,alvo]},{quoted:seloBot});
           await reagir(sock,msg,emojisAcao[comando]);
@@ -2317,41 +2373,50 @@ ${B_BOT}`},{quoted:seloBot});return;
         // ─── PINPACK — Pack de stickers ───
         if(comando==="pinpack"){
           const query=args.join(" ").trim();
-          if(!query){await sock.sendMessage(jid,{text:`❌ *!pinpack* [termo]\nEx: *!pinpack* Robin`},{quoted:seloBot});return;}
+          if(!query){await sock.sendMessage(jid,{text:bBloco("🎭 PINPACKS",[bLine("💡","Busca no Pinterest e manda"),bLine("💡","o *pack completo de uma vez*."),B_SEP,bLine("📌",`*${CONFIG.PREFIXO}pinpack* [nome]`),bLine("📌",`Ex: *${CONFIG.PREFIXO}pinpack* Neymar`)])},{quoted:seloBot});return;}
           await reagir(sock,msg,"⏳");
-          let loadMsg=null;
-          try{loadMsg=await sock.sendMessage(jid,{text:bBloco("🎭 PINPACK",[bLine("🔍",`A buscar: _${query}_`),FRAMES_LOADING[2]])},{quoted:seloBot});}catch{}
+          const packName=query.replace(/\s+/g," ").trim().slice(0,32)||"PACK";
+          const packAuthor=nomeBotEstilizado();
+          const packId=`com.${CONFIG.NOME_BOT.replace(/[^a-z0-9]/gi,"").toLowerCase()}.pack.${Date.now().toString(16)}`;
+          let progMsg=null;
+          try{progMsg=await sock.sendMessage(jid,{text:bBloco("🎭 PINPACK",[bLine("📦",`Pack: *${query}*`),bLine("⏳","A buscar imagens...")])},{quoted:seloBot});}catch{}
           try{
-            // Busca imagens do Pinterest
-            const imagens=await buscarPinterest(query,10);
-            if(!imagens.length){
-              await reagir(sock,msg,"❌");
-              if(loadMsg)try{await sock.sendMessage(jid,{text:`❌ Não encontrei imagens para *${query}*`,edit:loadMsg.key});}catch{}
-              return;
-            }
-            if(loadMsg)try{await sock.sendMessage(jid,{text:bBloco("🎭 PINPACK",[bLine("✅",`${imagens.length} imagens — A criar stickers...`),FRAMES_LOADING[4]]),edit:loadMsg.key});}catch{}
-            // Converte cada imagem em sticker
-            let enviados=0;
-            await sock.sendMessage(jid,{text:`${B_TOP}\n${bTitle("🎭 PACK: "+query.toUpperCase())}\n${bLine("📦",`A enviar *${imagens.length}* stickers...`)}\n${B_BOT}`},{quoted:seloBot});
-            for(let i=0;i<imagens.length;i++){
+            const imagens=await buscarPinterest(query+" aesthetic",29);
+            if(!imagens.length)throw new Error("Sem imagens encontradas.");
+            if(progMsg)try{await sock.sendMessage(jid,{text:bBloco("🎭 PINPACK",[bLine("📦",`Pack: *${query}*`),bLine("📥",`${imagens.length} imagens`),bLine("⚙️","A converter...")]),edit:progMsg.key});}catch{}
+
+            const stickers=[];
+            const total=imagens.length;
+            for(let i=0;i<total;i++){
               try{
                 const{data}=await axios.get(imagens[i],{responseType:"arraybuffer",timeout:15000,httpsAgent});
                 const buf=Buffer.from(data);
+                if(!buf||buf.length<1000)continue;
                 let stkBuf;
-                try{stkBuf=await criarSticker(buf,false);}
-                catch{stkBuf=buf;} // fallback: envia imagem raw como sticker
-                await sock.sendMessage(jid,{sticker:stkBuf},{quoted:seloBot});
-                enviados++;
-                await new Promise(r=>setTimeout(r,600));
-              }catch(e){console.log("⚠️ sticker",i,e.message);}
+                try{stkBuf=await criarSticker(buf,false);}catch{stkBuf=null;}
+                if(stkBuf){
+                  const comExif=await adicionarExifPack(stkBuf,packName,packAuthor,packId);
+                  stickers.push(comExif);
+                }
+              }catch(e){console.log("⚠️ pinpack sticker",i,e.message);}
+              if(progMsg&&((i+1)%3===0||i===total-1)){
+                const pct=Math.round(((i+1)/total)*100);
+                const filled=Math.round(pct/5);
+                const bar="█".repeat(filled)+"░".repeat(20-filled);
+                try{await sock.sendMessage(jid,{text:bBloco("🎭 PINPACK",[bLine("⏳",`Montando pack de *${query}*`),`[${bar}] ${pct}% (${i+1}/${total})`]),edit:progMsg.key});}catch{}
+              }
             }
+            if(!stickers.length)throw new Error("Nenhuma imagem convertida.");
+
+            for(const stk of stickers){try{await sock.sendMessage(jid,{sticker:stk},{quoted:seloBot});}catch{}await new Promise(r=>setTimeout(r,500));}
+
+            await sock.sendMessage(jid,{text:bBloco("✅ PACK PRONTO",[bLine("✅",`Pacote *${packName}* enviado de uma vez!`),bLine("📦",`${stickers.length} figurinha(s) dentro do pack`),bLine("👤",`Publicado por: *${packAuthor}*`),B_SEP,bLine("💡","Segura numa figurinha → *Adicionar às suas figurinhas*")])},{quoted:seloBot});
             await reagir(sock,msg,"✅");
-            if(enviados>0)await sock.sendMessage(jid,{text:bLine("✅",`Pack *${query}* concluído! *${enviados}* stickers enviados.`)},{quoted:seloBot});
-            else await sock.sendMessage(jid,{text:`❌ Não consegui criar os stickers.`},{quoted:seloBot});
           }catch(e){
             console.error("[PINPACK]",e.message);
             await reagir(sock,msg,"❌");
-            await sock.sendMessage(jid,{text:`❌ Erro: ${e.message.slice(0,80)}`},{quoted:seloBot});
+            if(progMsg)try{await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("❌",e.message.slice(0,100))]),edit:progMsg.key});}catch{}
+            else await sock.sendMessage(jid,{text:bLine("❌",e.message.slice(0,100))},{quoted:seloBot});
           }
           return;
         }
@@ -2634,6 +2699,22 @@ ${B_BOT}`},{quoted:seloBot});return;
         }
 
         // ─── STATUS (GRUPO) ───
+        if(comando==="totalcmd"){
+          const nativos=TODOS_COMANDOS.size;
+          const cases=carregarCases();
+          const dinamicos=Object.keys(cases).length;
+          const total=nativos+dinamicos;
+          await sock.sendMessage(jid,{text:bBloco("📊 TOTAL DE COMANDOS",[
+            bLine("🤖",`*${nomeBotEstilizado()}*`),
+            B_SEP,
+            bLine("⚙️",`Comandos nativos: *${nativos}*`),
+            bLine("♻️",`Comandos via !addcase: *${dinamicos}*`),
+            B_SEP,
+            bLine("📦",`*TOTAL: ${total} comandos*`),
+          ])},{quoted:seloBot});
+          return;
+        }
+
         if(comando==="status"&&isGrupo){
           const al=infoAluguel(jid);const ativo=verificarAluguel(jid);const diasR=diasRestantes(jid);
           const upSec=Math.floor(process.uptime());
