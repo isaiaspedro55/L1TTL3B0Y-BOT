@@ -30,7 +30,7 @@ const CONFIG = {
   NUMERO_BOT:      "244954260707",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
   GROQ_KEY: process.env.GROQ_KEY || "",
-  GEMINI_KEY: process.env.GEMINI_KEY || "", 
+  GEMINI_KEY: process.env.GEMINI_KEY || "",  
   DONO_JID:        "169853876965546@lid",
   DONO_NOME:       "ISAÍAS PEDRO",
   DONO_NUM:        "926 612 801",
@@ -193,6 +193,134 @@ let FONTE_ATUAL="Abadi";
 try{const fdata=fs.readJsonSync(ARQUIVO_FONTE);if(fdata?.nome&&FONTES[fdata.nome])FONTE_ATUAL=fdata.nome;}catch{}
 function salvarFonteAtual(nome){FONTE_ATUAL=nome;try{fs.writeJsonSync(ARQUIVO_FONTE,{nome});}catch{}}
 function nomeBotEstilizado(){return aplicarFonte(FONTE_ATUAL,CONFIG.NOME_BOT);}
+
+// ════════════════════════════════════════════════
+// ✅ RPG — dados e funções principais
+// ════════════════════════════════════════════════
+const ARQUIVO_RPG="./dados/rpg_jogadores.json",ARQUIVO_CASAMENTOS="./dados/casamentos.json",ARQUIVO_COLECAO="./dados/colecao_figurinhas.json";
+[ARQUIVO_RPG,ARQUIVO_CASAMENTOS,ARQUIVO_COLECAO].forEach(f=>{if(!fs.existsSync(f))fs.writeJsonSync(f,{});});
+function carregarRPG(){try{return fs.readJsonSync(ARQUIVO_RPG);}catch{return{};}}
+function salvarRPG(d){try{fs.writeJsonSync(ARQUIVO_RPG,d);}catch{}}
+function carregarCasamentos(){try{return fs.readJsonSync(ARQUIVO_CASAMENTOS);}catch{return{};}}
+function salvarCasamentos(d){try{fs.writeJsonSync(ARQUIVO_CASAMENTOS,d);}catch{}}
+function carregarColecao(){try{return fs.readJsonSync(ARQUIVO_COLECAO);}catch{return{};}}
+function salvarColecao(d){try{fs.writeJsonSync(ARQUIVO_COLECAO,d);}catch{}}
+
+const RPG_CLASSES={
+  guerreiro:{emoji:"⚔️",nome:"Guerreiro",hp:150,atk:20,def:15,spd:8,desc:"Muito HP e ataque"},
+  assassino:{emoji:"🗡️",nome:"Assassino",hp:90,atk:22,def:8,spd:20,desc:"Crítico e velocidade"},
+  mago:{emoji:"🧙",nome:"Mago",hp:80,atk:28,def:6,spd:10,desc:"Magia e dano alto"},
+  arqueiro:{emoji:"🏹",nome:"Arqueiro",hp:100,atk:18,def:10,spd:16,desc:"Precisão e ataque à distância"},
+  paladino:{emoji:"🛡️",nome:"Paladino",hp:130,atk:14,def:20,spd:7,desc:"Defesa e cura"},
+  invocador:{emoji:"🐉",nome:"Invocador",hp:95,atk:16,def:10,spd:12,desc:"Invoca criaturas"},
+  ninja:{emoji:"🥷",nome:"Ninja",hp:85,atk:19,def:9,spd:22,desc:"Esquiva e crítico"},
+};
+const RPG_RARIDADES=[
+  {nome:"Comum",emoji:"⚪",mult:1,peso:45},
+  {nome:"Incomum",emoji:"🟢",mult:1.3,peso:25},
+  {nome:"Raro",emoji:"🔵",mult:1.7,peso:15},
+  {nome:"Épico",emoji:"🟣",mult:2.2,peso:9},
+  {nome:"Lendário",emoji:"🟡",mult:3,peso:5},
+  {nome:"Mítico",emoji:"🔴",mult:4,peso:1},
+];
+function sortearRaridade(){const total=RPG_RARIDADES.reduce((s,r)=>s+r.peso,0);let n=Math.random()*total;for(const r of RPG_RARIDADES){if(n<r.peso)return r;n-=r.peso;}return RPG_RARIDADES[0];}
+const RPG_ARMAS=["⚔️ Espada Sombria","🗡️ Katana Demoníaca","🔥 Lâmina Infernal","⚡ Espada do Trovão","🌌 Espada Cósmica"];
+const RPG_ARMADURAS=["🧥 Armadura de Couro","🛡️ Armadura de Ferro","✨ Armadura Élfica","🌟 Armadura Sagrada","🌑 Armadura das Trevas"];
+function gerarItemRPG(tipo){
+  const r=sortearRaridade();
+  const nome=tipo==="arma"?RPG_ARMAS[Math.floor(Math.random()*RPG_ARMAS.length)]:RPG_ARMADURAS[Math.floor(Math.random()*RPG_ARMADURAS.length)];
+  const atk=tipo==="arma"?Math.round(8*r.mult):0;
+  const def=tipo==="armadura"?Math.round(8*r.mult):0;
+  const preco=Math.round(40*r.mult);
+  return{nome,tipo,raridade:r.nome,emoji:r.emoji,atk,def,preco};
+}
+const LOJA_CATALOGO=[
+  {id:1,nome:"⚔️ Espada Sombria",tipo:"arma",raridade:"Raro",emoji:"🔵",atk:14,def:0,preco:200},
+  {id:2,nome:"🗡️ Katana Demoníaca",tipo:"arma",raridade:"Épico",emoji:"🟣",atk:18,def:0,preco:350},
+  {id:3,nome:"🔥 Lâmina Infernal",tipo:"arma",raridade:"Lendário",emoji:"🟡",atk:24,def:0,preco:600},
+  {id:4,nome:"⚡ Espada do Trovão",tipo:"arma",raridade:"Épico",emoji:"🟣",atk:20,def:0,preco:400},
+  {id:5,nome:"🌌 Espada Cósmica",tipo:"arma",raridade:"Mítico",emoji:"🔴",atk:30,def:0,preco:900},
+  {id:6,nome:"🧥 Armadura de Couro",tipo:"armadura",raridade:"Comum",emoji:"⚪",atk:0,def:8,preco:100},
+  {id:7,nome:"🛡️ Armadura de Ferro",tipo:"armadura",raridade:"Incomum",emoji:"🟢",atk:0,def:12,preco:180},
+  {id:8,nome:"✨ Armadura Élfica",tipo:"armadura",raridade:"Raro",emoji:"🔵",atk:0,def:16,preco:300},
+  {id:9,nome:"🌟 Armadura Sagrada",tipo:"armadura",raridade:"Épico",emoji:"🟣",atk:0,def:22,preco:500},
+  {id:10,nome:"🌑 Armadura das Trevas",tipo:"armadura",raridade:"Mítico",emoji:"🔴",atk:0,def:30,preco:800},
+];
+function obterJogadorRPG(sender){const db=carregarRPG();if(!db[sender]){db[sender]={classe:null,nivel:1,xp:0,hp:100,hpMax:100,inventario:[],equipado:{arma:null,armadura:null},ultimoDaily:0,ultimoQuest:0,ultimaAcao:{}};salvarRPG(db);}return db[sender];}
+function statsBaseRPG(p){
+  const c=RPG_CLASSES[p.classe]||{hp:100,atk:12,def:10,spd:10};
+  const bonusNivel=p.nivel-1;
+  return{
+    hpMax:c.hp+bonusNivel*10,
+    atk:c.atk+bonusNivel*2+(p.equipado?.arma?.atk||0),
+    def:c.def+bonusNivel*1+(p.equipado?.armadura?.def||0),
+    spd:c.spd+Math.floor(bonusNivel/2),
+  };
+}
+function xpProximoNivelRPG(nivel){return nivel*100;}
+function ganharXPRPG(p,qtd){
+  p.xp+=qtd;
+  let subiu=false;
+  while(p.xp>=xpProximoNivelRPG(p.nivel)){p.xp-=xpProximoNivelRPG(p.nivel);p.nivel++;subiu=true;}
+  const st=statsBaseRPG(p);
+  p.hpMax=st.hpMax;
+  if(subiu)p.hp=p.hpMax;
+  return subiu;
+}
+function resolverCombateRPG(atkA,defA,hpA,atkB,defB,hpB,maxRounds=8){
+  let hpA2=hpA,hpB2=hpB;const log=[];
+  for(let i=0;i<maxRounds&&hpA2>0&&hpB2>0;i++){
+    const danoA=Math.max(1,Math.round(atkA-defB*0.4+(Math.random()*10-5)));
+    hpB2=Math.max(0,hpB2-danoA);
+    if(hpB2<=0){log.push(`Round ${i+1}: dano final de *${danoA}*!`);break;}
+    const danoB=Math.max(1,Math.round(atkB-defA*0.4+(Math.random()*10-5)));
+    hpA2=Math.max(0,hpA2-danoB);
+    log.push(`Round ${i+1}: *-${danoA}* / *-${danoB}*`);
+    if(hpA2<=0)break;
+  }
+  return{vencedor:hpA2>hpB2?"a":"b",hpA:hpA2,hpB:hpB2,log};
+}
+function cooldownRPG(p,chave,minutos){
+  const agora=Date.now();
+  const ultima=p.ultimaAcao?.[chave]||0;
+  const restoMs=(ultima+minutos*60000)-agora;
+  if(restoMs>0)return restoMs;
+  if(!p.ultimaAcao)p.ultimaAcao={};
+  p.ultimaAcao[chave]=agora;
+  return 0;
+}
+function formatarMs(ms){const m=Math.ceil(ms/60000);if(m<60)return`${m}min`;const h=Math.floor(m/60);const r=m%60;return`${h}h${r>0?r+"min":""}`;}
+
+// ════════════════════════════════════════════════
+// ✅ ANIME RPG — personagens
+// ════════════════════════════════════════════════
+const ANIME_PERSONAGENS={
+  naruto:{franquia:"Naruto",hp:110,atk:20,def:12,spd:18,habilidade:"Rasengan"},
+  sasuke:{franquia:"Naruto",hp:100,atk:22,def:10,spd:20,habilidade:"Chidori"},
+  itachi:{franquia:"Naruto",hp:95,atk:24,def:11,spd:19,habilidade:"Tsukuyomi"},
+  madara:{franquia:"Naruto",hp:150,atk:30,def:18,spd:17,habilidade:"Susanoo"},
+  kakashi:{franquia:"Naruto",hp:105,atk:21,def:13,spd:18,habilidade:"Kamui"},
+  goku:{franquia:"Dragon Ball",hp:140,atk:28,def:14,spd:24,habilidade:"Kamehameha"},
+  vegeta:{franquia:"Dragon Ball",hp:130,atk:27,def:13,spd:23,habilidade:"Final Flash"},
+  gohan:{franquia:"Dragon Ball",hp:120,atk:26,def:14,spd:20,habilidade:"Kamehameha Pai-Filho"},
+  freeza:{franquia:"Dragon Ball",hp:135,atk:29,def:16,spd:22,habilidade:"Death Beam"},
+  broly:{franquia:"Dragon Ball",hp:160,atk:32,def:15,spd:19,habilidade:"Fúria Lendária"},
+  luffy:{franquia:"One Piece",hp:125,atk:25,def:12,spd:21,habilidade:"Gear 5"},
+  zoro:{franquia:"One Piece",hp:115,atk:26,def:13,spd:19,habilidade:"Three Sword Style"},
+  sanji:{franquia:"One Piece",hp:110,atk:23,def:12,spd:22,habilidade:"Diable Jambe"},
+  ace:{franquia:"One Piece",hp:118,atk:24,def:11,spd:20,habilidade:"Mera Mera no Mi"},
+  law:{franquia:"One Piece",hp:105,atk:22,def:13,spd:18,habilidade:"Room Shambles"},
+  tanjiro:{franquia:"Demon Slayer",hp:100,atk:21,def:12,spd:19,habilidade:"Respiração da Água"},
+  zenitsu:{franquia:"Demon Slayer",hp:90,atk:20,def:9,spd:26,habilidade:"Respiração do Trovão"},
+  inosuke:{franquia:"Demon Slayer",hp:110,atk:23,def:13,spd:18,habilidade:"Respiração da Fera"},
+  rengoku:{franquia:"Demon Slayer",hp:120,atk:25,def:14,spd:19,habilidade:"Respiração das Chamas"},
+  akaza:{franquia:"Demon Slayer",hp:130,atk:27,def:15,spd:23,habilidade:"Punho Destrutivo"},
+  gojo:{franquia:"Jujutsu Kaisen",hp:145,atk:30,def:16,spd:22,habilidade:"Domínio Infinito"},
+  sukuna:{franquia:"Jujutsu Kaisen",hp:150,atk:31,def:17,spd:21,habilidade:"Malevolent Shrine"},
+  megumi:{franquia:"Jujutsu Kaisen",hp:100,atk:20,def:12,spd:18,habilidade:"Divindades Sombrias"},
+  yuji:{franquia:"Jujutsu Kaisen",hp:115,atk:23,def:13,spd:20,habilidade:"Punho Negro"},
+  toji:{franquia:"Jujutsu Kaisen",hp:120,atk:26,def:12,spd:24,habilidade:"Corpo Sem Amaldiçoamento"},
+};
 
 // ════ SISTEMA DE DONOS EXTRA / SUBDONOS ════
 function carregarDonosExtra(){try{return fs.readJsonSync(ARQUIVO_DONOS_EXTRA);}catch{return{};}}
@@ -423,23 +551,165 @@ function buildSecoes(isDono){
 
 function gerarSubmenu(catId,P){
   const E=ME;const em=E.e||E.principal||"🌀";
-  if(catId==="cat_principal")return bBloco(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 【${em}】`,[bLine("🤖",`*Bot:* ${CONFIG.NOME_BOT}`),bLine("👑",`*Criador:* ${CONFIG.DONO_NOME}`),bLine("📞",CONFIG.DONO_NUM),B_SEP,bLine(em,`*${P}menu* / *${P}ping* / *${P}stats* / *${P}sobre*`),bLine(em,`*${P}id* / *${P}regras* / *${P}dono* / *${P}alugar*`),bLine(em,`*${P}pp* [código] → _acesso_`),bLine(em,`*${P}setmenu* [emoji] → _mudar emojis_`),bLine(em,`*${P}totalcmd* → _total de comandos_`)]);
+  if(catId==="cat_principal")return bBloco(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 【${em}】`,[bLine("🤖",`*Bot:* ${CONFIG.NOME_BOT}`),bLine("👑",`*Criador:* ${CONFIG.DONO_NOME}`),bLine("📞",CONFIG.DONO_NUM),B_SEP,bLine(em,`*${P}menu*`),bLine(em,`*${P}ping*`),bLine(em,`*${P}stats*`),bLine(em,`*${P}sobre*`),bLine(em,`*${P}id*`),bLine(em,`*${P}regras*`),bLine(em,`*${P}dono*`),bLine(em,`*${P}alugar*`),bLine(em,`*${P}pp* [código] → _acesso_`),bLine(em,`*${P}setmenu* [emoji] → _mudar emojis_`),bLine(em,`*${P}totalcmd* → _total de comandos_`)]);
   if(catId==="cat_assistente")return bBloco(`𝑰𝑺𝑨Í𝑨𝑺 𝑰𝑨 【${em}】`,[bLine("💡","*Em grupos:* menciona o nome!"),bLine("📱","*No privado:* fala directamente!"),B_SEP,bLine("💬","_\"Isaías, baixa Calema te amo\"_"),bLine("💬","_\"Isaías, que tempo em Luanda?\"_"),bLine("💬","_\"Isaías, faz uma piada\"_"),B_SEP,bLine(em,`*${P}assistente* → _activar no grupo_`),bLine(em,`*${P}isaias-off* → _desactivar_`)]);
-  if(catId==="cat_downloads")return bBloco(`𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃'𝐬 【${em}】`,[bLine("🎵","*YOUTUBE*"),bLine(em,`*${P}play* [música] → _baixa e envia directo_`),bLine(em,`*${P}play1* [música] → _carrossel com 5 opções_`),bLine(em,`*${P}mp3* / *${P}mp4* / *${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),B_SEP,bLine("📱","*REDES SOCIAIS*"),bLine(em,`*${P}tiktok* / *${P}tt* [link] → _download rápido_`),bLine(em,`*${P}instagram* / *${P}twitter*`),bLine(em,`*${P}facebook* / *${P}kwai* / *${P}spotify*`),bLine(em,`*${P}soundcloud*`),B_SEP,bLine("📌","*PINTEREST*"),bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pin* [busca] | [qtd] → _até 10 imagens_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),B_SEP,bLine("🖼️","*FICHEIROS*"),bLine(em,`*${P}mediafire* / *${P}apk*`),bLine(em,`*${P}qr* / *${P}tourl* / *${P}mostre*`)]);
-  if(catId==="cat_musicas")return bBloco(`𝐌Ú𝐒𝐈𝐂𝐀𝐬 【${em}】`,[bLine("🎙️","*IDENTIFICAÇÃO*"),bLine(em,`*${P}busca* ↩️ áudio → _reconhece música_`),bLine(em,`*${P}shazam* → _diversão ⚡⚡_`),B_SEP,bLine("📝","*INFORMAÇÃO*"),bLine(em,`*${P}letra* / *${P}cifra* / *${P}bio* / *${P}album*`),B_SEP,bLine("📻","*DESCOBERTA*"),bLine(em,`*${P}recomenda* [género] / *${P}top10* [país]`)]);
-  if(catId==="cat_figurinhas")return bBloco(`𝐅𝐈𝐆𝐔𝐑𝐈𝐍𝐇𝐀𝐬 【${em}】`,[bLine(em,`*${P}s* → _imagem/vídeo ➜ sticker_`),bLine(em,`*${P}sf* → _sticker ➜ foto_`),bLine(em,`*${P}brat* [texto] → _brat sticker_`),bLine(em,`*${P}figurinha* [nº]`)]);
-  if(catId==="cat_brincadeiras")return bBloco(`𝐁𝐑𝐈𝐍𝐂𝐀𝐃𝐄𝐈𝐑𝐀𝐬 【${em}】`,[bLine("🎮","*GRUPO:*"),bLine(em,"quiz/vof/completar/caca/guerra/stop"),B_SEP,bLine("🎲","*SOLO:*"),bLine(em,"matematica/jokenpo/dado/cara-coroa"),bLine(em,"adivinhar/velocidade/roleta/aki/aposta"),bLine(em,`*${P}8ball* [pergunta] 🎱`),B_SEP,bLine("🕹️","*JOGOS INTERACTIVOS:*"),bLine(em,`*${P}dino* 🦖 → _Dino Runner interactivo_`),bLine(em,`*${P}piano* 🎹 → _piano interactivo_`),B_SEP,bLine("😂","*DIVERSÃO:*"),bLine(em,"piada/conselho/poema/historia/perfil/cara/ship/fofoca"),bLine(em,`*${P}cantada* 💘 / *${P}inunca* 🎯 / *${P}conselhobiblico* 📖`),B_SEP,bLine("⚔️","*PvP:*"),bLine(em,`*${P}batalha* @user [apostas]`),B_SEP,bLine("🏆","rank/toprank/nivel")]);
-  if(catId==="cat_coins")return bBloco(`𝐂𝐎𝐈𝐍𝐬 & 𝐄𝐂𝐎𝐍𝐎𝐌𝐈𝐀 【${em}】`,[bLine(em,`*${P}moedas* / *${P}diario* / *${P}topcoins*`),bLine(em,`*${P}dar* @user [qtd] / *${P}roubar* @user`),bLine(em,`*${P}aposta* [qtd] / *${P}nivel* / *${P}inventario*`),B_SEP,bLine("💼","*TRABALHO:*"),bLine(em,`*${P}trabalhar* ⏱2h / *${P}minerar* ⏱3h`),bLine(em,`*${P}pescar* ⏱90min / *${P}cacada* ⏱2.5h`),bLine(em,`*${P}bau* ⏱4h / *${P}missao* ⏱24h`),bLine(em,`*${P}treinar* ⏱1h / *${P}dormir* ⏱8h`),bLine(em,`*${P}explorar* ⏱1.5h / *${P}viajar*`),bLine(em,`*${P}crimes* ⏱6h / *${P}mendigar* ⏱30min`)]);
-  if(catId==="cat_alteradores")return bBloco(`𝐀𝐋𝐓𝐄𝐑𝐀𝐃𝐎𝐑𝐄𝐬 【${em}】`,[bLine("🔊","*VOZ:*"),bLine(em,`*${P}vz* [texto]`),B_SEP,bLine("📝","*TRANSCRIÇÃO:*"),bLine(em,`*${P}transcrever* / *${P}resumiraudio* / *${P}traduziraudio*`),B_SEP,bLine("🧠","*IA:*"),bLine(em,`*${P}ia* / *${P}resumir* / *${P}traduzir*`),B_SEP,bLine("🖼️","*IMAGEM:*"),bLine(em,`*${P}fotocopia* / *${P}fotoparaia* / *${P}resumirfoto*`)]);
-  if(catId==="cat_logos")return bBloco(`𝐋𝐎𝐆𝐎𝐬 & 𝐔𝐓𝐈𝐋𝐈𝐃𝐀𝐃𝐄𝐬 【${em}】`,[bLine(em,`*${P}meme* / *${P}logo* / *${P}card*`),bLine(em,`*${P}calc* / *${P}encurtar* / *${P}qr*`),bLine(em,`*${P}horario* / *${P}tempo* / *${P}cotacao*`),bLine(em,`*${P}ver* / *${P}apagadas* / *${P}placar*`),B_SEP,bLine("📦","*CASES DINÂMICAS:*"),bLine(em,`*${P}addcase* [nome] → _adicionar comando_`),bLine(em,`*${P}cases* → _listar cases_`),bLine(em,`*${P}extraircase* [nome] → _ver código_`),bLine(em,`*${P}delcase* [nome] → _remover_`)]);
-  if(catId==="cat_pesquisas")return bBloco(`𝐏𝐄𝐒𝐐𝐔𝐈𝐒𝐀𝐬 【${em}】`,[bLine("📰","*NOTÍCIAS:*"),bLine(em,`*${P}noticias* / *${P}hoje* / *${P}fato*`),B_SEP,bLine("🌍","*INFO:*"),bLine(em,`*${P}pais* / *${P}wikipedia* / *${P}signo*`),bLine(em,`*${P}definir* / *${P}sinonimo*`),B_SEP,bLine("🎬","*ENTRETENIMENTO:*"),bLine(em,`*${P}filme* / *${P}serie* / *${P}livro*`),B_SEP,bLine("💹","*FINANÇAS:*"),bLine(em,`*${P}cripto* / *${P}converter* / *${P}previsao*`)]);
-  if(catId==="cat_animes")return bBloco(`𝐀𝐍𝐈𝐌𝐄𝐬 【${em}】`,[bLine(em,`*${P}anime* / *${P}topanimes* / *${P}animealeatorio*`),bLine(em,`*${P}fraseanime* / *${P}quizanime*`)]);
-  if(catId==="cat_rpg")return bBloco(`𝐑𝐏𝐆 【${em}】`,[bLine(em,`*${P}rpgstart* → _criar personagem_`),bLine(em,`*${P}rpgstatus* / *${P}rpgataque* / *${P}rpgcurar*`),bLine(em,`*${P}rpgsorte* / *${P}rpgclasse*`)]);
-  if(catId==="cat_ias")return bBloco(`𝐈𝐀𝐬 【${em}】`,[bLine(em,`*${P}gpt* / *${P}gemini* / *${P}deepseek* / *${P}ia*`),bLine("💡","_Em grupos: chama Isaías pelo nome!_"),bLine("📱","_No privado: fala directamente!_")]);
-  if(catId==="cat_plaquinhas")return bBloco(`𝐏𝐋𝐀𝐐𝐔𝐈𝐍𝐇𝐀𝐬 【${em}】`,[bLine(em,`*${P}cantada* 💘 / *${P}inunca* 🎯`),bLine(em,`*${P}conselhobiblico* 📖 / *${P}frasemotivacional* 💪`),bLine(em,`*${P}piadacurta* 😂 / *${P}curiosidade* 🤔`),bLine(em,`*${P}bomdia* ☀️ / *${P}boanoite* 🌙`)]);
-  if(catId==="cat_18")return bBloco(`𝐌𝐄𝐍𝐔 +𝟏𝟖 【${em}】`,[bLine("⚠️","*EXCLUSIVO PARA VIPS*"),B_SEP,bLine(em,`*${P}piada18* / *${P}truth* / *${P}dare*`),bLine(em,`*${P}crush* / *${P}seduzir* / *${P}beijo* / *${P}abraco*`),bLine(em,`*${P}tapa* / *${P}flirt* / *${P}casal*`),B_SEP,bLine("💰",`*${P}alugar* para ser VIP`)]);
-  if(catId==="cat_adm"||catId==="adm")return bBloco(`𝐀𝐃𝐌𝐈𝐍𝐬 【${em}】`,[bLine("👥","banir/add/addadmin/removeadmin"),bLine("👥","silenciar/dessilenciar/addvip/vips"),bLine("📢","all/att/aviso/link/sorteio"),bLine("⚙️","fechar/abrir/bot"),bLine("⚙️","nomegrupo/descgrupo/fotogrupo/scanlink"),B_SEP,bLine("🔗","*ANTI-LINK:*"),bLine(em,`*${CONFIG.PREFIXO}anti-link easy* → _remove, sem banir_`),bLine(em,`*${CONFIG.PREFIXO}anti-link hard* → _remove e bane_`),bLine(em,`*${CONFIG.PREFIXO}anti-link off*`),B_SEP,bLine("🔔","*BOAS-VINDAS:*"),bLine(em,`*${CONFIG.PREFIXO}bemvindo on/off*`),bLine(em,`*${CONFIG.PREFIXO}bemvindo1* → _simples, sem foto_`),bLine(em,`*${CONFIG.PREFIXO}bemvindo2* → _completa, com foto_`),B_SEP,bLine("🏘️",`*${CONFIG.PREFIXO}grupoinfo* / *${CONFIG.PREFIXO}status* → _info do grupo/bot_`),bLine("😴",`*${CONFIG.PREFIXO}inactivos* [dias] → _lista membros inactivos_`),bLine("👮",`*${CONFIG.PREFIXO}marcaradmins* → _marca só admins_`)]);
-  if(catId==="cat_dono")return bBloco(`𝐃𝐎𝐍𝐎 【${em}】`,[bLine(em,`*${CONFIG.PREFIXO}ergue-se* / *${CONFIG.PREFIXO}set* / *${CONFIG.PREFIXO}out*`),bLine(em,`*${CONFIG.PREFIXO}prefixo* / *${CONFIG.PREFIXO}setfoto* / *${CONFIG.PREFIXO}chaton*`),bLine(em,`*${CONFIG.PREFIXO}sms* / *${CONFIG.PREFIXO}gsms*`),bLine(em,`*${CONFIG.PREFIXO}setmenu* [emoji] → _mudar emojis_`),bLine(em,`*${CONFIG.PREFIXO}setletra* [nome] / *${CONFIG.PREFIXO}verletras*`),bLine(em,`*${CONFIG.PREFIXO}downcase* [comando] → _extrai a case nativa_`),B_SEP,bLine("👑","*SUBDONOS:*"),bLine(em,`*${CONFIG.PREFIXO}addsubdono* @user / *${CONFIG.PREFIXO}removesubdono* @user`),bLine(em,`*${CONFIG.PREFIXO}subdonos* → _lista subdonos_`),bLine("👑","*DONOS:*"),bLine(em,`*${CONFIG.PREFIXO}adddono* @user / *${CONFIG.PREFIXO}removedono* @user`),B_SEP,bLine("👑",`*${CONFIG.DONO_NOME}* | 📞 ${CONFIG.DONO_NUM}`)]);
+  if(catId==="cat_downloads")return bBloco(`𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃'𝐬 【${em}】`,[
+    bLine("🎵","*YOUTUBE*"),
+    bLine(em,`*${P}play* [música] → _baixa e envia directo_`),
+    bLine(em,`*${P}play1* [música] → _carrossel com 5 opções_`),
+    bLine(em,`*${P}mp3*`),bLine(em,`*${P}mp4*`),bLine(em,`*${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),
+    B_SEP,bLine("📱","*REDES SOCIAIS*"),
+    bLine(em,`*${P}tiktok*`),bLine(em,`*${P}tt* [link] → _download rápido_`),
+    bLine(em,`*${P}instagram*`),bLine(em,`*${P}twitter*`),bLine(em,`*${P}facebook*`),bLine(em,`*${P}kwai*`),bLine(em,`*${P}spotify*`),bLine(em,`*${P}soundcloud*`),
+    B_SEP,bLine("📌","*PINTEREST*"),
+    bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),
+    B_SEP,bLine("🖼️","*FICHEIROS*"),
+    bLine(em,`*${P}mediafire*`),bLine(em,`*${P}apk*`),bLine(em,`*${P}qr*`),bLine(em,`*${P}tourl*`),bLine(em,`*${P}mostre*`),
+  ]);
+  if(catId==="cat_musicas")return bBloco(`𝐌Ú𝐒𝐈𝐂𝐀𝐬 【${em}】`,[bLine("🎙️","*IDENTIFICAÇÃO*"),bLine(em,`*${P}busca* ↩️ áudio → _reconhece música_`),bLine(em,`*${P}shazam* → _diversão ⚡⚡_`),B_SEP,bLine("📝","*INFORMAÇÃO*"),bLine(em,`*${P}letra*`),bLine(em,`*${P}cifra*`),bLine(em,`*${P}bio*`),bLine(em,`*${P}album*`),B_SEP,bLine("📻","*DESCOBERTA*"),bLine(em,`*${P}recomenda* [género]`),bLine(em,`*${P}top10* [país]`)]);
+  if(catId==="cat_figurinhas")return bBloco(`𝐅𝐈𝐆𝐔𝐑𝐈𝐍𝐇𝐀𝐬 【${em}】`,[
+    bLine("🖼️","*CRIAÇÃO*"),
+    bLine(em,`*${P}s* → _imagem/vídeo ➜ sticker_`),
+    bLine(em,`*${P}sticker2* → _vídeo/GIF ➜ sticker animado_`),
+    bLine(em,`*${P}sf* → _sticker ➜ foto_`),
+    bLine(em,`*${P}toimg* → _sticker ➜ imagem_`),
+    bLine(em,`*${P}tovideo* → _sticker animado ➜ vídeo_`),
+    bLine(em,`*${P}take* [nome] → _muda nome/autor_`),
+    bLine(em,`*${P}wm* [texto] → _marca d'água_`),
+    bLine(em,`*${P}brat* [texto] → _brat sticker_`),
+    B_SEP,bLine("😂","*AUTOMÁTICAS*"),
+    bLine(em,`*${P}figurinhas* → _lista_`),
+    bLine(em,`*${P}figaleatoria*`),
+    bLine(em,`*${P}figanime*`),
+    bLine(em,`*${P}figmeme*`),
+    bLine(em,`*${P}figgato*`),
+    bLine(em,`*${P}figfutebol*`),
+    bLine(em,`*${P}figamor*`),
+    bLine(em,`*${P}figengracada*`),
+    B_SEP,bLine("🎴","*COLECÇÃO*"),
+    bLine(em,`*${P}colecao* → _a tua colecção_`),
+    bLine(em,`*${P}figrank* → _ranking colecionadores_`),
+    bLine(em,`*${P}figdaily* → _figurinha diária_`),
+    bLine(em,`*${P}figtroca* @user → _trocar_`),
+    bLine(em,`*${P}figvender* [nº] → _vender_`),
+    bLine(em,`*${P}figcomprar* → _comprar no mercado_`),
+    bLine(em,`*${P}figduelo* @user → _batalha_`),
+  ]);
+  if(catId==="cat_brincadeiras")return bBloco(`𝐁𝐑𝐈𝐍𝐂𝐀𝐃𝐄𝐈𝐑𝐀𝐬 【${em}】`,[
+    bLine("🎮","*GRUPO:*"),
+    bLine(em,`*${P}quiz*`),bLine(em,`*${P}vof*`),bLine(em,`*${P}completar*`),bLine(em,`*${P}caca*`),bLine(em,`*${P}guerra*`),bLine(em,`*${P}stop*`),
+    B_SEP,bLine("🎲","*SOLO:*"),
+    bLine(em,`*${P}matematica*`),bLine(em,`*${P}jokenpo*`),bLine(em,`*${P}dado*`),bLine(em,`*${P}cara-coroa*`),bLine(em,`*${P}adivinhar*`),bLine(em,`*${P}velocidade*`),bLine(em,`*${P}roleta*`),bLine(em,`*${P}aki*`),bLine(em,`*${P}aposta*`),bLine(em,`*${P}8ball* [pergunta] 🎱`),
+    B_SEP,bLine("🕹️","*JOGOS INTERACTIVOS:*"),
+    bLine(em,`*${P}dino* 🦖 → _Dino Runner interactivo_`),bLine(em,`*${P}piano* 🎹 → _piano interactivo_`),
+    B_SEP,bLine("😂","*DIVERSÃO:*"),
+    bLine(em,`*${P}piada*`),bLine(em,`*${P}conselho*`),bLine(em,`*${P}poema*`),bLine(em,`*${P}historia*`),bLine(em,`*${P}analisar* @user`),bLine(em,`*${P}cara*`),bLine(em,`*${P}ship* @user`),bLine(em,`*${P}fofoca*`),
+    bLine(em,`*${P}cantada* 💘`),bLine(em,`*${P}inunca* 🎯`),bLine(em,`*${P}conselhobiblico* 📖`),
+    B_SEP,bLine("⚔️","*PvP:*"),
+    bLine(em,`*${P}batalha* @user [apostas]`),
+    B_SEP,bLine("🏆","*RANKS:*"),
+    bLine(em,`*${P}rank*`),bLine(em,`*${P}toprank*`),bLine(em,`*${P}nivel*`),
+  ]);
+  if(catId==="cat_coins")return bBloco(`𝐂𝐎𝐈𝐍𝐬 & 𝐄𝐂𝐎𝐍𝐎𝐌𝐈𝐀 【${em}】`,[
+    bLine(em,`*${P}moedas*`),bLine(em,`*${P}diario*`),bLine(em,`*${P}topcoins*`),
+    bLine(em,`*${P}dar* @user [qtd]`),bLine(em,`*${P}roubar* @user`),
+    bLine(em,`*${P}aposta* [qtd]`),bLine(em,`*${P}nivel*`),
+    B_SEP,bLine("💼","*TRABALHO:*"),
+    bLine(em,`*${P}trabalhar* ⏱2h`),bLine(em,`*${P}minerar* ⏱3h`),bLine(em,`*${P}pescar* ⏱90min`),bLine(em,`*${P}cacada* ⏱2.5h`),
+    bLine(em,`*${P}bau* ⏱4h`),bLine(em,`*${P}missao* ⏱24h`),bLine(em,`*${P}treinar* ⏱1h`),bLine(em,`*${P}dormir* ⏱8h`),
+    bLine(em,`*${P}explorar* ⏱1.5h`),bLine(em,`*${P}viajar*`),bLine(em,`*${P}crimes* ⏱6h`),bLine(em,`*${P}mendigar* ⏱30min`),
+  ]);
+  if(catId==="cat_alteradores")return bBloco(`𝐀𝐋𝐓𝐄𝐑𝐀𝐃𝐎𝐑𝐄𝐬 【${em}】`,[bLine("🔊","*VOZ:*"),bLine(em,`*${P}vz* [texto]`),B_SEP,bLine("📝","*TRANSCRIÇÃO:*"),bLine(em,`*${P}transcrever*`),bLine(em,`*${P}resumiraudio*`),bLine(em,`*${P}traduziraudio*`),B_SEP,bLine("🧠","*IA:*"),bLine(em,`*${P}ia*`),bLine(em,`*${P}resumir*`),bLine(em,`*${P}traduzir*`),B_SEP,bLine("🖼️","*IMAGEM:*"),bLine(em,`*${P}fotocopia*`),bLine(em,`*${P}fotoparaia*`),bLine(em,`*${P}resumirfoto*`)]);
+  if(catId==="cat_logos")return bBloco(`𝐋𝐎𝐆𝐎𝐬 & 𝐔𝐓𝐈𝐋𝐈𝐃𝐀𝐃𝐄𝐬 【${em}】`,[bLine(em,`*${P}meme*`),bLine(em,`*${P}logo*`),bLine(em,`*${P}card*`),bLine(em,`*${P}calc*`),bLine(em,`*${P}encurtar*`),bLine(em,`*${P}qr*`),bLine(em,`*${P}horario*`),bLine(em,`*${P}tempo*`),bLine(em,`*${P}cotacao*`),bLine(em,`*${P}ver*`),bLine(em,`*${P}apagadas*`),bLine(em,`*${P}placar*`),B_SEP,bLine("📦","*CASES DINÂMICAS:*"),bLine(em,`*${P}addcase* [nome] → _adicionar comando_`),bLine(em,`*${P}cases* → _listar cases_`),bLine(em,`*${P}extraircase* [nome] → _ver código_`),bLine(em,`*${P}delcase* [nome] → _remover_`)]);
+  if(catId==="cat_pesquisas")return bBloco(`𝐏𝐄𝐒𝐐𝐔𝐈𝐒𝐀𝐬 【${em}】`,[bLine("📰","*NOTÍCIAS:*"),bLine(em,`*${P}noticias*`),bLine(em,`*${P}hoje*`),bLine(em,`*${P}fato*`),B_SEP,bLine("🌍","*INFO:*"),bLine(em,`*${P}pais*`),bLine(em,`*${P}wikipedia*`),bLine(em,`*${P}signo*`),bLine(em,`*${P}definir*`),bLine(em,`*${P}sinonimo*`),B_SEP,bLine("🎬","*ENTRETENIMENTO:*"),bLine(em,`*${P}filme*`),bLine(em,`*${P}serie*`),bLine(em,`*${P}livro*`),B_SEP,bLine("💹","*FINANÇAS:*"),bLine(em,`*${P}cripto*`),bLine(em,`*${P}converter*`),bLine(em,`*${P}previsao*`)]);
+  if(catId==="cat_animes")return bBloco(`𝐀𝐍𝐈𝐌𝐄𝐬 【${em}】`,[
+    bLine("🔎","*PESQUISA*"),
+    bLine(em,`*${P}anime* [nome]`),bLine(em,`*${P}manga* [nome]`),bLine(em,`*${P}personagem* [nome]`),bLine(em,`*${P}autor* [nome]`),bLine(em,`*${P}estudio* [nome]`),bLine(em,`*${P}episodio* [anime]`),bLine(em,`*${P}temporada*`),
+    B_SEP,bLine("🎲","*ALEATÓRIOS*"),
+    bLine(em,`*${P}animealeatorio*`),bLine(em,`*${P}personagemaleatorio*`),bLine(em,`*${P}waifu*`),bLine(em,`*${P}husbando*`),bLine(em,`*${P}villain*`),bLine(em,`*${P}protagonista*`),
+    B_SEP,bLine("❤️","*INTERACÇÃO*"),
+    bLine(em,`*${P}ship* @user`),bLine(em,`*${P}casar* @user`),bLine(em,`*${P}divorcio*`),bLine(em,`*${P}beijar* @user`),bLine(em,`*${P}abracar* @user`),bLine(em,`*${P}morder* @user`),bLine(em,`*${P}tapa* @user`),bLine(em,`*${P}matar* @user 😂`),bLine(em,`*${P}rankwaifu*`),
+    B_SEP,bLine("⚔️","*ANIME RPG*"),
+    bLine(em,`*${P}animerpg* [personagem] → _escolhe e evolui_`),
+    bLine(em,`*${P}fraseanime*`),bLine(em,`*${P}quizanime*`),bLine(em,`*${P}topanimes*`),
+  ]);
+  if(catId==="cat_rpg")return bBloco(`⚔️ 𝐌𝐄𝐍𝐔 𝐑𝐏𝐆 【${em}】`,[
+    bLine("🎮","*PERFIL E PROGRESSÃO*"),
+    bLine(em,`*${P}perfil* → _nível, XP, moedas, HP e classe_`),
+    bLine(em,`*${P}atributos* → _atributos do jogador_`),
+    bLine(em,`*${P}classe* [nome] → _escolher classe_`),
+    bLine(em,`*${P}classes* → _lista de classes_`),
+    bLine(em,`*${P}level* → _nível e XP_`),
+    bLine(em,`*${P}inventario* → _itens possuídos_`),
+    bLine(em,`*${P}equipar* [nº] → _equipa arma/armadura_`),
+    bLine(em,`*${P}desequipar* [arma/armadura]`),
+    bLine(em,`*${P}ranking* → _ranking dos jogadores_`),
+    B_SEP,bLine("⚔️","*COMBATE*"),
+    bLine(em,`*${P}lutar* @user → _desafia outro jogador_`),
+    bLine(em,`*${P}duelo* @user → _batalha PvP_`),
+    bLine(em,`*${P}boss* → _enfrenta um Boss_`),
+    bLine(em,`*${P}hunt* → _caça monstros_`),
+    bLine(em,`*${P}aventura* → _aventura aleatória_`),
+    bLine(em,`*${P}masmorra* → _entra numa dungeon_`),
+    bLine(em,`*${P}raid* @user... → _batalha em grupo_`),
+    bLine(em,`*${P}treinar* → _ganha XP/atributos_`),
+    bLine(em,`*${P}fugir* → _abandona uma batalha_`),
+    B_SEP,bLine("💰","*ECONOMIA*"),
+    bLine(em,`*${P}daily* → _recompensa diária_`),
+    bLine(em,`*${P}quest* → _missão diária_`),
+    bLine(em,`*${P}quests* → _lista de missões_`),
+    bLine(em,`*${P}loja* → _loja RPG_`),
+    bLine(em,`*${P}comprar* [nº]`),
+    bLine(em,`*${P}vender* [nº]`),
+    bLine(em,`*${P}doar* @user [valor]`),
+    bLine(em,`*${P}saldo* → _moedas_`),
+    bLine(em,`*${P}bau* → _abre baú_`),
+    B_SEP,bLine("🧙","*CLASSES:*"),
+    ...Object.values(RPG_CLASSES).map(c=>bLine(c.emoji,`*${c.nome}* — ${c.desc}`)),
+    B_SEP,bLine("🔥","*RARIDADES:*"),
+    bLine(em,RPG_RARIDADES.map(r=>r.emoji+r.nome).join(" → ")),
+  ]);
+  if(catId==="cat_ias")return bBloco(`𝐈𝐀𝐬 【${em}】`,[bLine(em,`*${P}gpt*`),bLine(em,`*${P}gemini*`),bLine(em,`*${P}deepseek*`),bLine(em,`*${P}ia*`),bLine("💡","_Em grupos: chama Isaías pelo nome!_"),bLine("📱","_No privado: fala directamente!_")]);
+  if(catId==="cat_plaquinhas")return bBloco(`𝐏𝐋𝐀𝐐𝐔𝐈𝐍𝐇𝐀𝐬 【${em}】`,[bLine(em,`*${P}cantada* 💘`),bLine(em,`*${P}inunca* 🎯`),bLine(em,`*${P}conselhobiblico* 📖`),bLine(em,`*${P}frasemotivacional* 💪`),bLine(em,`*${P}piadacurta* 😂`),bLine(em,`*${P}curiosidade* 🤔`),bLine(em,`*${P}bomdia* ☀️`),bLine(em,`*${P}boanoite* 🌙`)]);
+  if(catId==="cat_18")return bBloco(`𝐌𝐄𝐍𝐔 +𝟏𝟖 【${em}】`,[
+    bLine("⚠️","*EXCLUSIVO PARA VIPS*"),B_SEP,
+    bLine(em,`*${P}piada18*`),bLine(em,`*${P}truth*`),bLine(em,`*${P}dare*`),bLine(em,`*${P}crush*`),
+    bLine(em,`*${P}seduzir* @user`),bLine(em,`*${P}beijo* @user`),bLine(em,`*${P}abraco* @user`),
+    bLine(em,`*${P}tapa* @user`),bLine(em,`*${P}flirt* @user`),bLine(em,`*${P}casal* @user`),
+    bLine(em,`*${P}confissao*`),bLine(em,`*${P}provocacao*`),bLine(em,`*${P}fantasia*`),
+    B_SEP,bLine("💰",`*${P}alugar* para ser VIP`),
+  ]);
+  if(catId==="cat_adm"||catId==="adm")return bBloco(`𝐀𝐃𝐌𝐈𝐍𝐬 【${em}】`,[
+    bLine(em,`*${P}banir*`),bLine(em,`*${P}add*`),bLine(em,`*${P}addadmin*`),bLine(em,`*${P}removeadmin*`),
+    bLine(em,`*${P}silenciar*`),bLine(em,`*${P}dessilenciar*`),bLine(em,`*${P}addvip*`),bLine(em,`*${P}vips*`),
+    bLine(em,`*${P}all*`),bLine(em,`*${P}att*`),bLine(em,`*${P}aviso*`),bLine(em,`*${P}link*`),bLine(em,`*${P}sorteio*`),
+    bLine(em,`*${P}fechar*`),bLine(em,`*${P}abrir*`),bLine(em,`*${P}bot*`),
+    bLine(em,`*${P}nomegrupo*`),bLine(em,`*${P}descgrupo*`),bLine(em,`*${P}fotogrupo*`),bLine(em,`*${P}scanlink*`),
+    B_SEP,bLine("🔗","*ANTI-LINK:*"),
+    bLine(em,`*${P}anti-link easy* → _remove, sem banir_`),
+    bLine(em,`*${P}anti-link hard* → _remove e bane_`),
+    bLine(em,`*${P}anti-link off*`),
+    B_SEP,bLine("🔔","*BOAS-VINDAS:*"),
+    bLine(em,`*${P}bemvindo on/off*`),
+    bLine(em,`*${P}bemvindo1* → _simples, sem foto_`),
+    bLine(em,`*${P}bemvindo2* → _completa, com foto_`),
+    B_SEP,
+    bLine(em,`*${P}grupoinfo*`),bLine(em,`*${P}status*`),
+    bLine(em,`*${P}inactivos* [dias]`),bLine(em,`*${P}marcaradmins*`),
+  ]);
+  if(catId==="cat_dono")return bBloco(`𝐃𝐎𝐍𝐎 【${em}】`,[
+    bLine(em,`*${CONFIG.PREFIXO}ergue-se*`),bLine(em,`*${CONFIG.PREFIXO}set*`),bLine(em,`*${CONFIG.PREFIXO}out*`),
+    bLine(em,`*${CONFIG.PREFIXO}prefixo*`),bLine(em,`*${CONFIG.PREFIXO}setfoto*`),bLine(em,`*${CONFIG.PREFIXO}chaton*`),
+    bLine(em,`*${CONFIG.PREFIXO}sms*`),bLine(em,`*${CONFIG.PREFIXO}gsms*`),
+    bLine(em,`*${CONFIG.PREFIXO}setmenu* [emoji] → _mudar emojis_`),
+    bLine(em,`*${CONFIG.PREFIXO}setletra* [nome]`),bLine(em,`*${CONFIG.PREFIXO}verletras*`),
+    bLine(em,`*${CONFIG.PREFIXO}downcase* [comando] → _extrai a case nativa_`),
+    B_SEP,bLine("👑","*SUBDONOS:*"),
+    bLine(em,`*${CONFIG.PREFIXO}addsubdono* @user`),bLine(em,`*${CONFIG.PREFIXO}removesubdono* @user`),bLine(em,`*${CONFIG.PREFIXO}subdonos*`),
+    bLine("👑","*DONOS:*"),
+    bLine(em,`*${CONFIG.PREFIXO}adddono* @user`),bLine(em,`*${CONFIG.PREFIXO}removedono* @user`),
+    B_SEP,bLine("👑",`*${CONFIG.DONO_NOME}* | 📞 ${CONFIG.DONO_NUM}`),
+  ]);
   return null;
 }
 
@@ -451,7 +721,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const cargo=isDono?"👑 Criador":(isAdmin?"👮 Administrador":"👤 Utilizador");
   const secoes=buildSecoes(isDono);
   const em=ME.e||ME.principal||"🌀";
-  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
+  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`*Cargo*: ${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
   try{
     const payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Categorias"),sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
     if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
@@ -1204,7 +1474,10 @@ async function processarBotaoPlay(sock,msg){
 // ════════════════════════════════════════════════
 // ✅ TODOS OS COMANDOS
 // ════════════════════════════════════════════════
-const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","ergue-se","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","rpgstart","rpgstatus","rpgataque","rpgcurar","rpgsorte","rpgclasse","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd"]);
+const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","ergue-se","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd",
+"classe","classes","atributos","level","equipar","desequipar","ranking","lutar","duelo","boss","hunt","aventura","masmorra","raid","fugir","daily","quest","quests","vender","doar","saldo","analisar",
+"sticker2","toimg","tovideo","take","wm","figurinhas","figaleatoria","figanime","figmeme","figgato","figfutebol","figamor","figengracada","colecao","figrank","figdaily","figtroca","figvender","figcomprar","figduelo","rankwaifu",
+"manga","personagem","autor","estudio","episodio","temporada","personagemaleatorio","villain","protagonista","waifu","husbando","casar","divorcio","beijar","abracar","morder","matar","animerpg","confissao","provocacao","fantasia"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -1623,7 +1896,7 @@ ${nomeEnviou}`;
         if(CMDS_ADMIN.includes(comando)&&!isAdmin){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas administradores.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
         const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto","adddono","removedono","addsubdono","removesubdono","setletra","downcase"];
         if(CMDS_DONO.includes(comando)&&!isDono){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas o dono.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
-        const CMDS_18=["piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal"];
+        const CMDS_18=["piada18","truth","dare","crush","seduzir","beijo","beijar","abraco","abracar","tapa","flirt","casal","confissao","provocacao","fantasia"];
         if(CMDS_18.includes(comando)&&!isDono&&!isVip(sender)){await sock.sendMessage(jid,{text:bBloco("🔞 VIP EXCLUSIVO",[bLine("💡",`Usa *${CONFIG.PREFIXO}alugar* para ser VIP 💎`)])},{quoted:seloBot});await reagir(sock,msg,"🔞");return;}
 
         // ═══════════════════════════════════════
@@ -1818,6 +2091,209 @@ ${nomeEnviou}`;
 
         // ─── FIGURINHAS ───
         if(comando==="s"){const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;const iM=quotedMsg?.imageMessage,vM=quotedMsg?.videoMessage;if(!iM&&!vM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde imagem/vídeo com *${CONFIG.PREFIXO}s*`)},{quoted:seloBot});return;}const isAnim=!!vM;await sock.sendMessage(jid,{text:bLine("🎭","A criar sticker... ⏳")},{quoted:seloBot});try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});const webpBuf=await criarSticker(buf,isAnim);await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}}return;}
+
+        // ─── SISTEMA DE FIGURINHAS ───
+        if(comando==="sticker2"){
+          const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+          const vM=quotedMsg?.videoMessage;
+          if(!vM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde um *vídeo/GIF* com *${CONFIG.PREFIXO}sticker2*`)},{quoted:seloBot});return;}
+          await sock.sendMessage(jid,{text:bLine("🎭","A criar sticker animado... ⏳")},{quoted:seloBot});
+          try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});const webpBuf=await criarSticker(buf,true);await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});await reagir(sock,msg,"✅");}
+          catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="toimg"){
+          const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+          const stM=quotedMsg?.stickerMessage;
+          if(!stM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde uma *figurinha* com *${CONFIG.PREFIXO}toimg*`)},{quoted:seloBot});return;}
+          const tempId=Date.now();const tIn=`./downloads/toimg_${tempId}.webp`,tOut=`./downloads/toimg_${tempId}.png`;
+          try{
+            const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            fs.writeFileSync(tIn,buf);
+            await new Promise((res,rej)=>{exec(`${FFMPEG_CMD} -i "${tIn}" "${tOut}" -y -loglevel error`,{timeout:20000},(err)=>err?rej(err):res());});
+            if(!fs.existsSync(tOut))throw new Error("Conversão falhou.");
+            await sock.sendMessage(jid,{image:fs.readFileSync(tOut),caption:bLine("🖼️","Convertido!")},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          finally{try{fs.removeSync(tIn);}catch{}try{fs.removeSync(tOut);}catch{}}
+          return;
+        }
+        if(comando==="tovideo"){
+          const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+          const stM=quotedMsg?.stickerMessage;
+          if(!stM||!stM.isAnimated){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde uma *figurinha animada* com *${CONFIG.PREFIXO}tovideo*`)},{quoted:seloBot});return;}
+          const tempId=Date.now();const tIn=`./downloads/tovid_${tempId}.webp`,tOut=`./downloads/tovid_${tempId}.mp4`;
+          try{
+            const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            fs.writeFileSync(tIn,buf);
+            await new Promise((res,rej)=>{exec(`${FFMPEG_CMD} -i "${tIn}" -movflags faststart -pix_fmt yuv420p "${tOut}" -y -loglevel error`,{timeout:20000},(err)=>err?rej(err):res());});
+            if(!fs.existsSync(tOut))throw new Error("Conversão falhou.");
+            await sock.sendMessage(jid,{video:fs.readFileSync(tOut),caption:bLine("🎬","Convertido!")},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          finally{try{fs.removeSync(tIn);}catch{}try{fs.removeSync(tOut);}catch{}}
+          return;
+        }
+        if(comando==="take"){
+          const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+          const stM=quotedMsg?.stickerMessage;
+          const novoNome=args.join(" ").trim();
+          if(!stM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde uma *figurinha* com *${CONFIG.PREFIXO}take* [novo nome]`)},{quoted:seloBot});return;}
+          if(!novoNome){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}take* [novo nome/autor]`)},{quoted:seloBot});return;}
+          try{
+            const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            const comExif=await adicionarExifPack(buf,novoNome,nomeBotEstilizado(),`com.take.${Date.now().toString(16)}`);
+            await sock.sendMessage(jid,{sticker:comExif},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="wm"){
+          const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+          const iM=quotedMsg?.imageMessage;
+          const textoWm=args.join(" ").trim();
+          if(!iM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde uma *imagem* com *${CONFIG.PREFIXO}wm* [texto]`)},{quoted:seloBot});return;}
+          if(!textoWm){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}wm* [texto da marca d'água]`)},{quoted:seloBot});return;}
+          const tempId=Date.now();const tIn=`./downloads/wm_in_${tempId}.jpg`,tOut=`./downloads/wm_out_${tempId}.jpg`;
+          try{
+            const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            fs.writeFileSync(tIn,buf);
+            const textoEscapado=textoWm.replace(/'/g,"\\'").replace(/:/g,"\\:");
+            await new Promise((res,rej)=>{exec(`${FFMPEG_CMD} -i "${tIn}" -vf "drawtext=text='${textoEscapado}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-th-20:box=1:boxcolor=black@0.5:boxborderw=8" "${tOut}" -y -loglevel error`,{timeout:20000},(err)=>err?rej(err):res());});
+            if(!fs.existsSync(tOut))throw new Error("Falha ao aplicar marca d'água.");
+            const webpBuf=await criarSticker(fs.readFileSync(tOut),false);
+            await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          finally{try{fs.removeSync(tIn);}catch{}try{fs.removeSync(tOut);}catch{}}
+          return;
+        }
+
+        // ─── FIGURINHAS AUTOMÁTICAS ───
+        if(comando==="figurinhas"){
+          await sock.sendMessage(jid,{text:bBloco("🎴 FIGURINHAS AUTOMÁTICAS",[
+            bLine("🎲",`*${CONFIG.PREFIXO}figaleatoria*`),
+            bLine("🍥",`*${CONFIG.PREFIXO}figanime*`),
+            bLine("😂",`*${CONFIG.PREFIXO}figmeme*`),
+            bLine("🐱",`*${CONFIG.PREFIXO}figgato*`),
+            bLine("⚽",`*${CONFIG.PREFIXO}figfutebol*`),
+            bLine("❤️",`*${CONFIG.PREFIXO}figamor*`),
+            bLine("🤣",`*${CONFIG.PREFIXO}figengracada*`),
+          ])},{quoted:seloBot});
+          return;
+        }
+        if(["figaleatoria","figanime","figmeme","figgato","figfutebol","figamor","figengracada"].includes(comando)){
+          try{
+            await reagir(sock,msg,"⏳");
+            let buf=null;
+            if(comando==="figanime"){
+              const{data}=await axios.get("https://api.waifu.pics/sfw/waifu",{timeout:15000,httpsAgent});
+              const img=await axios.get(data.url,{responseType:"arraybuffer",timeout:15000,httpsAgent});
+              buf=Buffer.from(img.data);
+            }else if(comando==="figgato"){
+              const img=await axios.get("https://cataas.com/cat",{responseType:"arraybuffer",timeout:15000,httpsAgent});
+              buf=Buffer.from(img.data);
+            }else{
+              const termos={figaleatoria:"aesthetic wallpaper",figmeme:"funny meme",figfutebol:"football wallpaper",figamor:"couple love aesthetic",figengracada:"funny animals"};
+              const imgs=await buscarPinterest(termos[comando]||"aesthetic",5);
+              if(!imgs.length)throw new Error("Sem imagens.");
+              const img=await axios.get(imgs[Math.floor(Math.random()*imgs.length)],{responseType:"arraybuffer",timeout:15000,httpsAgent});
+              buf=Buffer.from(img.data);
+            }
+            const webpBuf=await criarSticker(buf,false);
+            await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro ao gerar figurinha.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+
+        // ─── COLECÇÃO DE FIGURINHAS ───
+        if(comando==="colecao"){
+          const col=carregarColecao();
+          const minha=col[sender]||[];
+          if(!minha.length){await sock.sendMessage(jid,{text:bBloco("🎴 COLECÇÃO VAZIA",[bLine("💡",`Ganha figurinhas: *${CONFIG.PREFIXO}figdaily*`)])},{quoted:seloBot});return;}
+          const linhas=minha.map((f,i)=>bLine(f.emoji,`*${i+1}.* ${f.nome} _(${f.raridade})_`));
+          const valorTotal=minha.reduce((s,f)=>s+f.valor,0);
+          await sock.sendMessage(jid,{text:bBloco("🎴 A TUA COLECÇÃO",[...linhas,B_SEP,bLine("💰",`Valor total: *${valorTotal}*`)])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="figrank"){
+          const col=carregarColecao();
+          const lista=Object.entries(col).map(([s,items])=>[s,items.reduce((sum,f)=>sum+f.valor,0),items.length]).sort((a,b)=>b[1]-a[1]).slice(0,10);
+          if(!lista.length){await sock.sendMessage(jid,{text:bLine("📭","Ninguém tem colecção ainda.")},{quoted:seloBot});return;}
+          const linhas=lista.map(([s,valor,qtd],i)=>bLine(["🥇","🥈","🥉"][i]||"◎",`*${i+1}.* @${s.split("@")[0]} — 💰${valor} _(${qtd} itens)_`));
+          await sock.sendMessage(jid,{text:bBloco("🏆 RANKING COLECIONADORES",linhas),mentions:lista.map(l=>l[0])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="figdaily"){
+          const p=obterJogadorRPG(sender);
+          const cd=cooldownRPG(p,"figdaily",1440);
+          if(cd>0){const db0=carregarRPG();db0[sender]=p;salvarRPG(db0);await sock.sendMessage(jid,{text:bLine("⏳",`Já recebeste hoje! Volta em *${formatarMs(cd)}*.`)},{quoted:seloBot});return;}
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          const r=sortearRaridade();
+          const nomes=["Cavaleiro Pixelado","Dragão Chibi","Gato Ninja","Robô Retro","Fada da Sorte","Samurai Sombrio"];
+          const nome=nomes[Math.floor(Math.random()*nomes.length)];
+          const item={nome,raridade:r.nome,emoji:r.emoji,valor:Math.round(15*r.mult)};
+          const col=carregarColecao();if(!col[sender])col[sender]=[];col[sender].push(item);salvarColecao(col);
+          await sock.sendMessage(jid,{text:bBloco("🎴 FIGURINHA DIÁRIA",[bLine(item.emoji,`Ganhaste: *${item.nome}* _(${item.raridade})_!`),bLine("💰",`Valor: *${item.valor}*`)])},{quoted:seloBot});
+          await reagir(sock,msg,"🎴");
+          return;
+        }
+        if(comando==="figtroca"&&mencoes.length){
+          const alvo=extrairJid(mencoes[0]);
+          const col=carregarColecao();
+          const minha=col[sender]||[],dele=col[alvo]||[];
+          if(!minha.length||!dele.length){await sock.sendMessage(jid,{text:bLine("❌","Ambos precisam de ter pelo menos 1 figurinha.")},{quoted:seloBot});return;}
+          const itemMeu=minha.pop(),itemDele=dele.pop();
+          minha.push(itemDele);dele.push(itemMeu);
+          col[sender]=minha;col[alvo]=dele;salvarColecao(col);
+          await sock.sendMessage(jid,{text:bBloco("🔄 TROCA REALIZADA",[bLine("👤",`@${sender.split("@")[0]}: recebeu *${itemDele.nome}*`),bLine("👤",`@${alvo.split("@")[0]}: recebeu *${itemMeu.nome}*`)]),mentions:[sender,alvo]},{quoted:seloBot});
+          return;
+        }
+        if(comando==="figvender"){
+          const col=carregarColecao();
+          const minha=col[sender]||[];
+          const idx=parseInt(args[0])-1;
+          if(isNaN(idx)||!minha[idx]){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}figvender* [número] → vê *${CONFIG.PREFIXO}colecao*`)},{quoted:seloBot});return;}
+          const item=minha.splice(idx,1)[0];
+          col[sender]=minha;salvarColecao(col);
+          addCoins(sender,item.valor);
+          await sock.sendMessage(jid,{text:bLine("💰",`Vendeste *${item.nome}* por *${item.valor}* moedas!`)},{quoted:seloBot});
+          return;
+        }
+        if(comando==="figcomprar"){
+          const preco=50;
+          if(getCoins(sender)<preco){await sock.sendMessage(jid,{text:bLine("❌",`Precisas de *${preco}* moedas.`)},{quoted:seloBot});return;}
+          addCoins(sender,-preco);
+          const r=sortearRaridade();
+          const nomes=["Cavaleiro Pixelado","Dragão Chibi","Gato Ninja","Robô Retro","Fada da Sorte","Samurai Sombrio"];
+          const item={nome:nomes[Math.floor(Math.random()*nomes.length)],raridade:r.nome,emoji:r.emoji,valor:Math.round(15*r.mult)};
+          const col=carregarColecao();if(!col[sender])col[sender]=[];col[sender].push(item);salvarColecao(col);
+          await sock.sendMessage(jid,{text:bBloco("🛒 COMPRA REALIZADA",[bLine(item.emoji,`Recebeste: *${item.nome}* _(${item.raridade})_!`)])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="figduelo"&&mencoes.length){
+          const alvo=extrairJid(mencoes[0]);
+          const col=carregarColecao();
+          const minha=col[sender]||[],dele=col[alvo]||[];
+          if(!minha.length||!dele.length){await sock.sendMessage(jid,{text:bLine("❌","Ambos precisam de ter figurinhas na colecção.")},{quoted:seloBot});return;}
+          const poderMeu=minha.reduce((s,f)=>s+f.valor,0)+Math.random()*50;
+          const poderDele=dele.reduce((s,f)=>s+f.valor,0)+Math.random()*50;
+          const vencedor=poderMeu>poderDele?sender:alvo;
+          const ganho=30;addCoins(vencedor,ganho);
+          await sock.sendMessage(jid,{text:bBloco("⚔️ DUELO DE FIGURINHAS",[bLine("👥",`@${sender.split("@")[0]} 🆚 @${alvo.split("@")[0]}`),bLine("🏆",`Vencedor: @${vencedor.split("@")[0]}!`),bLine("💰",`+${ganho} moedas`)]),mentions:[sender,alvo]},{quoted:seloBot});
+          await reagir(sock,msg,"⚔️");
+          return;
+        }
+        if(comando==="rankwaifu"){
+          const col=carregarColecao();
+          const lista=Object.entries(col).map(([s,items])=>[s,items.length]).sort((a,b)=>b[1]-a[1]).slice(0,10);
+          if(!lista.length){await sock.sendMessage(jid,{text:bLine("📭","Sem dados ainda.")},{quoted:seloBot});return;}
+          const linhas=lista.map(([s,qtd],i)=>bLine(["🥇","🥈","🥉"][i]||"◎",`*${i+1}.* @${s.split("@")[0]} — *${qtd}* figurinhas`));
+          await sock.sendMessage(jid,{text:bBloco("💘 RANK WAIFU",linhas),mentions:lista.map(l=>l[0])},{quoted:seloBot});
+          return;
+        }
+
         if(comando==="sf"){const ctx=msg.message?.extendedTextMessage?.contextInfo,quotedMsg=ctx?.quotedMessage,stickerMsgD=msg.message?.stickerMessage,stickerMsgQ=quotedMsg?.stickerMessage,stickerMsg=stickerMsgD||stickerMsgQ;if(!stickerMsg){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde sticker com *${CONFIG.PREFIXO}sf*`)},{quoted:seloBot});return;}const isAnimated=stickerMsg.isAnimated||false;try{let buf;if(stickerMsgD)buf=await downloadMediaMessage(msg,"buffer",{});else{const qm={key:{remoteJid:jid,id:ctx.stanzaId||"",participant:ctx.participant||"",fromMe:false},message:quotedMsg};buf=await downloadMediaMessage(qm,"buffer",{});}if(!buf||buf.length<100)throw new Error("Sticker inválido");const resultado=await stickerParaFoto(buf,isAnimated);if(resultado.isVideo)await sock.sendMessage(jid,{video:resultado.buffer,mimetype:"video/mp4",caption:bLine("🎥","Convertido!")},{quoted:seloBot});else await sock.sendMessage(jid,{image:resultado.buffer,caption:bLine("🖼️","Convertido!")},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="brat"){const textoBrat=args.join(" ")||"brat";try{const url=`https://api.memegen.link/images/custom/~p${encodeURIComponent(textoBrat)}/_.jpg?background=d4c5a0&width=512&height=512`;const{data}=await axios.get(url,{responseType:"arraybuffer",timeout:15000,httpsAgent});const buf=await criarSticker(Buffer.from(data),false);await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="figurinha"||comando==="figu"){const quantidade=Math.min(parseInt(args[0])||1,5);await reagir(sock,msg,"🎭");const emojis=["😂","😍","🔥","💀","😭","🤣","😎","🥺","😤","💪"];for(let i=0;i<quantidade;i++){try{const emoji=emojis[Math.floor(Math.random()*emojis.length)];const url=`https://api.memegen.link/images/custom/~p${encodeURIComponent(emoji)}/_.png?width=512&height=512`;const{data}=await axios.get(url,{responseType:"arraybuffer",timeout:10000,httpsAgent});const buf=await criarSticker(Buffer.from(data),false);await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await new Promise(r=>setTimeout(r,500));}catch{}}return;}
@@ -1829,7 +2305,7 @@ ${nomeEnviou}`;
         if(comando==="conselho"&&args.length>0){const sit=args.join(" ");try{const resp=await chatIA(`Dá um conselho para: "${sit}".`);await sock.sendMessage(jid,{text:bBloco("💡 CONSELHO",[bLine("💡",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="historia"){const tema=args.join(" ")||"Angola";try{const h=await chatIA(`Escreve uma história curta sobre: "${tema}". Máx 200 palavras.`);await sock.sendMessage(jid,{text:bBloco("📖 HISTÓRIA",[bLine("📖",h)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="poema"){const tema=args.join(" ")||"Angola";try{const p=await chatIA(`Escreve um poema de 4-8 versos sobre: "${tema}".`,"Poeta angolano.");await sock.sendMessage(jid,{text:bBloco("✍️ POEMA",[bLine("✍️",p)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
-        if(comando==="perfil"){const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡","↩️ Menciona alguém!")},{quoted:seloBot});return;}const ehZoada=Math.random()<0.5,LISTA=ehZoada?PERFIS_ZOADA:PERFIS_ELOGIO;const desc=LISTA[Math.floor(Math.random()*LISTA.length)];let ppAlvo=null;try{ppAlvo=await sock.profilePictureUrl(alvo,"image");}catch{}const textoFinal=bBloco(ehZoada?"😂 PERFIL ZOADO":"🌟 PERFIL ELOGIO",[bLine(ehZoada?"😂":"🌟",desc),bLine("📱",`+${alvo.split("@")[0]}`)]);if(ppAlvo)await sock.sendMessage(jid,{image:{url:ppAlvo},caption:textoFinal,mentions:[alvo]},{quoted:seloBot});else await sock.sendMessage(jid,{text:textoFinal,mentions:[alvo]},{quoted:seloBot});await reagir(sock,msg,ehZoada?"😂":"🌟");return;}
+        if(comando==="analisar"&&mencoes.length){const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡","↩️ Menciona alguém!")},{quoted:seloBot});return;}const ehZoada=Math.random()<0.5,LISTA=ehZoada?PERFIS_ZOADA:PERFIS_ELOGIO;const desc=LISTA[Math.floor(Math.random()*LISTA.length)];let ppAlvo=null;try{ppAlvo=await sock.profilePictureUrl(alvo,"image");}catch{}const textoFinal=bBloco(ehZoada?"😂 PERFIL ZOADO":"🌟 PERFIL ELOGIO",[bLine(ehZoada?"😂":"🌟",desc),bLine("📱",`+${alvo.split("@")[0]}`)]);if(ppAlvo)await sock.sendMessage(jid,{image:{url:ppAlvo},caption:textoFinal,mentions:[alvo]},{quoted:seloBot});else await sock.sendMessage(jid,{text:textoFinal,mentions:[alvo]},{quoted:seloBot});await reagir(sock,msg,ehZoada?"😂":"🌟");return;}
         if(comando==="cara"){const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}cara* @user`)},{quoted:seloBot});return;}const nota=Math.floor(Math.random()*10)+1;await sock.sendMessage(jid,{text:bBloco("📊 AVALIAÇÃO",[bLine("👤",`@${alvo.split("@")[0]}`),bLine("⭐",`Nota: *${nota}/10* ${nota>=8?"🔥😍":nota>=5?"😊👍":"😬💀"}`)]),mentions:[alvo]},{quoted:seloBot});return;}
         if(comando==="ship"){const a1=extrairJid(mencoes[0]),a2=extrairJid(mencoes[1]);if(!a1||!a2){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ship* @user1 @user2`)},{quoted:seloBot});return;}const percent=Math.floor(Math.random()*100)+1;const barra=`${"💕".repeat(Math.floor(percent/10))}${"⬛".repeat(10-Math.floor(percent/10))}`;await sock.sendMessage(jid,{text:bBloco("💘 SHIP",[bLine("👥",`@${a1.split("@")[0]} + @${a2.split("@")[0]}`),bLine("💕",`${barra} *${percent}%*`),bLine("💬",percent>=80?"Perfeito! 😍":percent>=60?"Muito compatíveis! 😊":percent>=40?"Pode funcionar! 🤔":"Hmmm... 😅")]),mentions:[a1,a2]},{quoted:seloBot});return;}
         if(comando==="fofoca"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Só em grupos.")},{quoted:seloBot});return;}try{const meta=await sock.groupMetadata(jid);const membros=meta.participants.filter(p=>!p.admin).map(p=>extrairJid(p.id||p));if(membros.length<2){await sock.sendMessage(jid,{text:bLine("❌","Poucos membros.")},{quoted:seloBot});return;}const a=membros[Math.floor(Math.random()*membros.length)];const b=membros.filter(m=>m!==a)[Math.floor(Math.random()*(membros.length-1))];const fofocas=[`Dizem que @${a.split("@")[0]} tem crush em @${b.split("@")[0]}! 😱`,`@${a.split("@")[0]} apagou as mensagens antes de tu veres... 👀`,`@${a.split("@")[0]} é o que finge não ler mas vê tudo! 😂`,`Fontes confiáveis: @${a.split("@")[0]} e @${b.split("@")[0]} têm segredos! 🤫`];await sock.sendMessage(jid,{text:bBloco("📢 FOFOCA 🗣️",[bLine("📢",fofocas[Math.floor(Math.random()*fofocas.length)])]),mentions:[a,b]},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
@@ -1967,16 +2443,483 @@ ${nomeEnviou}`;
         if(comando==="anime"&&args.length>0){const nome=args.join(" ");try{const resp=await chatIA(`Info sobre o anime "${nome}": estúdio, ano, episódios, género, sinopse (2 linhas), nota MAL.`,"Otaku especialista.");let img=null;try{img=await buscarImagemInternet(`${nome} anime poster`);}catch{}const textoA=bBloco("🎌 "+nome.toUpperCase(),[bLine("📝",resp)]);if(img)await sock.sendMessage(jid,{image:{url:img},caption:textoA},{quoted:seloBot});else await sock.sendMessage(jid,{text:textoA},{quoted:seloBot});await reagir(sock,msg,"🎌");}catch{await sock.sendMessage(jid,{text:bLine("❌","Não encontrei.")},{quoted:seloBot});}return;}
         if(comando==="topanimes"){try{const resp=await chatIA("Top 10 melhores animes. Formato: 🏆 Nº. *Nome* — Género","Especialista em animes.");await sock.sendMessage(jid,{text:bBloco("🎌 TOP ANIMES",[resp])},{quoted:seloBot});await reagir(sock,msg,"🎌");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="animealeatorio"){const a=ANIMES_INFO[Math.floor(Math.random()*ANIMES_INFO.length)];let img=null;try{img=await buscarImagemInternet(`${a.nome} anime poster`);}catch{}const textoAA=bBloco("🎌 ANIME ALEATÓRIO",[bLine("🎌",`*${a.nome}*`),bLine("🎭",`Género: ${a.gen}`),bLine("📺",`Episódios: ${a.ep}`),bLine("⭐",`Nota: ${a.nota}/10`)]);if(img)await sock.sendMessage(jid,{image:{url:img},caption:textoAA},{quoted:seloBot});else await sock.sendMessage(jid,{text:textoAA},{quoted:seloBot});await reagir(sock,msg,"🎌");return;}
+
+        // ─── ANIME (Jikan API) ───
+        if(comando==="manga"&&args.length){
+          try{
+            const{data}=await axios.get(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(args.join(" "))}&limit=1`,{timeout:15000,httpsAgent});
+            const m=data?.data?.[0];
+            if(!m)throw new Error("Mangá não encontrado.");
+            const texto=bBloco("📖 "+m.title.toUpperCase(),[bLine("📚",`Capítulos: *${m.chapters||"?"}*`),bLine("📅",`Estado: *${m.status}*`),bLine("⭐",`Nota: *${m.score||"?"}*`),bLine("📝",(m.synopsis||"Sem sinopse.").slice(0,300))]);
+            if(m.images?.jpg?.image_url)await sock.sendMessage(jid,{image:{url:m.images.jpg.image_url},caption:texto},{quoted:seloBot});
+            else await sock.sendMessage(jid,{text:texto},{quoted:seloBot});
+            await reagir(sock,msg,"📖");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="personagem"&&args.length){
+          try{
+            const{data}=await axios.get(`https://api.jikan.moe/v4/characters?q=${encodeURIComponent(args.join(" "))}&limit=1`,{timeout:15000,httpsAgent});
+            const c=data?.data?.[0];
+            if(!c)throw new Error("Personagem não encontrado.");
+            const texto=bBloco("👤 "+c.name.toUpperCase(),[bLine("⭐",`Favoritos: *${c.favorites||0}*`),bLine("📝",(c.about||"Sem informação.").slice(0,300))]);
+            if(c.images?.jpg?.image_url)await sock.sendMessage(jid,{image:{url:c.images.jpg.image_url},caption:texto},{quoted:seloBot});
+            else await sock.sendMessage(jid,{text:texto},{quoted:seloBot});
+            await reagir(sock,msg,"👤");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="autor"&&args.length){
+          try{
+            const{data}=await axios.get(`https://api.jikan.moe/v4/people?q=${encodeURIComponent(args.join(" "))}&limit=1`,{timeout:15000,httpsAgent});
+            const p=data?.data?.[0];
+            if(!p)throw new Error("Autor não encontrado.");
+            const texto=bBloco("✍️ "+p.name.toUpperCase(),[bLine("🎂",`Nascimento: *${p.birthday?p.birthday.split("T")[0]:"?"}*`),bLine("⭐",`Favoritos: *${p.favorites||0}*`)]);
+            if(p.images?.jpg?.image_url)await sock.sendMessage(jid,{image:{url:p.images.jpg.image_url},caption:texto},{quoted:seloBot});
+            else await sock.sendMessage(jid,{text:texto},{quoted:seloBot});
+            await reagir(sock,msg,"✍️");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="estudio"&&args.length){
+          try{
+            const{data}=await axios.get(`https://api.jikan.moe/v4/producers?q=${encodeURIComponent(args.join(" "))}&limit=1`,{timeout:15000,httpsAgent});
+            const e2=data?.data?.[0];
+            if(!e2)throw new Error("Estúdio não encontrado.");
+            const titles=(e2.titles||[]).map(t=>t.title).join(", ")||"?";
+            await sock.sendMessage(jid,{text:bBloco("🏢 "+titles.split(",")[0].toUpperCase(),[bLine("📅",`Fundado: *${e2.established?e2.established.split("T")[0]:"?"}*`),bLine("⭐",`Favoritos: *${e2.favorites||0}*`)])},{quoted:seloBot});
+            await reagir(sock,msg,"🏢");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="episodio"&&args.length){
+          try{
+            const busca=await axios.get(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(args.join(" "))}&limit=1`,{timeout:15000,httpsAgent});
+            const anime=busca.data?.data?.[0];
+            if(!anime)throw new Error("Anime não encontrado.");
+            const eps=await axios.get(`https://api.jikan.moe/v4/anime/${anime.mal_id}/episodes`,{timeout:15000,httpsAgent});
+            const lista=(eps.data?.data||[]).slice(0,10).map((e2,i)=>bLine("📺",`*${i+1}.* ${e2.title||"Sem título"}`));
+            await sock.sendMessage(jid,{text:bBloco(`📺 EPISÓDIOS — ${anime.title.toUpperCase()}`,lista.length?lista:[bLine("❌","Sem episódios listados.")])},{quoted:seloBot});
+            await reagir(sock,msg,"📺");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="temporada"){
+          try{
+            const{data}=await axios.get("https://api.jikan.moe/v4/seasons/now",{timeout:15000,httpsAgent});
+            const lista=(data?.data||[]).slice(0,10).map(a=>bLine("🎌",`*${a.title}* — ⭐${a.score||"?"}`));
+            await sock.sendMessage(jid,{text:bBloco("📅 ANIMES DA TEMPORADA",lista)},{quoted:seloBot});
+            await reagir(sock,msg,"📅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+        if(["personagemaleatorio","villain","protagonista"].includes(comando)){
+          try{
+            const{data}=await axios.get("https://api.jikan.moe/v4/random/characters",{timeout:15000,httpsAgent});
+            const c=data?.data;
+            if(!c)throw new Error("Erro ao buscar personagem.");
+            const texto=bBloco("🎲 PERSONAGEM ALEATÓRIO",[bLine("👤",`*${c.name}*`),bLine("⭐",`Favoritos: *${c.favorites||0}*`)]);
+            if(c.images?.jpg?.image_url)await sock.sendMessage(jid,{image:{url:c.images.jpg.image_url},caption:texto},{quoted:seloBot});
+            else await sock.sendMessage(jid,{text:texto},{quoted:seloBot});
+            await reagir(sock,msg,"🎲");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="waifu"||comando==="husbando"){
+          try{
+            const cat=comando==="waifu"?"waifu":"husbando";
+            const{data}=await axios.get(`https://api.waifu.pics/sfw/${cat}`,{timeout:15000,httpsAgent});
+            await sock.sendMessage(jid,{image:{url:data.url},caption:bLine(comando==="waifu"?"💖":"💙",comando==="waifu"?"Waifu aleatória!":"Husbando aleatório!")},{quoted:seloBot});
+            await reagir(sock,msg,"💖");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
+          return;
+        }
+
+        // ─── CASAMENTO ───
+        if(comando==="casar"&&mencoes.length){
+          const alvo=extrairJid(mencoes[0]);
+          if(alvo===sender){await sock.sendMessage(jid,{text:bLine("❌","Não podes casar contigo mesmo!")},{quoted:seloBot});return;}
+          const cas=carregarCasamentos();
+          if(cas[sender]){await sock.sendMessage(jid,{text:bLine("💍",`Já és casado(a) com @${cas[sender].split("@")[0]}!`),mentions:[cas[sender]]},{quoted:seloBot});return;}
+          if(cas[alvo]){await sock.sendMessage(jid,{text:bLine("❌","Essa pessoa já está casada!")},{quoted:seloBot});return;}
+          cas[sender]=alvo;cas[alvo]=sender;salvarCasamentos(cas);
+          await sock.sendMessage(jid,{text:bBloco("💍 CASAMENTO!",[bLine("💑",`@${sender.split("@")[0]} e @${alvo.split("@")[0]} agora são casados! 🎉`)]),mentions:[sender,alvo]},{quoted:seloBot});
+          await reagir(sock,msg,"💍");
+          return;
+        }
+        if(comando==="divorcio"){
+          const cas=carregarCasamentos();
+          if(!cas[sender]){await sock.sendMessage(jid,{text:bLine("❌","Não estás casado(a)!")},{quoted:seloBot});return;}
+          const exCjg=cas[sender];delete cas[sender];delete cas[exCjg];salvarCasamentos(cas);
+          await sock.sendMessage(jid,{text:bLine("💔",`Divorciaste de @${exCjg.split("@")[0]}...`),mentions:[exCjg]},{quoted:seloBot});
+          await reagir(sock,msg,"💔");
+          return;
+        }
+        if(comando==="matar"&&mencoes.length){
+          const alvo=extrairJid(mencoes[0]);
+          let gifUrl=null;
+          try{const{data}=await axios.get("https://nekos.best/api/v2/punch",{timeout:10000,httpsAgent});gifUrl=data?.results?.[0]?.url||null;}catch{}
+          const legenda=bLine("💀",`@${sender.split("@")[0]} matou @${alvo.split("@")[0]} de brincadeira! 😂`);
+          if(gifUrl){try{const mp4=await baixarGifComoMp4(gifUrl);await sock.sendMessage(jid,{video:mp4,gifPlayback:true,caption:legenda,mentions:[sender,alvo]},{quoted:seloBot});await reagir(sock,msg,"💀");return;}catch{}}
+          await sock.sendMessage(jid,{text:legenda,mentions:[sender,alvo]},{quoted:seloBot});
+          await reagir(sock,msg,"💀");
+          return;
+        }
+
+        // ─── ANIME RPG ───
+        if(comando==="animerpg"){
+          const escolha=args.join(" ").toLowerCase().trim().replace(/\s+/g,"");
+          if(!escolha){
+            const franquias={};
+            for(const[k,c] of Object.entries(ANIME_PERSONAGENS)){if(!franquias[c.franquia])franquias[c.franquia]=[];franquias[c.franquia].push(k);}
+            const linhas=Object.entries(franquias).map(([f,chars])=>bLine("🎌",`*${f}:* ${chars.join(", ")}`));
+            await sock.sendMessage(jid,{text:bBloco("⚔️ ANIME RPG",[bLine("💡",`*${CONFIG.PREFIXO}animerpg* [nome do personagem]`),B_SEP,...linhas])},{quoted:seloBot});
+            return;
+          }
+          const personagem=ANIME_PERSONAGENS[escolha];
+          if(!personagem){await sock.sendMessage(jid,{text:bLine("❌",`Personagem *${escolha}* não encontrado. Usa *${CONFIG.PREFIXO}animerpg* para ver a lista.`)},{quoted:seloBot});return;}
+          const db=carregarRPG();
+          const p=obterJogadorRPG(sender);
+          if(!p.personagemAnime||p.personagemAnime.nome!==escolha){
+            p.personagemAnime={nome:escolha,nivel:1,xp:0,...personagem};
+            db[sender]=p;salvarRPG(db);
+            let gifUrl=null;
+            try{const{data}=await axios.get(`https://api.giphy.com/v1/gifs/search?q=${encodeURIComponent(personagem.franquia+" "+escolha)}&api_key=dc6zaTOxFJmzC&limit=1&rating=pg-13`,{timeout:10000,httpsAgent});gifUrl=data?.data?.[0]?.images?.original?.url||null;}catch{}
+            const texto=bBloco("⚔️ PERSONAGEM ESCOLHIDO!",[bLine("🎌",`*${escolha}* _(${personagem.franquia})_`),bLine("❤️",`HP: *${personagem.hp}*`),bLine("⚔️",`ATK: *${personagem.atk}*`),bLine("🛡️",`DEF: *${personagem.def}*`),bLine("⚡",`SPD: *${personagem.spd}*`),bLine("🔥",`Habilidade: *${personagem.habilidade}*`)]);
+            if(gifUrl)await sock.sendMessage(jid,{video:{url:gifUrl},gifPlayback:true,caption:texto},{quoted:seloBot});
+            else await sock.sendMessage(jid,{text:texto},{quoted:seloBot});
+            await reagir(sock,msg,"⚔️");
+            return;
+          }
+          const pa=p.personagemAnime;
+          const xpG=20+Math.floor(Math.random()*15);
+          pa.xp+=xpG;
+          let subiu=false;
+          while(pa.xp>=pa.nivel*80){pa.xp-=pa.nivel*80;pa.nivel++;pa.hp+=8;pa.atk+=2;pa.def+=1;pa.spd+=1;subiu=true;}
+          db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco(`⚔️ ${escolha.toUpperCase()} TREINOU!`,[bLine("✨",`+${xpG} XP`),bLine("⭐",`Nível: *${pa.nivel}*`),...(subiu?[bLine("🎉","Subiu de nível! Stats melhorados.")]:[])])},{quoted:seloBot});
+          await reagir(sock,msg,"⚔️");
+          return;
+        }
+
         if(comando==="fraseanime"){try{const resp=await chatIA("Dá uma frase épica de um personagem de anime. Formato: _\"frase\"_ — *Personagem* (Anime)","Otaku especialista.");await sock.sendMessage(jid,{text:bBloco("🎌 FRASE DE ANIME",[bLine("✨",resp)])},{quoted:seloBot});await reagir(sock,msg,"✨");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="quizanime"){try{const resp=await chatIA("Cria uma pergunta de quiz sobre animes. Formato: ❓ *Pergunta*? Resposta: ||spoiler||","Quiz animes.");await sock.sendMessage(jid,{text:bBloco("🎌 QUIZ ANIME",[bLine("❓",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
 
         // ─── RPG ───
-        if(comando==="rpgstart"){if(!rpgPersonagens)rpgPersonagens={};if(rpgPersonagens[sender]){const p=rpgPersonagens[sender];const barHP="█".repeat(Math.floor((p.hp/p.hpMax)*10))+"░".repeat(10-Math.floor((p.hp/p.hpMax)*10));await sock.sendMessage(jid,{text:bBloco("⚔️ PERSONAGEM JÁ EXISTE",[bLine("👤",`*${p.nome}* | *${p.classe}*`),bLine("⭐",`Nível: *${p.nivel}*`),bLine("❤️",`HP: [${barHP}] *${p.hp}/${p.hpMax}*`),bLine("⚔️",`ATK: *${p.atk}* | DEF: *${p.def}*`),bLine("💰",`Ouro: *${p.ouro}*`)])},{quoted:seloBot});return;}const classes=["Guerreiro","Mago","Arqueiro","Paladino","Assassino"];const classe=classes[Math.floor(Math.random()*classes.length)];const statsClasse={Guerreiro:{hp:120,atk:15,def:12},Mago:{hp:80,atk:25,def:6},Arqueiro:{hp:100,atk:18,def:9},Paladino:{hp:130,atk:12,def:15},Assassino:{hp:90,atk:22,def:7}};const st=statsClasse[classe];rpgPersonagens[sender]={nome:sender.split("@")[0],classe,nivel:1,xp:0,hp:st.hp,hpMax:st.hp,atk:st.atk,def:st.def,ouro:50};salvarRpg();await sock.sendMessage(jid,{text:bBloco("⚔️ PERSONAGEM CRIADO",[bLine("👤",`*${rpgPersonagens[sender].nome}*`),bLine("🛡️",`Classe: *${classe}*`),bLine("❤️",`HP: *${st.hp}* | ⚔️ ATK: *${st.atk}* | 🛡️ DEF: *${st.def}*`),bLine("💰","Ouro: *50*"),B_SEP,bLine("💡",`*!rpgstatus* | *!rpgataque* | *!rpgcurar* | *!rpgsorte*`)])},{quoted:seloBot});await reagir(sock,msg,"⚔️");return;}
-        if(comando==="rpgstatus"){if(!rpgPersonagens?.[sender]){await sock.sendMessage(jid,{text:bLine("⚔️",`Usa *${CONFIG.PREFIXO}rpgstart* primeiro!`)},{quoted:seloBot});return;}const p=rpgPersonagens[sender];const barHP="█".repeat(Math.floor((p.hp/p.hpMax)*10))+"░".repeat(10-Math.floor((p.hp/p.hpMax)*10));await sock.sendMessage(jid,{text:bBloco("⚔️ STATUS — "+p.nome.toUpperCase(),[bLine("🛡️",`Classe: *${p.classe}* | Nível: *${p.nivel}*`),bLine("❤️",`HP: [${barHP}] *${p.hp}/${p.hpMax}*`),bLine("⚔️",`ATK: *${p.atk}* | DEF: *${p.def}*`),bLine("✨",`XP: *${p.xp}* | 💰 Ouro: *${p.ouro}*`)])},{quoted:seloBot});return;}
-        if(comando==="rpgataque"){if(!rpgPersonagens?.[sender]){await sock.sendMessage(jid,{text:bLine("⚔️",`Usa *${CONFIG.PREFIXO}rpgstart* primeiro!`)},{quoted:seloBot});return;}const p=rpgPersonagens[sender];const inimigos=["Goblin","Orc","Dragão Jovem","Bandido","Lobo Sombrio","Esqueleto","Troll"];const inimigo=inimigos[Math.floor(Math.random()*inimigos.length)];const hpInimigo=Math.floor(Math.random()*60)+30;const atkInimigo=Math.floor(Math.random()*15)+5;const danoJogador=Math.max(1,p.atk+Math.floor(Math.random()*10)-3);const danoInimigo=Math.max(0,atkInimigo-p.def+Math.floor(Math.random()*5));if(danoJogador>hpInimigo*0.4){const xpGanho=Math.floor(hpInimigo*0.8);const ouroGanho=Math.floor(Math.random()*20)+5;p.xp+=xpGanho;p.ouro+=ouroGanho;if(p.xp>=p.nivel*100){p.nivel++;p.hpMax+=10;p.hp=p.hpMax;p.atk+=2;p.def+=1;}salvarRpg();await sock.sendMessage(jid,{text:bBloco("⚔️ VITÓRIA!",[bLine("⚔️",`Derrotaste um *${inimigo}*!`),bLine("💥",`Dano: *${danoJogador}*`),bLine("✨",`XP: +${xpGanho} | 💰 Ouro: +${ouroGanho}`)])},{quoted:seloBot});await reagir(sock,msg,"⚔️");}else{p.hp=Math.max(1,p.hp-danoInimigo);salvarRpg();await sock.sendMessage(jid,{text:bBloco("⚔️ BATALHA DIFÍCIL",[bLine("⚔️",`Enfrentaste um *${inimigo}*`),bLine("💥",`Dano causado: *${danoJogador}*`),bLine("❤️",`Dano recebido: *${danoInimigo}* | HP: *${p.hp}/${p.hpMax}*`)])},{quoted:seloBot});await reagir(sock,msg,"😤");}return;}
-        if(comando==="rpgcurar"){if(!rpgPersonagens?.[sender]){await sock.sendMessage(jid,{text:bLine("⚔️",`Usa *${CONFIG.PREFIXO}rpgstart* primeiro!`)},{quoted:seloBot});return;}const p=rpgPersonagens[sender];const custo=20;if(p.ouro<custo){await sock.sendMessage(jid,{text:bBloco("💰 OURO INSUFICIENTE",[bLine("❌",`Precisas de *${custo}* ouro. Tens: *${p.ouro}*`)])},{quoted:seloBot});return;}const cura=Math.floor(p.hpMax*0.4);p.hp=Math.min(p.hpMax,p.hp+cura);p.ouro-=custo;salvarRpg();await sock.sendMessage(jid,{text:bBloco("💚 CURADO!",[bLine("💚",`HP restaurado: *+${cura}*`),bLine("❤️",`HP actual: *${p.hp}/${p.hpMax}*`),bLine("💰",`Ouro restante: *${p.ouro}*`)])},{quoted:seloBot});await reagir(sock,msg,"💚");return;}
-        if(comando==="rpgsorte"){if(!rpgPersonagens?.[sender]){await sock.sendMessage(jid,{text:bLine("⚔️",`Usa *${CONFIG.PREFIXO}rpgstart* primeiro!`)},{quoted:seloBot});return;}const p=rpgPersonagens[sender];const eventos=[{msg:"Encontraste uma moeda! +10 ouro.",ouro:10,hp:0},{msg:"Um mercador deu-te uma poção! +20 HP.",ouro:0,hp:20},{msg:"Caíste numa armadilha! -15 HP.",ouro:0,hp:-15},{msg:"Ganhaste a lotaria! +30 ouro!",ouro:30,hp:0},{msg:"Treino surpresa! +5 XP.",ouro:0,hp:0,xp:5},{msg:"Encontraste um baú! +25 ouro.",ouro:25,hp:0}];const ev=eventos[Math.floor(Math.random()*eventos.length)];p.ouro=Math.max(0,p.ouro+(ev.ouro||0));p.hp=Math.max(1,Math.min(p.hpMax,p.hp+(ev.hp||0)));if(ev.xp)p.xp+=(ev.xp||0);salvarRpg();await sock.sendMessage(jid,{text:bBloco("🎲 SORTE DO DIA",[bLine("🎲",ev.msg),bLine("📊",`HP: *${p.hp}/${p.hpMax}* | 💰 *${p.ouro}*`)])},{quoted:seloBot});await reagir(sock,msg,"🎲");return;}
-        if(comando==="rpgclasse"){if(!rpgPersonagens?.[sender]){await sock.sendMessage(jid,{text:bLine("⚔️",`Usa *${CONFIG.PREFIXO}rpgstart* primeiro!`)},{quoted:seloBot});return;}const p=rpgPersonagens[sender];const descClasses={Guerreiro:"🗡️ Mestre do combate. Alto HP e defesa.",Mago:"🔮 Poder mágico devastador. Baixa defesa mas ATK altíssimo.",Arqueiro:"🏹 Ataques à distância. Equilíbrio entre ATK e HP.",Paladino:"🛡️ Tanque supremo. Alta defesa e HP.",Assassino:"🗡️ Velocidade e precisão. Alto ATK."};await sock.sendMessage(jid,{text:bBloco("⚔️ CLASSE: "+p.classe.toUpperCase(),[bLine("🛡️",descClasses[p.classe]||"Classe especial."),bLine("📊",`Nível: *${p.nivel}* | XP: *${p.xp}*`)])},{quoted:seloBot});return;}
+        if(comando==="classes"){
+          const linhas=Object.values(RPG_CLASSES).map(c=>bLine(c.emoji,`*${c.nome}* — ${c.desc} _(HP:${c.hp} ATK:${c.atk} DEF:${c.def} SPD:${c.spd})_`));
+          await sock.sendMessage(jid,{text:bBloco("🎭 CLASSES DISPONÍVEIS",[...linhas,B_SEP,bLine("💡",`*${CONFIG.PREFIXO}classe* [nome] → _escolher_`)])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="classe"){
+          const p=obterJogadorRPG(sender);
+          const escolha=(args[0]||"").toLowerCase();
+          if(p.classe){await sock.sendMessage(jid,{text:bLine("⚠️",`Já és *${RPG_CLASSES[p.classe].nome}*! Usa *${CONFIG.PREFIXO}perfil* para ver.`)},{quoted:seloBot});return;}
+          if(!RPG_CLASSES[escolha]){await sock.sendMessage(jid,{text:bBloco("🎭 ESCOLHE UMA CLASSE",[bLine("💡",`*${CONFIG.PREFIXO}classe* [nome]`),...Object.entries(RPG_CLASSES).map(([k,c])=>bLine(c.emoji,`*${k}* — ${c.desc}`))])},{quoted:seloBot});return;}
+          p.classe=escolha;
+          const st=statsBaseRPG(p);p.hpMax=st.hpMax;p.hp=p.hpMax;
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco("✅ CLASSE ESCOLHIDA!",[bLine(RPG_CLASSES[escolha].emoji,`Agora és *${RPG_CLASSES[escolha].nome}*!`),bLine("❤️",`HP: *${p.hpMax}*`),bLine("💡",`Usa *${CONFIG.PREFIXO}perfil* para ver os teus dados.`)])},{quoted:seloBot});
+          await reagir(sock,msg,"✅");
+          return;
+        }
+        if(comando==="perfil"){
+          const p=obterJogadorRPG(sender);
+          if(!p.classe){await sock.sendMessage(jid,{text:bBloco("⚔️ SEM CLASSE",[bLine("💡",`Escolhe uma classe: *${CONFIG.PREFIXO}classes*`)])},{quoted:seloBot});return;}
+          const st=statsBaseRPG(p);
+          const barHP="█".repeat(Math.round((p.hp/p.hpMax)*10))+"░".repeat(10-Math.round((p.hp/p.hpMax)*10));
+          await sock.sendMessage(jid,{text:bBloco(`${RPG_CLASSES[p.classe].emoji} PERFIL`,[
+            bLine("👤",`@${sender.split("@")[0]}`),
+            bLine(RPG_CLASSES[p.classe].emoji,`Classe: *${RPG_CLASSES[p.classe].nome}*`),
+            bLine("⭐",`Nível: *${p.nivel}* | XP: *${p.xp}/${xpProximoNivelRPG(p.nivel)}*`),
+            bLine("❤️",`HP: [${barHP}] *${p.hp}/${p.hpMax}*`),
+            bLine("⚔️",`ATK: *${st.atk}* | 🛡️ DEF: *${st.def}* | ⚡ SPD: *${st.spd}*`),
+            bLine("💰",`Moedas: *${getCoins(sender)}*`),
+            bLine("🎒",`Itens: *${p.inventario.length}*`),
+          ]),mentions:[sender]},{quoted:seloBot});
+          return;
+        }
+        if(comando==="atributos"){
+          const p=obterJogadorRPG(sender);
+          if(!p.classe){await sock.sendMessage(jid,{text:bLine("💡",`Escolhe uma classe: *${CONFIG.PREFIXO}classes*`)},{quoted:seloBot});return;}
+          const st=statsBaseRPG(p);
+          await sock.sendMessage(jid,{text:bBloco("📊 ATRIBUTOS",[bLine("⚔️",`ATK: *${st.atk}*`),bLine("🛡️",`DEF: *${st.def}*`),bLine("⚡",`SPD: *${st.spd}*`),bLine("❤️",`HP máx: *${st.hpMax}*`)])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="level"){
+          const p=obterJogadorRPG(sender);
+          await sock.sendMessage(jid,{text:bBloco("⭐ NÍVEL",[bLine("⭐",`Nível: *${p.nivel}*`),bLine("✨",`XP: *${p.xp}/${xpProximoNivelRPG(p.nivel)}*`)])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="inventario"){
+          const p=obterJogadorRPG(sender);
+          if(!p.inventario.length){await sock.sendMessage(jid,{text:bBloco("🎒 INVENTÁRIO VAZIO",[bLine("💡",`Compra itens: *${CONFIG.PREFIXO}loja*`)])},{quoted:seloBot});return;}
+          const linhas=p.inventario.map((it,i)=>bLine(it.emoji||"📦",`*${i+1}.* ${it.nome} _(${it.raridade})_ ${it.tipo==="arma"?`ATK+${it.atk}`:`DEF+${it.def}`}`));
+          await sock.sendMessage(jid,{text:bBloco("🎒 INVENTÁRIO",[...linhas,B_SEP,bLine("💡",`*${CONFIG.PREFIXO}equipar* [número]`)])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="equipar"){
+          const p=obterJogadorRPG(sender);
+          const idx=parseInt(args[0])-1;
+          if(isNaN(idx)||!p.inventario[idx]){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}equipar* [número] → vê *${CONFIG.PREFIXO}inventario*`)},{quoted:seloBot});return;}
+          const item=p.inventario[idx];
+          p.equipado[item.tipo]=item;
+          const st=statsBaseRPG(p);p.hpMax=st.hpMax;if(p.hp>p.hpMax)p.hp=p.hpMax;
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bLine("✅",`Equipaste *${item.nome}*!`)},{quoted:seloBot});
+          await reagir(sock,msg,"✅");
+          return;
+        }
+        if(comando==="desequipar"){
+          const p=obterJogadorRPG(sender);
+          const tipo=(args[0]||"").toLowerCase();
+          if(tipo!=="arma"&&tipo!=="armadura"){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}desequipar* arma _ou_ *${CONFIG.PREFIXO}desequipar* armadura`)},{quoted:seloBot});return;}
+          p.equipado[tipo]=null;
+          const st=statsBaseRPG(p);p.hpMax=st.hpMax;if(p.hp>p.hpMax)p.hp=p.hpMax;
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bLine("✅",`${tipo==="arma"?"Arma":"Armadura"} removida.`)},{quoted:seloBot});
+          return;
+        }
+        if(comando==="ranking"){
+          const db=carregarRPG();
+          const lista=Object.entries(db).filter(([,p])=>p.classe).sort((a,b)=>(b[1].nivel*100000+b[1].xp)-(a[1].nivel*100000+a[1].xp)).slice(0,10);
+          if(!lista.length){await sock.sendMessage(jid,{text:bLine("📭","Ninguém no ranking ainda.")},{quoted:seloBot});return;}
+          const linhas=lista.map(([s,p],i)=>bLine(["🥇","🥈","🥉"][i]||"◎",`*${i+1}.* @${s.split("@")[0]} — Nível *${p.nivel}* _(${RPG_CLASSES[p.classe]?.nome||"?"})_`));
+          await sock.sendMessage(jid,{text:bBloco("🏆 RANKING RPG",linhas),mentions:lista.map(l=>l[0])},{quoted:seloBot});
+          return;
+        }
+        if((comando==="lutar"||comando==="duelo")&&mencoes.length){
+          const p1=obterJogadorRPG(sender);
+          const alvo=extrairJid(mencoes[0]);
+          if(!p1.classe){await sock.sendMessage(jid,{text:bLine("💡",`Escolhe uma classe primeiro: *${CONFIG.PREFIXO}classes*`)},{quoted:seloBot});return;}
+          if(alvo===sender){await sock.sendMessage(jid,{text:bLine("❌","Não podes lutar contigo mesmo!")},{quoted:seloBot});return;}
+          const p2=obterJogadorRPG(alvo);
+          if(!p2.classe){await sock.sendMessage(jid,{text:bLine("❌","Esse jogador ainda não tem classe!")},{quoted:seloBot});return;}
+          const st1=statsBaseRPG(p1),st2=statsBaseRPG(p2);
+          const resultado=resolverCombateRPG(st1.atk,st1.def,p1.hp,st2.atk,st2.def,p2.hp);
+          const vencedorJid=resultado.vencedor==="a"?sender:alvo;
+          const perdedorJid=resultado.vencedor==="a"?alvo:sender;
+          const ganhoXP=30,ganhoCoins=25;
+          const dbR=carregarRPG();
+          const pv=dbR[vencedorJid];ganharXPRPG(pv,ganhoXP);addCoins(vencedorJid,ganhoCoins);
+          dbR[sender].hp=Math.max(1,resultado.hpA);dbR[alvo].hp=Math.max(1,resultado.hpB);
+          salvarRPG(dbR);
+          await sock.sendMessage(jid,{text:bBloco(`⚔️ ${comando.toUpperCase()}`,[
+            bLine("👥",`@${sender.split("@")[0]} 🆚 @${alvo.split("@")[0]}`),
+            ...resultado.log.slice(-3),
+            B_SEP,
+            bLine("🏆",`Vencedor: @${vencedorJid.split("@")[0]}!`),
+            bLine("✨",`+${ganhoXP} XP | 💰 +${ganhoCoins} moedas`),
+          ]),mentions:[sender,alvo]},{quoted:seloBot});
+          await reagir(sock,msg,"⚔️");
+          return;
+        }
+        if(comando==="boss"){
+          const p=obterJogadorRPG(sender);
+          if(!p.classe){await sock.sendMessage(jid,{text:bLine("💡",`Escolhe uma classe: *${CONFIG.PREFIXO}classes*`)},{quoted:seloBot});return;}
+          const cd=cooldownRPG(p,"boss",30);
+          if(cd>0){const db0=carregarRPG();db0[sender]=p;salvarRPG(db0);await sock.sendMessage(jid,{text:bLine("⏳",`Espera *${formatarMs(cd)}* para enfrentar outro boss.`)},{quoted:seloBot});return;}
+          const bosses=["🐉 Dragão Ancião","👹 Rei Demónio","💀 Lich Supremo","🦂 Rainha Aracnídea","🔥 Fénix Sombria"];
+          const bossNome=bosses[Math.floor(Math.random()*bosses.length)];
+          const st=statsBaseRPG(p);
+          const bossAtk=25+p.nivel*3,bossDef=15+p.nivel*2,bossHp=200+p.nivel*20;
+          const resultado=resolverCombateRPG(st.atk,st.def,p.hp,bossAtk,bossDef,bossHp,10);
+          const db=carregarRPG();
+          if(resultado.vencedor==="a"){
+            const xpG=80+p.nivel*5,coinsG=60+p.nivel*5;
+            const item=Math.random()<0.3?gerarItemRPG(Math.random()<0.5?"arma":"armadura"):null;
+            const subiu=ganharXPRPG(p,xpG);addCoins(sender,coinsG);
+            if(item)p.inventario.push(item);
+            p.hp=Math.max(1,resultado.hpA);
+            db[sender]=p;salvarRPG(db);
+            await sock.sendMessage(jid,{text:bBloco("👑 BOSS DERROTADO!",[bLine("⚔️",`Derrotaste *${bossNome}*!`),bLine("✨",`+${xpG} XP | 💰 +${coinsG} moedas`),...(item?[bLine(item.emoji,`Item: *${item.nome}* (${item.raridade})!`)]:[]),...(subiu?[bLine("🎉",`Subiste para o nível *${p.nivel}*!`)]:[])])},{quoted:seloBot});
+            await reagir(sock,msg,"👑");
+          }else{
+            p.hp=Math.max(1,resultado.hpA);
+            db[sender]=p;salvarRPG(db);
+            await sock.sendMessage(jid,{text:bBloco("💀 DERROTA",[bLine("💀",`*${bossNome}* foi forte demais...`),bLine("❤️",`HP restante: *${p.hp}/${p.hpMax}*`)])},{quoted:seloBot});
+            await reagir(sock,msg,"💀");
+          }
+          return;
+        }
+        if(comando==="hunt"){
+          const p=obterJogadorRPG(sender);
+          if(!p.classe){await sock.sendMessage(jid,{text:bLine("💡",`Escolhe uma classe: *${CONFIG.PREFIXO}classes*`)},{quoted:seloBot});return;}
+          const cd=cooldownRPG(p,"hunt",10);
+          if(cd>0){const db0=carregarRPG();db0[sender]=p;salvarRPG(db0);await sock.sendMessage(jid,{text:bLine("⏳",`Espera *${formatarMs(cd)}* para caçar de novo.`)},{quoted:seloBot});return;}
+          const monstros=["🐺 Lobo","👹 Goblin","🦇 Morcego Gigante","🐍 Serpente","🕷️ Aranha"];
+          const m=monstros[Math.floor(Math.random()*monstros.length)];
+          const xpG=15+Math.floor(Math.random()*10),coinsG=10+Math.floor(Math.random()*15);
+          const subiu=ganharXPRPG(p,xpG);addCoins(sender,coinsG);
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco("🏹 CAÇADA",[bLine("🎯",`Caçaste um *${m}*!`),bLine("✨",`+${xpG} XP | 💰 +${coinsG} moedas`),...(subiu?[bLine("🎉",`Subiste para o nível *${p.nivel}*!`)]:[])])},{quoted:seloBot});
+          await reagir(sock,msg,"🏹");
+          return;
+        }
+        if(comando==="aventura"){
+          const p=obterJogadorRPG(sender);
+          if(!p.classe){await sock.sendMessage(jid,{text:bLine("💡",`Escolhe uma classe: *${CONFIG.PREFIXO}classes*`)},{quoted:seloBot});return;}
+          const cd=cooldownRPG(p,"aventura",15);
+          if(cd>0){const db0=carregarRPG();db0[sender]=p;salvarRPG(db0);await sock.sendMessage(jid,{text:bLine("⏳",`Espera *${formatarMs(cd)}* para outra aventura.`)},{quoted:seloBot});return;}
+          const eventos=[
+            {msg:"Encontraste um tesouro escondido!",coins:40,xp:10,hp:0},
+            {msg:"Caíste numa armadilha de espinhos!",coins:0,xp:5,hp:-15},
+            {msg:"Um viajante ensinou-te uma técnica!",coins:0,xp:25,hp:0},
+            {msg:"Sobreviveste a uma emboscada!",coins:20,xp:15,hp:-10},
+            {msg:"Descansaste numa aldeia pacífica.",coins:10,xp:5,hp:20},
+          ];
+          const ev=eventos[Math.floor(Math.random()*eventos.length)];
+          p.hp=Math.max(1,Math.min(p.hpMax,p.hp+ev.hp));
+          if(ev.coins)addCoins(sender,ev.coins);
+          const subiu=ganharXPRPG(p,ev.xp);
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco("🗺️ AVENTURA",[bLine("🗺️",ev.msg),bLine("📊",`${ev.coins?`💰 +${ev.coins} | `:""}✨ +${ev.xp} XP${ev.hp?` | ❤️ ${ev.hp>0?"+":""}${ev.hp} HP`:""}`),...(subiu?[bLine("🎉",`Subiste para o nível *${p.nivel}*!`)]:[])])},{quoted:seloBot});
+          await reagir(sock,msg,"🗺️");
+          return;
+        }
+        if(comando==="masmorra"){
+          const p=obterJogadorRPG(sender);
+          if(!p.classe){await sock.sendMessage(jid,{text:bLine("💡",`Escolhe uma classe: *${CONFIG.PREFIXO}classes*`)},{quoted:seloBot});return;}
+          const cd=cooldownRPG(p,"masmorra",60);
+          if(cd>0){const db0=carregarRPG();db0[sender]=p;salvarRPG(db0);await sock.sendMessage(jid,{text:bLine("⏳",`Espera *${formatarMs(cd)}* para outra masmorra.`)},{quoted:seloBot});return;}
+          const st=statsBaseRPG(p);
+          let hpAtual=p.hp,vitorias=0;const log=[];
+          for(let onda=1;onda<=3;onda++){
+            const inimAtk=15+onda*8,inimDef=8+onda*4,inimHp=50+onda*30;
+            const r=resolverCombateRPG(st.atk,st.def,hpAtual,inimAtk,inimDef,inimHp,6);
+            hpAtual=Math.max(0,r.hpA);
+            if(r.vencedor==="a"){vitorias++;log.push(bLine("✅",`Onda ${onda}: vencida!`));}
+            else{log.push(bLine("❌",`Onda ${onda}: derrota!`));break;}
+            if(hpAtual<=0)break;
+          }
+          p.hp=Math.max(1,hpAtual);
+          const db=carregarRPG();
+          if(vitorias===3){
+            const xpG=150,coinsG=120;const item=gerarItemRPG(Math.random()<0.5?"arma":"armadura");
+            const subiu=ganharXPRPG(p,xpG);addCoins(sender,coinsG);p.inventario.push(item);
+            db[sender]=p;salvarRPG(db);
+            await sock.sendMessage(jid,{text:bBloco("🏰 MASMORRA CONCLUÍDA!",[...log,B_SEP,bLine("✨",`+${xpG} XP | 💰 +${coinsG} moedas`),bLine(item.emoji,`Item: *${item.nome}* (${item.raridade})!`),...(subiu?[bLine("🎉",`Subiste para o nível *${p.nivel}*!`)]:[])])},{quoted:seloBot});
+          }else{
+            db[sender]=p;salvarRPG(db);
+            await sock.sendMessage(jid,{text:bBloco("🏰 MASMORRA — DERROTA",[...log,B_SEP,bLine("❤️",`HP restante: *${p.hp}/${p.hpMax}*`)])},{quoted:seloBot});
+          }
+          await reagir(sock,msg,"🏰");
+          return;
+        }
+        if(comando==="raid"){
+          if(!isGrupo){await sock.sendMessage(jid,{text:bLine("💡","O raid só funciona em grupos!")},{quoted:seloBot});return;}
+          if(mencoes.length<1){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}raid* @user1 @user2 ... _(mínimo 1 aliado)_`)},{quoted:seloBot});return;}
+          const equipe=[sender,...mencoes.map(m=>extrairJid(m))].filter((v,i,a)=>a.indexOf(v)===i);
+          const db=carregarRPG();
+          let atkTotal=0,defTotal=0,hpTotal=0;
+          for(const membro of equipe){const pm=obterJogadorRPG(membro);const stm=statsBaseRPG(pm);atkTotal+=stm.atk;defTotal+=stm.def;hpTotal+=pm.hp;}
+          const bossAtk=30*equipe.length,bossDef=15*equipe.length,bossHp=250*equipe.length;
+          const resultado=resolverCombateRPG(atkTotal,defTotal,hpTotal,bossAtk,bossDef,bossHp,10);
+          const xpG=100,coinsG=80;
+          for(const membro of equipe){
+            const pm=db[membro]||obterJogadorRPG(membro);
+            if(resultado.vencedor==="a"){ganharXPRPG(pm,xpG);addCoins(membro,coinsG);}
+            db[membro]=pm;
+          }
+          salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco(resultado.vencedor==="a"?"👑 RAID VENCIDO!":"💀 RAID PERDIDO",[
+            bLine("👥",`Equipa: ${equipe.map(e=>"@"+e.split("@")[0]).join(", ")}`),
+            ...resultado.log.slice(-3),
+            ...(resultado.vencedor==="a"?[B_SEP,bLine("✨",`Cada membro: +${xpG} XP | 💰 +${coinsG} moedas`)]:[]),
+          ]),mentions:equipe},{quoted:seloBot});
+          await reagir(sock,msg,resultado.vencedor==="a"?"👑":"💀");
+          return;
+        }
+        if(comando==="fugir"){
+          const p=obterJogadorRPG(sender);
+          if(!p.ultimaAcao)p.ultimaAcao={};
+          p.ultimaAcao.hunt=0;p.ultimaAcao.aventura=0;
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bLine("🏃",`Fugiste em segurança! Cooldowns de caçada/aventura reiniciados.`)},{quoted:seloBot});
+          return;
+        }
+        if(comando==="daily"){
+          const p=obterJogadorRPG(sender);
+          const cd=cooldownRPG(p,"daily",1440);
+          if(cd>0){const db0=carregarRPG();db0[sender]=p;salvarRPG(db0);await sock.sendMessage(jid,{text:bLine("⏳",`Já recebeste hoje! Volta em *${formatarMs(cd)}*.`)},{quoted:seloBot});return;}
+          const coinsG=50+Math.floor(Math.random()*50),xpG=p.classe?20:0;
+          addCoins(sender,coinsG);
+          if(p.classe)ganharXPRPG(p,xpG);
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco("🎁 RECOMPENSA DIÁRIA",[bLine("💰",`+${coinsG} moedas`),...(xpG?[bLine("✨",`+${xpG} XP`)]:[]),bLine("💡","Volta amanhã!")])},{quoted:seloBot});
+          await reagir(sock,msg,"🎁");
+          return;
+        }
+        if(comando==="quests"){
+          await sock.sendMessage(jid,{text:bBloco("📜 MISSÕES DISPONÍVEIS",[
+            bLine("🗡️","Derrota 1 monstro — usa !hunt"),
+            bLine("👑","Derrota um Boss — usa !boss"),
+            bLine("🏰","Conclui uma masmorra — usa !masmorra"),
+            B_SEP,
+            bLine("💡",`*${CONFIG.PREFIXO}quest* → _completar missão diária aleatória_`),
+          ])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="quest"){
+          const p=obterJogadorRPG(sender);
+          const cd=cooldownRPG(p,"quest",1440);
+          if(cd>0){const db0=carregarRPG();db0[sender]=p;salvarRPG(db0);await sock.sendMessage(jid,{text:bLine("⏳",`Missão diária já feita! Volta em *${formatarMs(cd)}*.`)},{quoted:seloBot});return;}
+          const missoes=["Entregar uma encomenda","Caçar um lobo selvagem","Explorar uma caverna","Proteger uma aldeia","Recolher ervas raras"];
+          const missao=missoes[Math.floor(Math.random()*missoes.length)];
+          const coinsG=35+Math.floor(Math.random()*30),xpG=p.classe?25:0;
+          addCoins(sender,coinsG);
+          if(p.classe)ganharXPRPG(p,xpG);
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco("✅ MISSÃO CONCLUÍDA",[bLine("📜",`*${missao}*`),bLine("💰",`+${coinsG} moedas`),...(xpG?[bLine("✨",`+${xpG} XP`)]:[])])},{quoted:seloBot});
+          await reagir(sock,msg,"✅");
+          return;
+        }
+        if(comando==="loja"){
+          const linhas=LOJA_CATALOGO.map(it=>bLine(it.emoji,`*${it.id}.* ${it.nome} _(${it.raridade})_ — ${it.tipo==="arma"?`ATK+${it.atk}`:`DEF+${it.def}`} — 💰${it.preco}`));
+          await sock.sendMessage(jid,{text:bBloco("🏪 LOJA RPG",[...linhas,B_SEP,bLine("💡",`*${CONFIG.PREFIXO}comprar* [número]`)])},{quoted:seloBot});
+          return;
+        }
+        if(comando==="comprar"){
+          const id=parseInt(args[0]);
+          const item=LOJA_CATALOGO.find(i=>i.id===id);
+          if(!item){await sock.sendMessage(jid,{text:bLine("💡",`Vê a loja: *${CONFIG.PREFIXO}loja*`)},{quoted:seloBot});return;}
+          if(getCoins(sender)<item.preco){await sock.sendMessage(jid,{text:bLine("❌",`Precisas de *${item.preco}* moedas. Tens: *${getCoins(sender)}*`)},{quoted:seloBot});return;}
+          addCoins(sender,-item.preco);
+          const p=obterJogadorRPG(sender);
+          p.inventario.push({nome:item.nome,tipo:item.tipo,raridade:item.raridade,emoji:item.emoji,atk:item.atk,def:item.def});
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bBloco("✅ COMPRA REALIZADA",[bLine(item.emoji,`Compraste *${item.nome}*!`),bLine("💰",`Restam: *${getCoins(sender)}* moedas`)])},{quoted:seloBot});
+          await reagir(sock,msg,"✅");
+          return;
+        }
+        if(comando==="vender"){
+          const p=obterJogadorRPG(sender);
+          const idx=parseInt(args[0])-1;
+          if(isNaN(idx)||!p.inventario[idx]){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}vender* [número] → vê *${CONFIG.PREFIXO}inventario*`)},{quoted:seloBot});return;}
+          const item=p.inventario[idx];
+          const raridadeInfo=RPG_RARIDADES.find(r=>r.nome===item.raridade)||RPG_RARIDADES[0];
+          const valor=Math.round(20*raridadeInfo.mult);
+          p.inventario.splice(idx,1);
+          addCoins(sender,valor);
+          const db=carregarRPG();db[sender]=p;salvarRPG(db);
+          await sock.sendMessage(jid,{text:bLine("💰",`Vendeste *${item.nome}* por *${valor}* moedas!`)},{quoted:seloBot});
+          return;
+        }
+        if(comando==="doar"&&mencoes.length){
+          const alvo=extrairJid(mencoes[0]);
+          const valor=parseInt(args[1]||args[0]);
+          if(isNaN(valor)||valor<=0){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}doar* @user [valor]`)},{quoted:seloBot});return;}
+          if(getCoins(sender)<valor){await sock.sendMessage(jid,{text:bLine("❌","Moedas insuficientes!")},{quoted:seloBot});return;}
+          addCoins(sender,-valor);addCoins(alvo,valor);
+          await sock.sendMessage(jid,{text:bLine("💰",`Doaste *${valor}* moedas a @${alvo.split("@")[0]}!`),mentions:[alvo]},{quoted:seloBot});
+          await reagir(sock,msg,"💰");
+          return;
+        }
+        if(comando==="saldo"){
+          await sock.sendMessage(jid,{text:bLine("💰",`Tens *${getCoins(sender)}* moedas.`)},{quoted:seloBot});
+          return;
+        }
+
 
         // ─── IAs ───
         if(["gpt","gemini","deepseek"].includes(comando)&&args.length>0){const perg=args.join(" ");const nomes={gpt:{nome:"🤖 GPT",sistema:"Você é o ChatGPT da OpenAI. Responde em português de forma precisa."},gemini:{nome:"💎 GEMINI",sistema:"Você é o Gemini do Google. Responde em português de forma inteligente."},deepseek:{nome:"🔵 DEEPSEEK",sistema:"Você é o DeepSeek. Responde em português com raciocínio detalhado."}};const info=nomes[comando];let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco(info.nome,[bLine("⏳","A processar..."),FRAMES_LOADING[2]])},{quoted:seloBot});}catch{}try{const resp=await chatIA(perg,info.sistema);if(loadMsg)try{await sock.sendMessage(jid,{text:bBloco(info.nome,[FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}await new Promise(r=>setTimeout(r,300));await sock.sendMessage(jid,{text:bBloco(info.nome,[bLine("💬",`_${perg}_`),B_SEP,bLine("🤖",resp)])},{quoted:seloBot});await reagir(sock,msg,"🤖");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
@@ -1986,12 +2929,15 @@ ${nomeEnviou}`;
         if(comando==="truth"){const t=VERDADES_18[Math.floor(Math.random()*VERDADES_18.length)];await sock.sendMessage(jid,{text:bBloco("🎯 TRUTH",[bLine("❓",t)])},{quoted:seloBot});return;}
         if(comando==="dare"){const d=DESAFIOS_18[Math.floor(Math.random()*DESAFIOS_18.length)];await sock.sendMessage(jid,{text:bBloco("🎲 DARE",[bLine("🔥",d)])},{quoted:seloBot});return;}
         if(comando==="crush"){const membros=isGrupo?(await sock.groupMetadata(jid).catch(()=>({participants:[]}))).participants.filter(p=>!p.admin).map(p=>extrairJid(p.id||p)).filter(m=>m!==sender):[];const alvo=membros.length>0?membros[Math.floor(Math.random()*membros.length)]:null;await sock.sendMessage(jid,{text:bBloco("💘 CRUSH",[bLine("💘",alvo?`Teu crush secreto é @${alvo.split("@")[0]}! 😍`:"Sem membros!")]),mentions:alvo?[alvo]:[]},{quoted:seloBot});return;}
-        if(["seduzir","beijo","abraco","tapa","flirt","casal"].includes(comando)){
+        if(comando==="confissao"){const resp=await chatIA("Escreve uma confissão anónima picante, curta (máx 3 frases), engraçada e leve, em português de Angola, sem nomes reais.","Escreves confissões anónimas divertidas e picantes, nunca explícitas.");await sock.sendMessage(jid,{text:bBloco("🙊 CONFISSÃO ANÓNIMA",[bLine("🙊",resp)])},{quoted:seloBot});await reagir(sock,msg,"🙊");return;}
+        if(comando==="provocacao"){const resp=await chatIA("Escreve uma frase curta, provocante e sedutora (sem ser vulgar), em português de Angola.","Escreves frases sedutoras e picantes, sempre elegantes, nunca vulgares ou explícitas.");await sock.sendMessage(jid,{text:bBloco("😏 PROVOCAÇÃO",[bLine("😏",resp)])},{quoted:seloBot});await reagir(sock,msg,"😏");return;}
+        if(comando==="fantasia"){const resp=await chatIA("Descreve, em 3-4 frases, um encontro romântico e sensual mas totalmente non-explícito (estilo novela/filme, sem conteúdo sexual explícito), em português de Angola.","Escreves cenas românticas sugestivas mas sempre non-explícitas e elegantes.");await sock.sendMessage(jid,{text:bBloco("🌹 FANTASIA",[bLine("🌹",resp)])},{quoted:seloBot});await reagir(sock,msg,"🌹");return;}
+        if(["seduzir","beijo","beijar","abraco","abracar","tapa","flirt","casal","morder"].includes(comando)){
           const alvo=extrairJid(mencoes[0]||msg.message?.extendedTextMessage?.contextInfo?.participant);
           if(!alvo||!alvo.includes("@")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}${comando}* @user`)},{quoted:seloBot});return;}
-          const emojisAcao={seduzir:"😏",beijo:"😘",abraco:"🤗",tapa:"👋",flirt:"💋",casal:"💑"};
-          const frasesAcao={seduzir:`😏 @${sender.split("@")[0]} está a seduzir @${alvo.split("@")[0]}! 🔥`,beijo:`😘 @${sender.split("@")[0]} deu um beijo em @${alvo.split("@")[0]}! 💋`,abraco:`🤗 @${sender.split("@")[0]} abraçou @${alvo.split("@")[0]}! ❤️`,tapa:`👋 @${sender.split("@")[0]} deu um tapa em @${alvo.split("@")[0]}! 💥`,flirt:`💋 @${sender.split("@")[0]} está a flirtar com @${alvo.split("@")[0]}! 😍`,casal:`💑 @${sender.split("@")[0]} e @${alvo.split("@")[0]} estão juntos! ❤️`};
-          const GIF_ACAO={seduzir:"wink",beijo:"kiss",abraco:"hug",tapa:"slap",flirt:"cuddle",casal:"cuddle"};
+          const emojisAcao={seduzir:"😏",beijo:"😘",beijar:"😘",abraco:"🤗",abracar:"🤗",tapa:"👋",flirt:"💋",casal:"💑",morder:"😬"};
+          const frasesAcao={seduzir:`😏 @${sender.split("@")[0]} está a seduzir @${alvo.split("@")[0]}! 🔥`,beijo:`😘 @${sender.split("@")[0]} deu um beijo em @${alvo.split("@")[0]}! 💋`,beijar:`😘 @${sender.split("@")[0]} deu um beijo em @${alvo.split("@")[0]}! 💋`,abraco:`🤗 @${sender.split("@")[0]} abraçou @${alvo.split("@")[0]}! ❤️`,abracar:`🤗 @${sender.split("@")[0]} abraçou @${alvo.split("@")[0]}! ❤️`,tapa:`👋 @${sender.split("@")[0]} deu um tapa em @${alvo.split("@")[0]}! 💥`,flirt:`💋 @${sender.split("@")[0]} está a flirtar com @${alvo.split("@")[0]}! 😍`,casal:`💑 @${sender.split("@")[0]} e @${alvo.split("@")[0]} estão juntos! ❤️`,morder:`😬 @${sender.split("@")[0]} mordeu @${alvo.split("@")[0]}!`};
+          const GIF_ACAO={seduzir:"wink",beijo:"kiss",beijar:"kiss",abraco:"hug",abracar:"hug",tapa:"slap",flirt:"cuddle",casal:"cuddle",morder:"bite"};
           const legenda=bBloco(emojisAcao[comando]+" "+comando.toUpperCase(),[bLine(emojisAcao[comando],frasesAcao[comando])]);
           let gifUrl=null;
           try{const{data}=await axios.get(`https://nekos.best/api/v2/${GIF_ACAO[comando]}`,{timeout:10000,httpsAgent});gifUrl=data?.results?.[0]?.url||null;}catch(e){console.log(`❌ GIF ${comando}:`,e.message);}
@@ -2357,17 +3303,6 @@ ${bLine("📊",`[${barra}] *${progresso}/${prox}* XP`)}
 ${bLine("💬",`Msgs: *${d.msgs}*`)}
 ${bLine("💰",`Moedas: *${getCoins(sender)}*`)}
 ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`},{quoted:seloBot});}return;
-        }
-
-        if(comando==="inventario"){
-          await sock.sendMessage(jid,{text:`${B_TOP}
-${bTitle("🎒 INVENTÁRIO")}
-${B_MID}
-${bLine("💰",`Moedas: *${getCoins(sender)}*`)}
-${bLine("⭐",`VIP: *${isVip(sender)?"✅ Sim":"❌ Não"}*`)}
-${bLine("💡","Usa *!bau*, *!trabalhar*, *!pescar*")}
-${bLine("💡","para ganhar mais itens!")}
-${B_BOT}`},{quoted:seloBot});return;
         }
 
         // ─── PINPACK — Pack de stickers ───
