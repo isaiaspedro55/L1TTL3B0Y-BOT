@@ -721,7 +721,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const cargo=isDono?"👑 Criador":(isAdmin?"👮 Administrador":"👤 Utilizador");
   const secoes=buildSecoes(isDono);
   const em=ME.e||ME.principal||"🌀";
-  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`*Cargo*: ${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
+  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
   try{
     const payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Categorias"),sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
     if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
