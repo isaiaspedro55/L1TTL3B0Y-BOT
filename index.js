@@ -29,8 +29,7 @@ const CONFIG = {
   PREFIXO:         "!",
   NUMERO_BOT:      "244954260707",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
-  GROQ_KEY: process.env.GROQ_KEY || "",
-  GEMINI_KEY: process.env.GEMINI_KEY || "",  
+  GEMINI_KEY:      process.env.GEMINI_KEY || "", // ⚠️ Cola aqui a tua API key grátis do Gemini (https://aistudio.google.com/apikey)
   DONO_JID:        "169853876965546@lid",
   DONO_NOME:       "ISAÍAS PEDRO",
   DONO_NUM:        "926 612 801",
@@ -91,7 +90,7 @@ function gerarBlocoPing(msg){
 // ✅ EMOJIS DO MENU
 // ════════════════════════════════════════════════
 const EMOJIS_PATH="./dados/emojis.json";
-function carregarEmojis(){try{return fs.readJsonSync(EMOJIS_PATH);}catch{return{e:"🌀",principal:"🌀",downloads:"⬇️",figurinhas:"🎭",brincadeiras:"🎮",coins:"💰",alteradores:"🎵",logos:"🎨",mais18:"🔞",adm:"🛡️",dono:"👑",musicas:"🎵",pesquisas:"🔍",animes:"🎌",rpg:"⚔️",ias:"🤖",plaquinhas:"🪧",extras:"⭐",assistente:"🤖"};}}
+function carregarEmojis(){const padrao={e:"🌀",principal:"🌀",downloads:"⬇️",redes:"📱",figurinhas:"🎭",brincadeiras:"🎮",coins:"💰",alteradores:"🎵",logos:"🎨",mais18:"🔞",adm:"🛡️",dono:"👑",musicas:"🎵",pesquisas:"🔍",animes:"🎌",rpg:"⚔️",ias:"🤖",plaquinhas:"🪧",extras:"⭐",assistente:"🤖"};try{return{...padrao,...fs.readJsonSync(EMOJIS_PATH)};}catch{return padrao;}}
 function salvarEmojis(e){try{fs.writeJsonSync(EMOJIS_PATH,e);}catch{}}
 let ME=carregarEmojis();
 
@@ -514,6 +513,7 @@ function buildSecoes(isDono){
   const principal={title:`${E.principal} MENUS`,highlight_label:"⚡️SHAZAM⚡️",rows:[
     {header:`${E.principal} MENU-PRINCIPAL`,title:"_comandos principais._",id:"cat_principal"},
     {header:`${E.downloads} MENU-DOWNLOADS`,title:"_download de conteúdo._",id:"cat_downloads"},
+    {header:`${E.redes} REDES SOCIAIS`,title:"_tiktok, instagram, youtube, facebook._",id:"cat_redes"},
     {header:`${E.musicas} MENU-MÚSICAS`,title:"_músicas, letras, bio._",id:"cat_musicas"},
     {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"_stickers e criações._",id:"cat_figurinhas"},
     {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"_jogos e diversão._",id:"cat_brincadeiras"},
@@ -697,6 +697,38 @@ function gerarSubmenu(catId,P){
     bLine(em,`*${P}grupoinfo*`),bLine(em,`*${P}status*`),
     bLine(em,`*${P}inactivos* [dias]`),bLine(em,`*${P}marcaradmins*`),
   ]);
+  if(catId==="cat_redes")return bBloco(`📱 𝐑𝐄𝐃𝐄𝐒 𝐒𝐎𝐂𝐈𝐀𝐈𝐒 【${em}】`,[
+    bLine("🎬","*TIKTOK — DOWNLOADS*"),
+    bLine(em,`*${P}tt* [link]`),
+    bLine(em,`*${P}ttmp3* [link] → _extrair áudio_`),
+    bLine(em,`*${P}ttinfo* [link] → _informações_`),
+    bLine(em,`*${P}ttfoto* [link] → _fotos/slides_`),
+    bLine(em,`*${P}ttsemwater* [link] → _sem marca d'água_`),
+    B_SEP,bLine("🔎","*TIKTOK — PESQUISA*"),
+    bLine(em,`*${P}ttuser* [@usuario]`),
+    bLine(em,`*${P}ttsearch* [termo]`),
+    bLine(em,`*${P}tttrend* → _tendências_`),
+    B_SEP,bLine("😂","*TIKTOK — EXTRAS (IA)*"),
+    bLine(em,`*${P}ttcaption*`),bLine(em,`*${P}tthashtag* [tema]`),bLine(em,`*${P}ttidea* [tema]`),bLine(em,`*${P}ttscript* [tema]`),bLine(em,`*${P}ttbio*`),
+    B_SEP,bLine("📸","*INSTAGRAM — DOWNLOADS*"),
+    bLine(em,`*${P}ig* [link]`),bLine(em,`*${P}igreels* [link]`),bLine(em,`*${P}igstory* [link]`),bLine(em,`*${P}igfoto* [link]`),bLine(em,`*${P}igvideo* [link]`),
+    B_SEP,bLine("🔎","*INSTAGRAM — INFO (IA)*"),
+    bLine(em,`*${P}iguser* [usuario]`),bLine(em,`*${P}igpost* [link]`),bLine(em,`*${P}igcaption* [tema]`),bLine(em,`*${P}ighashtag* [tema]`),bLine(em,`*${P}igbio* [descrição]`),bLine(em,`*${P}igideia* [tema]`),bLine(em,`*${P}igreel* [tema]`),bLine(em,`*${P}igscript* [tema]`),
+    B_SEP,bLine("▶️","*YOUTUBE — DOWNLOADS*"),
+    bLine(em,`*${P}yt* [link/nome]`),bLine(em,`*${P}ytmp3* [link/nome]`),bLine(em,`*${P}ytmp4* [link/nome]`),bLine(em,`*${P}ytshort* [link]`),bLine(em,`*${P}ytthumb* [link]`),bLine(em,`*${P}ytinfo* [link]`),
+    B_SEP,bLine("🔎","*YOUTUBE — PESQUISA*"),
+    bLine(em,`*${P}ytsearch* [termo]`),bLine(em,`*${P}ytchannel* [nome]`),bLine(em,`*${P}ytmusic* [nome]`),
+    B_SEP,bLine("🤖","*YOUTUBE — IA*"),
+    bLine(em,`*${P}ytsum* [link] → _resumir_`),bLine(em,`*${P}ytcaption* [tema]`),bLine(em,`*${P}yttags* [tema]`),bLine(em,`*${P}yttitle* [tema]`),bLine(em,`*${P}ytscript* [tema]`),bLine(em,`*${P}ytideia* [tema]`),
+    B_SEP,bLine("📊","*YOUTUBE — CRIADOR*"),
+    bLine(em,`*${P}ytseo* [tema]`),bLine(em,`*${P}ytthumbnail* [tema]`),bLine(em,`*${P}ytcalendario* [tema]`),bLine(em,`*${P}ytshortidea* [tema]`),
+    B_SEP,bLine("📘","*FACEBOOK — DOWNLOADS*"),
+    bLine(em,`*${P}fb* [link]`),bLine(em,`*${P}fbvideo* [link]`),bLine(em,`*${P}fbfoto* [link]`),bLine(em,`*${P}fbinfo* [link]`),
+    B_SEP,bLine("✍️","*FACEBOOK — CRIAÇÃO (IA)*"),
+    bLine(em,`*${P}fbcaption* [tema]`),bLine(em,`*${P}fbpost* [tema]`),bLine(em,`*${P}fbhashtag* [tema]`),bLine(em,`*${P}fbideia* [tema]`),bLine(em,`*${P}fbbio* [descrição]`),
+    B_SEP,bLine("🎯","*FACEBOOK — CREATOR (IA)*"),
+    bLine(em,`*${P}fbviral* [tema]`),bLine(em,`*${P}fbreels* [tema]`),bLine(em,`*${P}fbengagement* [tema]`),
+  ]);
   if(catId==="cat_dono")return bBloco(`𝐃𝐎𝐍𝐎 【${em}】`,[
     bLine(em,`*${CONFIG.PREFIXO}ergue-se*`),bLine(em,`*${CONFIG.PREFIXO}set*`),bLine(em,`*${CONFIG.PREFIXO}out*`),
     bLine(em,`*${CONFIG.PREFIXO}prefixo*`),bLine(em,`*${CONFIG.PREFIXO}setfoto*`),bLine(em,`*${CONFIG.PREFIXO}chaton*`),
@@ -766,9 +798,43 @@ function runCmd(cmd){return new Promise((resolve,reject)=>{exec(cmd,{timeout:180
 function encontrarArquivo(pasta,prefixo){try{const arqs=fs.readdirSync(pasta).filter(f=>f.startsWith(prefixo)&&!f.endsWith(".part")&&!f.endsWith(".ytdl"));if(!arqs.length)return null;const p=path.join(pasta,arqs[0]);return fs.statSync(p).size>3000?p:null;}catch{return null;}}
 
 // ════════════════════════════════════════════════
-// ✅ IA — Gemini (principal, grátis) com fallback Groq/Pollinations
+// ✅ IA — Gemini (única dependência) com fallback Pollinations
 // ════════════════════════════════════════════════
 const IA_OFFLINE_MSG="❌ IA indisponível.";
+
+// ════════════════════════════════════════════════
+// ✅ IA — geração de conteúdo para Redes Sociais
+// ════════════════════════════════════════════════
+const IA_SOCIAL_COMANDOS={
+  ttcaption:{titulo:"🎬 LEGENDA TIKTOK",emoji:"✍️",sistema:"Crias legendas curtas, virais e cativantes para TikTok em português de Angola.",prompt:(t)=>`Cria uma legenda curta e viral para um TikTok sobre: ${t||"conteúdo genérico"}`},
+  tthashtag:{titulo:"#️⃣ HASHTAGS TIKTOK",emoji:"#️⃣",sistema:"Geras listas de hashtags populares e relevantes para TikTok.",prompt:(t)=>`Gera 10 hashtags populares para um TikTok sobre: ${t||"conteúdo genérico"}`},
+  ttidea:{titulo:"💡 IDEIA TIKTOK",emoji:"💡",sistema:"Crias ideias criativas e virais para vídeos de TikTok.",prompt:(t)=>`Dá 3 ideias curtas e virais para um vídeo de TikTok sobre: ${t||"algo divertido"}`},
+  ttscript:{titulo:"📝 ROTEIRO TIKTOK",emoji:"📝",sistema:"Escreves roteiros curtos (15-30seg) para vídeos de TikTok.",prompt:(t)=>`Escreve um roteiro curto (15-30 segundos) para um TikTok sobre: ${t||"algo divertido"}`},
+  ttbio:{titulo:"👤 BIO TIKTOK",emoji:"👤",sistema:"Escreves bios curtas e criativas para perfis de TikTok.",prompt:(t)=>`Cria uma bio curta e criativa para TikTok${t?` sobre: ${t}`:""}`},
+  igcaption:{titulo:"📸 LEGENDA INSTAGRAM",emoji:"✍️",sistema:"Crias legendas envolventes para posts do Instagram.",prompt:(t)=>`Cria uma legenda envolvente para um post de Instagram sobre: ${t||"conteúdo genérico"}`},
+  ighashtag:{titulo:"#️⃣ HASHTAGS INSTAGRAM",emoji:"#️⃣",sistema:"Geras listas de hashtags populares para o Instagram.",prompt:(t)=>`Gera 15 hashtags populares para um post de Instagram sobre: ${t||"conteúdo genérico"}`},
+  igbio:{titulo:"👤 BIO INSTAGRAM",emoji:"👤",sistema:"Escreves bios curtas e criativas para perfis de Instagram.",prompt:(t)=>`Cria uma bio criativa para Instagram baseada em: ${t||"uma pessoa criativa"}`},
+  igideia:{titulo:"💡 IDEIA DE POST",emoji:"💡",sistema:"Crias ideias criativas para posts de Instagram.",prompt:(t)=>`Dá 3 ideias de posts para Instagram sobre: ${t||"algo interessante"}`},
+  igreel:{titulo:"🎥 IDEIA DE REEL",emoji:"🎥",sistema:"Crias ideias criativas e virais para Reels do Instagram.",prompt:(t)=>`Dá 3 ideias virais de Reel para Instagram sobre: ${t||"algo divertido"}`},
+  igscript:{titulo:"📝 ROTEIRO REEL",emoji:"📝",sistema:"Escreves roteiros curtos para Reels do Instagram.",prompt:(t)=>`Escreve um roteiro curto para um Reel de Instagram sobre: ${t||"algo divertido"}`},
+  ytcaption:{titulo:"📺 DESCRIÇÃO YOUTUBE",emoji:"✍️",sistema:"Escreves descrições optimizadas para vídeos do YouTube.",prompt:(t)=>`Escreve uma descrição de YouTube para um vídeo sobre: ${t||"conteúdo genérico"}`},
+  yttags:{titulo:"🏷️ TAGS YOUTUBE",emoji:"🏷️",sistema:"Geras listas de tags relevantes para SEO do YouTube.",prompt:(t)=>`Gera 15 tags de SEO para um vídeo de YouTube sobre: ${t||"conteúdo genérico"}`},
+  yttitle:{titulo:"📌 TÍTULOS YOUTUBE",emoji:"📌",sistema:"Crias títulos chamativos e optimizados para SEO do YouTube.",prompt:(t)=>`Cria 5 títulos chamativos para um vídeo de YouTube sobre: ${t||"conteúdo genérico"}`},
+  ytscript:{titulo:"📝 ROTEIRO YOUTUBE",emoji:"📝",sistema:"Escreves roteiros estruturados para vídeos de YouTube.",prompt:(t)=>`Escreve um roteiro curto e estruturado para um vídeo de YouTube sobre: ${t||"conteúdo genérico"}`},
+  ytideia:{titulo:"💡 IDEIA DE VÍDEO",emoji:"💡",sistema:"Crias ideias criativas para vídeos de YouTube.",prompt:(t)=>`Dá 3 ideias de vídeos de YouTube sobre: ${t||"algo interessante"}`},
+  ytseo:{titulo:"📊 SEO YOUTUBE",emoji:"📊",sistema:"Dás sugestões práticas de SEO para YouTube.",prompt:(t)=>`Dá sugestões de SEO (título, tags, descrição) para um vídeo de YouTube sobre: ${t||"conteúdo genérico"}`},
+  ytthumbnail:{titulo:"🖼️ IDEIA DE THUMBNAIL",emoji:"🖼️",sistema:"Descreves ideias de thumbnails chamativas para YouTube.",prompt:(t)=>`Descreve uma ideia de thumbnail chamativa para um vídeo de YouTube sobre: ${t||"conteúdo genérico"}`},
+  ytcalendario:{titulo:"📅 CALENDÁRIO DE CONTEÚDO",emoji:"📅",sistema:"Crias calendários semanais de conteúdo para criadores de YouTube.",prompt:(t)=>`Cria um calendário de conteúdo para 7 dias para um canal de YouTube sobre: ${t||"conteúdo genérico"}`},
+  ytshortidea:{titulo:"🩳 IDEIA DE SHORT",emoji:"🩳",sistema:"Crias ideias curtas e virais para YouTube Shorts.",prompt:(t)=>`Dá 3 ideias virais para YouTube Shorts sobre: ${t||"algo divertido"}`},
+  fbcaption:{titulo:"📘 LEGENDA FACEBOOK",emoji:"✍️",sistema:"Crias legendas envolventes para publicações do Facebook.",prompt:(t)=>`Cria uma legenda envolvente para uma publicação de Facebook sobre: ${t||"conteúdo genérico"}`},
+  fbpost:{titulo:"📘 POST FACEBOOK",emoji:"📝",sistema:"Escreves publicações completas e envolventes para Facebook.",prompt:(t)=>`Escreve uma publicação completa para Facebook sobre: ${t||"conteúdo genérico"}`},
+  fbhashtag:{titulo:"#️⃣ HASHTAGS FACEBOOK",emoji:"#️⃣",sistema:"Geras hashtags relevantes para publicações do Facebook.",prompt:(t)=>`Gera 10 hashtags para uma publicação de Facebook sobre: ${t||"conteúdo genérico"}`},
+  fbideia:{titulo:"💡 IDEIA DE POST",emoji:"💡",sistema:"Crias ideias criativas para publicações do Facebook.",prompt:(t)=>`Dá 3 ideias de publicações para Facebook sobre: ${t||"algo interessante"}`},
+  fbbio:{titulo:"👤 BIO FACEBOOK",emoji:"👤",sistema:"Escreves bios curtas para páginas/perfis de Facebook.",prompt:(t)=>`Cria uma bio curta para uma página de Facebook baseada em: ${t||"uma marca criativa"}`},
+  fbviral:{titulo:"🔥 IDEIA VIRAL",emoji:"🔥",sistema:"Crias ideias de conteúdo com potencial viral para Facebook.",prompt:(t)=>`Dá 3 ideias de conteúdo viral para Facebook sobre: ${t||"algo interessante"}`},
+  fbreels:{titulo:"🎥 IDEIA DE REELS",emoji:"🎥",sistema:"Crias ideias criativas para Reels do Facebook.",prompt:(t)=>`Dá 3 ideias de Reels para Facebook sobre: ${t||"algo divertido"}`},
+  fbengagement:{titulo:"📈 AUMENTAR INTERAÇÃO",emoji:"📈",sistema:"Dás dicas práticas para aumentar o engagement no Facebook.",prompt:(t)=>`Dá 3 dicas práticas para aumentar a interação numa publicação de Facebook sobre: ${t||"conteúdo genérico"}`},
+};
 const GEMINI_MODELOS=["gemini-2.0-flash","gemini-1.5-flash"];
 async function chamarGeminiChat(mensagens,maxTokens=800,temperature=0.7){
   if(!CONFIG.GEMINI_KEY)throw new Error("Sem GEMINI_KEY configurada");
@@ -786,19 +852,43 @@ async function chamarGeminiChat(mensagens,maxTokens=800,temperature=0.7){
   throw new Error("Gemini falhou");
 }
 async function chatIA(prompt,sistema="És um assistente simpático que responde em português de Angola. Sê direto."){
-  try{const r=await chamarGeminiChat([{role:"system",content:sistema},{role:"user",content:prompt}],800,0.7);if(r)return r;}catch{}
-  for(const modelo of["llama-3.1-8b-instant","mixtral-8x7b-32768"]){try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:modelo,messages:[{role:"system",content:sistema},{role:"user",content:prompt}],max_tokens:800,temperature:0.7},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:20000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();if(resp&&resp.length>2)return resp;}catch(e){console.log(`❌ Groq ${modelo}:`,e.message);}}
+  try{const r=await chamarGeminiChat([{role:"system",content:sistema},{role:"user",content:prompt}],800,0.7);if(r)return r;}catch(e){console.log("❌ Gemini chatIA:",e.message);}
   try{const{data}=await axios.get(`https://text.pollinations.ai/${encodeURIComponent(prompt)}?system=${encodeURIComponent(sistema)}&model=openai-large`,{timeout:25000,responseType:"text",httpsAgent});const resp=typeof data==="string"?data.trim():String(data).trim();if(resp.length>5)return resp;}catch{}
   return IA_OFFLINE_MSG;
 }
 
-async function transcreverComGroq(buffer){const formData=new FormData();formData.append("file",buffer,{filename:"audio.ogg",contentType:"audio/ogg"});formData.append("model","whisper-large-v3");formData.append("response_format","json");const{data}=await axios.post("https://api.groq.com/openai/v1/audio/transcriptions",formData,{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,...formData.getHeaders()},timeout:60000,httpsAgent});const texto=data?.text?.trim();if(!texto)throw new Error("Áudio não audível");return texto;}
+async function transcreverAudio(buffer){
+  if(!CONFIG.GEMINI_KEY)throw new Error("GEMINI_KEY não configurada.");
+  const base64=buffer.toString("base64");
+  for(const modelo of GEMINI_MODELOS){
+    try{
+      const body={contents:[{role:"user",parts:[{inline_data:{mime_type:"audio/ogg",data:base64}},{text:"Transcreve este áudio literalmente, apenas o texto falado, sem comentários."}]}],generationConfig:{maxOutputTokens:1000,temperature:0.2}};
+      const{data}=await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${CONFIG.GEMINI_KEY}`,body,{headers:{"Content-Type":"application/json"},timeout:40000,httpsAgent});
+      const texto=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim();
+      if(texto&&texto.length>0)return texto;
+    }catch(e){console.log(`❌ Transcrição Gemini ${modelo}:`,e.response?.data?.error?.message||e.message);}
+  }
+  throw new Error("Áudio não audível ou Gemini indisponível.");
+}
 
 async function textoParaFala(texto,voz=CONFIG.VOZ_TTS){const tempId=Date.now(),tempTxt=`./downloads/tts_in_${tempId}.txt`,tempOut=`./downloads/tts_out_${tempId}.mp3`;try{const textoLimpo=texto.replace(/[*_~`#]/g,"").replace(/\n+/g,". ").slice(0,1800);if(!textoLimpo.trim())throw new Error("Texto vazio");fs.writeFileSync(tempTxt,textoLimpo,"utf8");await runCmd(`${EDGETTS_CMD} --voice "${voz}" --file "${tempTxt}" --write-media "${tempOut}"`);if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<500)throw new Error("TTS inválido");return tempOut;}finally{try{fs.removeSync(tempTxt);}catch{}}}
 
 async function reconhecerMusica(buf){const formData=new FormData();formData.append("file",buf,{filename:"audio.ogg",contentType:"audio/ogg"});formData.append("api_token","test");formData.append("return","apple_music,spotify");const{data}=await axios.post("https://api.audd.io/",formData,{headers:{...formData.getHeaders()},timeout:30000,httpsAgent});return data;}
 
-async function analisarImagem(imagemBuffer,instrucao){let mimeType="image/jpeg";if(imagemBuffer[0]===0x89&&imagemBuffer[1]===0x50)mimeType="image/png";const base64=imagemBuffer.toString("base64");for(const modelo of["meta-llama/llama-4-scout-17b-16e-instruct","meta-llama/llama-4-maverick-17b-128e-instruct"]){try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:modelo,messages:[{role:"user",content:[{type:"image_url",image_url:{url:`data:${mimeType};base64,${base64}`}},{type:"text",text:instrucao}]}],max_tokens:1000,temperature:0.3},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:30000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();if(resp&&resp.length>2)return resp;}catch(e){console.log(`❌ ${modelo}:`,e.message);}}throw new Error("Modelos de visão falharam.");}
+async function analisarImagem(imagemBuffer,instrucao){
+  if(!CONFIG.GEMINI_KEY)throw new Error("GEMINI_KEY não configurada.");
+  let mimeType="image/jpeg";if(imagemBuffer[0]===0x89&&imagemBuffer[1]===0x50)mimeType="image/png";
+  const base64=imagemBuffer.toString("base64");
+  for(const modelo of GEMINI_MODELOS){
+    try{
+      const body={contents:[{role:"user",parts:[{inline_data:{mime_type:mimeType,data:base64}},{text:instrucao}]}],generationConfig:{maxOutputTokens:1000,temperature:0.3}};
+      const{data}=await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${CONFIG.GEMINI_KEY}`,body,{headers:{"Content-Type":"application/json"},timeout:30000,httpsAgent});
+      const resp=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim();
+      if(resp&&resp.length>2)return resp;
+    }catch(e){console.log(`❌ Visão Gemini ${modelo}:`,e.response?.data?.error?.message||e.message);}
+  }
+  throw new Error("Gemini indisponível para análise de imagem.");
+}
 
 async function buscarImagemInternet(query){try{const{data}=await axios.get(`https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`,{timeout:8000,httpsAgent});if(data?.originalimage?.source)return data.originalimage.source;if(data?.thumbnail?.source)return data.thumbnail.source;}catch{}try{const{data}=await axios.get(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`,{timeout:8000,httpsAgent});if(data?.originalimage?.source)return data.originalimage.source;if(data?.thumbnail?.source)return data.thumbnail.source;}catch{}return null;}
 
@@ -809,7 +899,70 @@ async function uploadParaCatbox(buffer,nome,mimeType){const formData=new FormDat
 // ✅ SCRAPERS
 // ════════════════════════════════════════════════
 async function scraperHub(endpoint){const{data}=await axios.get(`${CONFIG.SCRAPER_HUB_URL}${endpoint}`,{timeout:30000,httpsAgent});return data;}
+async function buscarImagemWaifuPics(categoria){
+  const urls=[`https://api.waifu.pics/sfw/${categoria}`,`https://waifu.pics/api/sfw/${categoria}`];
+  for(const url of urls){
+    try{const{data}=await axios.get(url,{timeout:12000,httpsAgent});if(data?.url)return data.url;}catch(e){console.log(`⚠️ waifu.pics (${url}):`,e.message);}
+  }
+  throw new Error("Serviço de imagens indisponível no momento.");
+}
 async function scraperTikTokVideo(url){try{const data=await scraperHub(`/api/tiktok/video?url=${encodeURIComponent(url)}`);if(data?.url||data?.video)return{url:data.url||data.video,title:data.title||"TikTok"};}catch{}const{data}=await axios.post("https://www.tikwm.com/api/",`url=${encodeURIComponent(url)}&count=12&cursor=0&web=1&hd=1`,{headers:{"Content-Type":"application/x-www-form-urlencoded","User-Agent":"Mozilla/5.0"},timeout:30000,httpsAgent});const d=data?.data;if(!d)throw new Error("Sem dados");return{url:d.hdplay||d.play,title:d.title||"TikTok"};}
+
+// ════════════════════════════════════════════════
+// ✅ REDES SOCIAIS — scrapers auxiliares
+// ════════════════════════════════════════════════
+async function tikwmDados(url){
+  const{data}=await axios.post("https://www.tikwm.com/api/",`url=${encodeURIComponent(url)}&count=12&cursor=0&web=1&hd=1`,{headers:{"Content-Type":"application/x-www-form-urlencoded","User-Agent":"Mozilla/5.0"},timeout:30000,httpsAgent});
+  if(!data?.data)throw new Error("Não consegui obter dados do TikTok.");
+  return data.data;
+}
+async function scraperTikTokUserTikwm(username){
+  const user=username.replace("@","").trim();
+  const{data}=await axios.get(`https://www.tikwm.com/api/user/info?unique_id=${encodeURIComponent(user)}`,{timeout:20000,httpsAgent});
+  if(!data?.data)throw new Error("Utilizador não encontrado.");
+  return data.data;
+}
+async function scraperTikTokSearchTikwm(termo){
+  const{data}=await axios.post("https://www.tikwm.com/api/feed/search",`keywords=${encodeURIComponent(termo)}&count=10&cursor=0&web=1&hd=1`,{headers:{"Content-Type":"application/x-www-form-urlencoded","User-Agent":"Mozilla/5.0"},timeout:20000,httpsAgent});
+  return data?.data?.videos||[];
+}
+async function tikwmHybrid(url){
+  try{
+    const{data}=await axios.post("https://www.tikwm.com/api/hybrid/single",`url=${encodeURIComponent(url)}`,{headers:{"Content-Type":"application/x-www-form-urlencoded","User-Agent":"Mozilla/5.0"},timeout:20000,httpsAgent});
+    if(data?.data)return data.data;
+  }catch{}
+  try{
+    const{data}=await axios.get(`https://www.tikwm.com/api/hybrid/single?url=${encodeURIComponent(url)}`,{headers:{"User-Agent":"Mozilla/5.0"},timeout:20000,httpsAgent});
+    if(data?.data)return data.data;
+  }catch{}
+  return null;
+}
+async function scraperInstagram(url){
+  try{const data=await scraperHub(`/api/instagram/media?url=${encodeURIComponent(url)}`);if(data?.url||data?.medias?.length)return data;}catch{}
+  const hib=await tikwmHybrid(url);
+  if(hib)return hib;
+  try{
+    const{data}=await axios.get(`https://www.instagram.com/api/v1/oembed/?url=${encodeURIComponent(url)}`,{timeout:15000,httpsAgent,headers:{"User-Agent":"Mozilla/5.0"}});
+    if(data)return{url:data.thumbnail_url,title:data.title||"Instagram",tipo:"foto"};
+  }catch{}
+  throw new Error("Não consegui baixar do Instagram. O conteúdo pode ser privado.");
+}
+async function scraperFacebook(url){
+  try{const data=await scraperHub(`/api/facebook/video?url=${encodeURIComponent(url)}`);if(data?.url||data?.hd||data?.sd)return data;}catch{}
+  const hib=await tikwmHybrid(url);
+  if(hib)return hib;
+  throw new Error("Não consegui baixar do Facebook. Verifica se o vídeo é público.");
+}
+async function ytInfoJson(entrada){
+  const isUrl=entrada.startsWith("http")||entrada.includes("youtu");
+  const q=isUrl?entrada:`ytsearch1:${entrada}`;
+  return new Promise((resolve,reject)=>{
+    exec(`${YTDLP_CMD} --dump-json --no-playlist --no-warnings "${q}"`,{timeout:20000,maxBuffer:20*1024*1024},(err,stdout)=>{
+      if(err)return reject(new Error("Não consegui obter informações."));
+      try{resolve(JSON.parse(stdout.split("\n")[0]));}catch{reject(new Error("Erro ao processar dados."));}
+    });
+  });
+}
 async function scraperTikTokSearch(query,limit=10){try{const data=await scraperHub(`/api/tiktok/search?q=${encodeURIComponent(query)}&limit=${limit}`);return data?.resultados||data?.results||data?.videos||[];}catch{return[];}}
 async function scraperTikTokTrending(region="AO",limit=10){try{const data=await scraperHub(`/api/tiktok/trending?region=${region}&limit=${limit}`);return data?.resultados||data?.results||data?.videos||[];}catch{return[];}}
 async function scraperTikTokUser(username){try{const data=await scraperHub(`/api/tiktok/user?username=${encodeURIComponent(username)}`);return data?.resultado||data?.result||data?.user||null;}catch{return null;}}
@@ -1005,8 +1158,7 @@ async function buscarPinterest(busca,qtd=5){
 // ✅ STICKER / ÁUDIO
 // ════════════════════════════════════════════════
 let _webpmux=null;try{_webpmux=require("node-webpmux");}catch{console.log("⚠️ node-webpmux não instalado — packs de sticker ficarão sem metadata de pack. Corre: npm i node-webpmux");}
-async function adicionarExifPack(webpBuffer,packName,authorName,packId){
-  if(!_webpmux)return webpBuffer;
+async function adicionarExifPack(webpBuffer,packName,authorName,packId){  if(!_webpmux)return webpBuffer;
   try{
     const{Image}=_webpmux;
     const img=new Image();
@@ -1020,7 +1172,33 @@ async function adicionarExifPack(webpBuffer,packName,authorName,packId){
     return await img.save(null);
   }catch(e){console.log("⚠️ EXIF pack:",e.message);return webpBuffer;}
 }
-async function criarSticker(imagemBuffer,isAnimated=false){const tempId=Date.now(),tempIn=`./downloads/stk_in_${tempId}.tmp`,tempOut=`./downloads/stk_out_${tempId}.webp`;try{fs.writeFileSync(tempIn,imagemBuffer);const cmd=isAnimated?`${FFMPEG_CMD} -i "${tempIn}" -t 5 -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=12" -c:v libwebp -quality 70 -preset default -loop 0 -an -vsync 0 "${tempOut}" -y -loglevel error`:`${FFMPEG_CMD} -i "${tempIn}" -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512" -c:v libwebp -quality 90 "${tempOut}" -y -loglevel error`;await new Promise((resolve,reject)=>{exec(cmd,{timeout:30000,env:{...process.env}},(err)=>err?reject(err):resolve());});if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100)throw new Error("WebP inválido");return fs.readFileSync(tempOut);}finally{try{fs.removeSync(tempIn);}catch{}try{fs.removeSync(tempOut);}catch{}}}
+
+// ✅ Tenta enviar como PACK nativo (1 só bloco); se não suportado, devolve false para usar o envio individual
+async function enviarPackNativo(sock,jid,stickers,packName,packAuthor){
+  try{
+    await sock.sendMessage(jid,{
+      stickerPack:{
+        name:packName,
+        publisher:packAuthor,
+        stickers:stickers.map(buf=>({image:buf,isAnimated:false,emojis:["🎭"]})),
+      },
+    });
+    return true;
+  }catch(e){
+    console.log("⚠️ Pack nativo não suportado nesta versão do baileys, a usar envio individual:",e.message);
+    return false;
+  }
+}
+function ehWebpValido(buf){return buf&&buf.length>50&&buf.slice(0,4).toString("ascii")==="RIFF"&&buf.slice(8,12).toString("ascii")==="WEBP";}
+function execFFmpegLimpo(cmd){
+  return new Promise((resolve,reject)=>{
+    exec(cmd,{timeout:20000},(err,stdout,stderr)=>{
+      if(err){console.log("❌ ffmpeg:",stderr||err.message);reject(new Error("Não consegui converter este ficheiro."));}
+      else resolve();
+    });
+  });
+}
+async function criarSticker(imagemBuffer,isAnimated=false){const tempId=Date.now(),tempIn=`./downloads/stk_in_${tempId}.tmp`,tempOut=`./downloads/stk_out_${tempId}.webp`;try{if(!imagemBuffer||imagemBuffer.length<200)throw new Error("Imagem inválida ou vazia.");fs.writeFileSync(tempIn,imagemBuffer);const cmd=isAnimated?`${FFMPEG_CMD} -i "${tempIn}" -t 5 -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512,fps=12" -c:v libwebp -quality 70 -preset default -loop 0 -an -vsync 0 "${tempOut}" -y -loglevel error`:`${FFMPEG_CMD} -i "${tempIn}" -vf "scale=512:512:force_original_aspect_ratio=increase,crop=512:512" -c:v libwebp -quality 90 "${tempOut}" -y -loglevel error`;await execFFmpegLimpo(cmd);if(!fs.existsSync(tempOut)||fs.statSync(tempOut).size<100)throw new Error("Não consegui criar o sticker (imagem inválida).");return fs.readFileSync(tempOut);}finally{try{fs.removeSync(tempIn);}catch{}try{fs.removeSync(tempOut);}catch{}}}
 
 // ✅ Baixa um GIF/vídeo de uma URL e converte para MP4 (necessário para o WhatsApp reproduzir como "GIF")
 async function baixarGifComoMp4(gifUrl){
@@ -1099,7 +1277,6 @@ async function classificarIntencao(pergunta){
 Intenções: DOWNLOADS_MUSICA, DOWNLOADS_VIDEO, DOWNLOADS_TIKTOK, CALCULADORA, TEMPO, HORARIO, MOEDAS, ALUGAR, PING, IA_PERGUNTA, IA_PIADA, IA_HISTORIA, IA_POEMA, DESCONHECIDO
 Formato: {"intencao":"NOME","parametro":"texto ou vazio","confianca":0-100}`;
   try{const resp=await chamarGeminiChat([{role:"system",content:sistema},{role:"user",content:pergunta}],200,0.1);const m=resp?.match(/\{[\s\S]+\}/);if(m)return JSON.parse(m[0]);}catch(e){console.log("❌ classificarIntencao Gemini:",e.message);}
-  try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:"llama-3.1-8b-instant",messages:[{role:"system",content:sistema},{role:"user",content:pergunta}],max_tokens:200,temperature:0.1},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:12000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();const m=resp?.match(/\{[\s\S]+\}/);if(m)return JSON.parse(m[0]);}catch(e){console.log("❌ classificarIntencao Groq:",e.message);}
   return{intencao:"DESCONHECIDO",parametro:"",confianca:0};
 }
 
@@ -1107,7 +1284,6 @@ async function respostaAssistente(pergunta,historico=[],nomeUser){
   const sistema=`Você é Isaías, assistente do bot LORDE LÁ DJUM v3.5 no WhatsApp. Responde em português de Angola. Seja direto, amigável e natural. O utilizador chama-se ${nomeUser}.`;
   const msgs=[{role:"system",content:sistema},...historico.slice(-MAX_HISTORIA_IA*2),{role:"user",content:pergunta}];
   try{const r=await chamarGeminiChat(msgs,600,0.8);if(r)return r;}catch(e){console.log("❌ respostaAssistente Gemini:",e.message);}
-  try{const{data}=await axios.post("https://api.groq.com/openai/v1/chat/completions",{model:"llama-3.1-8b-instant",messages:msgs,max_tokens:600,temperature:0.8},{headers:{Authorization:`Bearer ${CONFIG.GROQ_KEY}`,"Content-Type":"application/json"},timeout:20000,httpsAgent});const resp=data.choices?.[0]?.message?.content?.trim();if(resp)return resp;}catch(e){console.log("❌ respostaAssistente Groq:",e.message);}
   return IA_OFFLINE_MSG;
 }
 
@@ -1477,7 +1653,11 @@ async function processarBotaoPlay(sock,msg){
 const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","ergue-se","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd",
 "classe","classes","atributos","level","equipar","desequipar","ranking","lutar","duelo","boss","hunt","aventura","masmorra","raid","fugir","daily","quest","quests","vender","doar","saldo","analisar",
 "sticker2","toimg","tovideo","take","wm","figurinhas","figaleatoria","figanime","figmeme","figgato","figfutebol","figamor","figengracada","colecao","figrank","figdaily","figtroca","figvender","figcomprar","figduelo","rankwaifu",
-"manga","personagem","autor","estudio","episodio","temporada","personagemaleatorio","villain","protagonista","waifu","husbando","casar","divorcio","beijar","abracar","morder","matar","animerpg","confissao","provocacao","fantasia"]);
+"manga","personagem","autor","estudio","episodio","temporada","personagemaleatorio","villain","protagonista","waifu","husbando","casar","divorcio","beijar","abracar","morder","matar","animerpg","confissao","provocacao","fantasia",
+"ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
+"ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
+"yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -1831,7 +2011,7 @@ ${nomeEnviou}`;
             userRateLimit[voiceLimitKey]=agoraV;
             (async()=>{try{
               const audioData=await downloadAudioDaMensagem(msg);if(!audioData)return;
-              const transcricao=await transcreverComGroq(audioData.buffer);
+              const transcricao=await transcreverAudio(audioData.buffer);
               // Em grupo: só se mencionar Isaías na transcrição
               if(isGrupo&&!detectarChamadaAssistente(transcricao))return;
               const pergunta=isGrupo?removerNomeAssistente(transcricao).trim():transcricao;
@@ -1947,7 +2127,7 @@ ${nomeEnviou}`;
           return;
         }
         if(comando==="addai"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Só em grupos.")},{quoted:seloBot});return;}try{await sock.groupParticipantsUpdate(jid,["867051314767696@bot"],"add");await sock.sendMessage(jid,{text:bLine("✅","Meta AI adicionada!")},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="menu"||comando==="ajuda"){const sub=args[0]?.toLowerCase();const catMap={principal:"cat_principal",downloads:"cat_downloads",musicas:"cat_musicas",figurinhas:"cat_figurinhas",brincadeiras:"cat_brincadeiras",coins:"cat_coins",alteradores:"cat_alteradores",logos:"cat_logos",pesquisas:"cat_pesquisas",animes:"cat_animes",rpg:"cat_rpg",ias:"cat_ias",plaquinhas:"cat_plaquinhas","18":"cat_18",adm:"cat_adm",dono:"cat_dono",assistente:"cat_assistente"};if(sub&&catMap[sub]){await enviarSubmenu(sock,jid,msg,catMap[sub],seloBot,sender,isDono);}else{await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot);}return;}
+        if(comando==="menu"||comando==="ajuda"){const sub=args[0]?.toLowerCase();const catMap={principal:"cat_principal",downloads:"cat_downloads",redes:"cat_redes",musicas:"cat_musicas",figurinhas:"cat_figurinhas",brincadeiras:"cat_brincadeiras",coins:"cat_coins",alteradores:"cat_alteradores",logos:"cat_logos",pesquisas:"cat_pesquisas",animes:"cat_animes",rpg:"cat_rpg",ias:"cat_ias",plaquinhas:"cat_plaquinhas","18":"cat_18",adm:"cat_adm",dono:"cat_dono",assistente:"cat_assistente"};if(sub&&catMap[sub]){await enviarSubmenu(sock,jid,msg,catMap[sub],seloBot,sender,isDono);}else{await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot);}return;}
         if(comando==="sobre"){await enviarComSelo(sock,jid,bBloco("🤖 SOBRE",[bLine("🤖",`*${CONFIG.NOME_BOT}*`),bLine("👑",`*${CONFIG.DONO_NOME}*`),bLine("📦","@itsliaaa/baileys"),bLine("✅","Estética cases.js style"),bLine("✅","Isaías só responde quando mencionado"),bLine("✅","!pin — Pinterest multi-imagem"),bLine("✅","30+ comandos"),bLine("🟢",`© ${CONFIG.NOME_BOT} — 24/7`)]),seloBot);return;}
         if(comando==="set"){const novaSenha=args.join(" ").replace(/['"]/g,"").trim();if(!novaSenha){await sock.sendMessage(jid,{text:bLine("🔑",`*${CONFIG.PREFIXO}set [nova_senha]*`)},{quoted:seloBot});return;}CONFIG.SENHA_BOT=novaSenha;senhasAprovadas.clear();await sock.sendMessage(jid,{text:bBloco("✅ SENHA ALTERADA",[bLine("🔑",`Senha: *${novaSenha}*`)])},{quoted:seloBot});await reagir(sock,msg,"🔑");return;}
         if(comando==="id"){await sock.sendMessage(jid,{text:bBloco("📱 INFO",[bLine("📱",`_${sender}_`),bLine("👑",`Dono: ${isDono?"✅":"❌"} | 👮 Admin: ${isAdmin?"✅":"❌"}`),bLine("💎",`VIP: ${isVip(sender)?"✅":"❌"}`),bLine("🔑",`Acesso: ${senhasAprovadas.has(sender)||isDono?"✅":"❌"}`)])},{quoted:seloBot});return;}
@@ -2041,9 +2221,256 @@ ${nomeEnviou}`;
 
         // ─── TIKTOK ───
         if(comando==="tiktok"){const url=args[0];if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}tiktok* [link]`)},{quoted:seloBot});return;}await reagir(sock,msg,"📱");let result=null;try{result=await barraCarregamento(sock,jid,seloBot,"A baixar TikTok...",()=>scraperTikTokVideo(url));}catch{}if(!result){await sock.sendMessage(jid,{text:bLine("❌","Não consegui.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}try{await sock.sendMessage(jid,{video:{url:result.url},caption:bLine("📱",result.title||"TikTok")},{quoted:seloBot});await reagir(sock,msg,"✅");addXP(sender,5);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="ttsearch"&&args.length>0){const query=args.join(" ");const videos=await scraperTikTokSearch(query,5);if(!videos.length){await sock.sendMessage(jid,{text:bLine("❌","Nenhum resultado.")},{quoted:seloBot});return;}const lista=videos.slice(0,5).map((v,i)=>`◎ *${i+1}.* ${(v.title||v.desc||"TikTok").slice(0,40)}\n   🔗 ${v.video||v.url||""}`).join("\n\n");await sock.sendMessage(jid,{text:bBloco("🔍 TIKTOK — "+query,[lista])},{quoted:seloBot});await reagir(sock,msg,"🔍");return;}
-        if(comando==="tttrend"){const videos=await scraperTikTokTrending("AO",5);if(!videos.length){await sock.sendMessage(jid,{text:bLine("❌","Não consegui buscar.")},{quoted:seloBot});return;}const lista=videos.slice(0,5).map((v,i)=>`◎ *${i+1}.* 🔥 ${(v.title||v.desc||"TikTok").slice(0,40)}`).join("\n\n");await sock.sendMessage(jid,{text:bBloco("🔥 TRENDING TIKTOK 🇦🇴",[lista])},{quoted:seloBot});await reagir(sock,msg,"🔥");return;}
-        if(comando==="ttuser"&&args.length>0){const user=await scraperTikTokUser(args[0]);if(!user){await sock.sendMessage(jid,{text:bLine("❌",`Não encontrei: ${args[0]}`)},{quoted:seloBot});return;}const texto_user=bBloco("📱 TIKTOK USER",[bLine("👤",`*${user.nickname||user.nome||args[0]}*`),bLine("🔖",`@${user.username||args[0]}`),bLine("👥",`Seguidores: *${user.seguidores||0}*`)]);if(user.foto||user.avatar)await sock.sendMessage(jid,{image:{url:user.foto||user.avatar},caption:texto_user},{quoted:seloBot});else await sock.sendMessage(jid,{text:texto_user},{quoted:seloBot});return;}
+
+        // ─── TIKTOK — extras ───
+        if(comando==="ttmp3"){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ttmp3* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🎧");
+          try{
+            const d=await barraCarregamento(sock,jid,seloBot,"A extrair áudio do TikTok...",()=>tikwmDados(url));
+            const audioUrl=d.music||d.music_info?.play;
+            if(!audioUrl)throw new Error("Sem áudio disponível.");
+            await sock.sendMessage(jid,{audio:{url:audioUrl},mimetype:"audio/mp4",caption:bLine("🎧",d.title||"Áudio TikTok")},{quoted:seloBot});
+            await reagir(sock,msg,"✅");addXP(sender,5);
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ttinfo"){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ttinfo* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"ℹ️");
+          try{
+            const d=await tikwmDados(url);
+            await sock.sendMessage(jid,{image:{url:d.cover},caption:bBloco("ℹ️ INFO TIKTOK",[bLine("📝",d.title||"Sem título"),bLine("👤",`@${d.author?.unique_id||"?"}`),bLine("❤️",`${d.digg_count||0} likes`),bLine("💬",`${d.comment_count||0} comentários`),bLine("🔁",`${d.share_count||0} partilhas`),bLine("▶️",`${d.play_count||0} visualizações`)])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ttfoto"){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ttfoto* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🖼️");
+          try{
+            const d=await tikwmDados(url);
+            const imagens=d.images||[];
+            if(!imagens.length)throw new Error("Este link não é um slide de fotos.");
+            for(const img of imagens.slice(0,10)){await sock.sendMessage(jid,{image:{url:img}},{quoted:seloBot});await new Promise(r=>setTimeout(r,400));}
+            await reagir(sock,msg,"✅");addXP(sender,5);
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ttsemwater"){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ttsemwater* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"📱");
+          try{
+            const d=await barraCarregamento(sock,jid,seloBot,"A baixar sem marca d'água...",()=>tikwmDados(url));
+            const videoUrl=d.hdplay||d.play;
+            if(!videoUrl)throw new Error("Vídeo sem marca d'água indisponível para este link.");
+            await sock.sendMessage(jid,{video:{url:videoUrl},caption:bLine("📱",d.title||"TikTok (sem marca d'água)")},{quoted:seloBot});
+            await reagir(sock,msg,"✅");addXP(sender,5);
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ttuser"){
+          const user=args[0];
+          if(!user){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ttuser* [@usuario]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"👤");
+          try{
+            const u=await scraperTikTokUserTikwm(user);
+            const info=u.user||u;const stats=u.stats||u;
+            await sock.sendMessage(jid,{image:{url:info.avatarLarger||info.avatarMedium},caption:bBloco("👤 PERFIL TIKTOK",[bLine("📛",info.nickname||user),bLine("🆔",`@${info.uniqueId||user}`),bLine("📝",(info.signature||"Sem bio").slice(0,150)),bLine("👥",`Seguidores: *${stats.followerCount||0}*`),bLine("❤️",`Likes: *${stats.heartCount||0}*`),bLine("🎬",`Vídeos: *${stats.videoCount||0}*`)])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ttsearch"){
+          const termo=args.join(" ").trim();
+          if(!termo){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ttsearch* [termo]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🔎");
+          try{
+            const videos=await scraperTikTokSearchTikwm(termo);
+            if(!videos.length)throw new Error("Nenhum vídeo encontrado.");
+            const v=videos[0];
+            const videoUrl=v.play||v.hdplay;
+            await sock.sendMessage(jid,{video:{url:videoUrl},caption:bLine("🔎",v.title||termo)},{quoted:seloBot});
+            await reagir(sock,msg,"✅");addXP(sender,5);
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="tttrend"){
+          await reagir(sock,msg,"📈");
+          try{
+            let videos=await scraperTikTokTrending("AO",5);
+            if(!videos.length)videos=await scraperTikTokSearchTikwm("viral");
+            if(!videos.length)throw new Error("Sem tendências disponíveis no momento.");
+            const linhas=videos.slice(0,5).map((v,i)=>bLine("📈",`*${i+1}.* ${(v.title||v.desc||"Sem título").slice(0,50)}`));
+            await sock.sendMessage(jid,{text:bBloco("📈 TENDÊNCIAS TIKTOK 🇦🇴",linhas)},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+
+        // ─── INSTAGRAM ───
+        if(["ig","igreels","igstory","igfoto","igvideo"].includes(comando)){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}${comando}* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"📸");
+          try{
+            const d=await barraCarregamento(sock,jid,seloBot,"A baixar do Instagram...",()=>scraperInstagram(url));
+            const mediaUrl=d.url||d.play||d.hdplay||d.medias?.[0]?.url;
+            if(!mediaUrl)throw new Error("Conteúdo não encontrado ou privado.");
+            const ehVideo=comando==="igfoto"?false:(d.tipo!=="foto");
+            if(ehVideo)await sock.sendMessage(jid,{video:{url:mediaUrl},caption:bLine("📸",d.title||"Instagram")},{quoted:seloBot});
+            else await sock.sendMessage(jid,{image:{url:mediaUrl},caption:bLine("📸",d.title||"Instagram")},{quoted:seloBot});
+            await reagir(sock,msg,"✅");addXP(sender,5);
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="iguser"){
+          const user=(args[0]||"").replace("@","");
+          if(!user){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}iguser* [usuario]`)},{quoted:seloBot});return;}
+          await sock.sendMessage(jid,{text:bLine("💡",`Perfis do Instagram exigem login para ver dados públicos de forma fiável. Tenta *${CONFIG.PREFIXO}igpost* com um link directo.`)},{quoted:seloBot});
+          return;
+        }
+        if(comando==="igpost"){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}igpost* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"ℹ️");
+          try{
+            const d=await scraperInstagram(url);
+            await sock.sendMessage(jid,{text:bBloco("ℹ️ INFO INSTAGRAM",[bLine("📝",d.title||d.caption||"Sem legenda"),bLine("👤",d.author||"Desconhecido")])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+
+        // ─── YOUTUBE — extras ───
+        if(comando==="ytmp3"){
+          const entrada=args.join(" ").trim();
+          if(!entrada){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ytmp3* [link ou nome]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🎵");
+          let arq=null;
+          try{arq=await barraCarregamento(sock,jid,seloBot,`A baixar áudio: _${entrada.slice(0,40)}_`,()=>downloadMusica(entrada,false));}catch(e){console.log("❌ ytmp3:",e.message);}
+          if(!arq||!fs.existsSync(arq)){await sock.sendMessage(jid,{text:bLine("❌","Não encontrei este áudio.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}
+          try{await enviarAudio(sock,jid,arq,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}
+          setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+          return;
+        }
+        if(comando==="yt"||comando==="ytmp4"){
+          const entrada=args.join(" ").trim();
+          if(!entrada){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}${comando}* [link ou nome]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🎬");
+          let saida=null;
+          try{saida=await barraCarregamento(sock,jid,seloBot,`A baixar vídeo: _${entrada.slice(0,40)}_`,()=>downloadVideo(entrada,480));}catch(e){console.log("❌ yt:",e.message);}
+          if(!saida||!fs.existsSync(saida)){await sock.sendMessage(jid,{text:bBloco("❌ NÃO ENCONTREI",[bLine("💡","Tenta outro link ou nome.")])},{quoted:seloBot});await reagir(sock,msg,"❌");return;}
+          try{await enviarVideo(sock,jid,saida,bLine("🎬",`_© ${nomeBotEstilizado()}_`),[sender],seloBot);await reagir(sock,msg,"✅");addXP(sender,5);}
+          catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}
+          setTimeout(()=>{try{fs.removeSync(saida);}catch{}},15000);
+          return;
+        }
+        if(comando==="ytshort"){
+          const url=args[0];
+          if(!url){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ytshort* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🩳");
+          let saida=null;
+          try{saida=await barraCarregamento(sock,jid,seloBot,"A baixar Short...",()=>downloadVideo(url,720));}catch{}
+          if(!saida||!fs.existsSync(saida)){await sock.sendMessage(jid,{text:bLine("❌","Não consegui baixar este Short.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}
+          try{await enviarVideo(sock,jid,saida,bLine("🩳",`_© ${nomeBotEstilizado()}_`),[sender],seloBot);await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}
+          setTimeout(()=>{try{fs.removeSync(saida);}catch{}},15000);
+          return;
+        }
+        if(comando==="ytthumb"){
+          const entrada=args.join(" ").trim();
+          if(!entrada){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ytthumb* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🖼️");
+          try{
+            const thumb=await buscarThumbnailYT(entrada);
+            if(!thumb)throw new Error("Não consegui obter a thumbnail.");
+            await sock.sendMessage(jid,{image:{url:thumb},caption:bLine("🖼️","Thumbnail")},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ytinfo"){
+          const entrada=args.join(" ").trim();
+          if(!entrada){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ytinfo* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"ℹ️");
+          try{
+            const info=await ytInfoJson(entrada);
+            const dur=info.duration?`${Math.floor(info.duration/60)}m${info.duration%60}s`:"?";
+            await sock.sendMessage(jid,{image:{url:info.thumbnail},caption:bBloco("ℹ️ INFO YOUTUBE",[bLine("📝",info.title||"Sem título"),bLine("👤",info.uploader||"?"),bLine("⏱️",dur),bLine("👁️",`${info.view_count||0} visualizações`),bLine("👍",`${info.like_count||0} likes`)])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ytchannel"){
+          const nome=args.join(" ").trim();
+          if(!nome){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ytchannel* [nome]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"📺");
+          try{
+            const videos=await scraperYouTubeSearch(nome,1);
+            if(!videos.length)throw new Error("Canal não encontrado.");
+            await sock.sendMessage(jid,{text:bBloco("📺 CANAL ENCONTRADO",[bLine("📛",videos[0].author||videos[0].channel||nome),bLine("💡",`Usa *${CONFIG.PREFIXO}ytsearch* ${nome} para ver vídeos.`)])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="ytmusic"){
+          const nome=args.join(" ").trim();
+          if(!nome){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ytmusic* [nome]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🎵");
+          const videos=await scraperYouTubeSearch(nome+" official audio",5);
+          if(!videos.length){await sock.sendMessage(jid,{text:bLine("❌","Nenhum resultado.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}
+          const lista=videos.slice(0,5).map((v,i)=>bLine("🎵",`*${i+1}.* ${(v.title||v.titulo||"?").slice(0,45)}`));
+          await sock.sendMessage(jid,{text:bBloco("🎵 RESULTADOS",lista)},{quoted:seloBot});
+          await reagir(sock,msg,"✅");
+          return;
+        }
+        if(comando==="ytsum"){
+          const entrada=args.join(" ").trim();
+          if(!entrada){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}ytsum* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"🧠");
+          try{
+            const info=await ytInfoJson(entrada);
+            const base=info.description?info.description.slice(0,1500):info.title;
+            const resumo=await chatIA(`Resume em poucas frases, em português de Angola, o conteúdo deste vídeo do YouTube com base na descrição/título: "${base}"`,"Resumes vídeos do YouTube de forma clara e directa.");
+            await sock.sendMessage(jid,{text:bBloco("🧠 RESUMO DO VÍDEO",[bLine("📝",info.title||"?"),B_SEP,bLine("🧠",resumo)])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Não consegui resumir (sem transcrição disponível).")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+
+        // ─── FACEBOOK ───
+        if(["fb","fbvideo","fbfoto"].includes(comando)){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}${comando}* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"📘");
+          try{
+            const d=await barraCarregamento(sock,jid,seloBot,"A baixar do Facebook...",()=>scraperFacebook(url));
+            const mediaUrl=d.hdplay||d.play||d.hd||d.sd||d.url;
+            if(!mediaUrl)throw new Error("Conteúdo não encontrado ou privado.");
+            if(comando==="fbfoto")await sock.sendMessage(jid,{image:{url:mediaUrl},caption:bLine("📘",d.title||"Facebook")},{quoted:seloBot});
+            else await sock.sendMessage(jid,{video:{url:mediaUrl},caption:bLine("📘",d.title||"Facebook")},{quoted:seloBot});
+            await reagir(sock,msg,"✅");addXP(sender,5);
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        if(comando==="fbinfo"){
+          const url=args[0];
+          if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}fbinfo* [link]`)},{quoted:seloBot});return;}
+          await reagir(sock,msg,"ℹ️");
+          try{
+            const d=await scraperFacebook(url);
+            await sock.sendMessage(jid,{text:bBloco("ℹ️ INFO FACEBOOK",[bLine("📝",d.title||"Sem título")])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+        // (handler antigo de !ttsearch removido — duplicado, agora tratado acima)
+        // (handler antigo de !tttrend removido — duplicado, agora tratado acima)
+        // (handler antigo de !ttuser removido — duplicado, agora tratado acima)
 
         // ─── PINTEREST ───
         if(comando==="pinterest"&&args.length>0){const query=args.join(" ");let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("📌 PINTEREST",[bLine("🔍",`_${query}_`),FRAMES_LOADING[0]])},{quoted:seloBot});}catch{}const pins=await buscarPinterest(query,1);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("📌 PINTEREST",[bLine("🔍",`_${query}_`),FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));if(!pins.length){await sock.sendMessage(jid,{text:bLine("❌","Nenhuma imagem.")},{quoted:seloBot});return;}try{await sock.sendMessage(jid,{image:{url:pins[0]},caption:bLine("📌",`Pinterest: ${query}`)},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
@@ -2109,8 +2536,9 @@ ${nomeEnviou}`;
           const tempId=Date.now();const tIn=`./downloads/toimg_${tempId}.webp`,tOut=`./downloads/toimg_${tempId}.png`;
           try{
             const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            if(!ehWebpValido(buf))throw new Error("Não consegui obter esta figurinha (pode ter expirado). Tenta com uma figurinha mais recente.");
             fs.writeFileSync(tIn,buf);
-            await new Promise((res,rej)=>{exec(`${FFMPEG_CMD} -i "${tIn}" "${tOut}" -y -loglevel error`,{timeout:20000},(err)=>err?rej(err):res());});
+            await execFFmpegLimpo(`${FFMPEG_CMD} -i "${tIn}" "${tOut}" -y -loglevel error`);
             if(!fs.existsSync(tOut))throw new Error("Conversão falhou.");
             await sock.sendMessage(jid,{image:fs.readFileSync(tOut),caption:bLine("🖼️","Convertido!")},{quoted:seloBot});
             await reagir(sock,msg,"✅");
@@ -2125,8 +2553,9 @@ ${nomeEnviou}`;
           const tempId=Date.now();const tIn=`./downloads/tovid_${tempId}.webp`,tOut=`./downloads/tovid_${tempId}.mp4`;
           try{
             const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            if(!ehWebpValido(buf))throw new Error("Não consegui obter esta figurinha (pode ser um formato não suportado, como stickers Lottie/Avatar, ou ter expirado). Tenta outra figurinha animada.");
             fs.writeFileSync(tIn,buf);
-            await new Promise((res,rej)=>{exec(`${FFMPEG_CMD} -i "${tIn}" -movflags faststart -pix_fmt yuv420p "${tOut}" -y -loglevel error`,{timeout:20000},(err)=>err?rej(err):res());});
+            await execFFmpegLimpo(`${FFMPEG_CMD} -i "${tIn}" -movflags faststart -pix_fmt yuv420p "${tOut}" -y -loglevel error`);
             if(!fs.existsSync(tOut))throw new Error("Conversão falhou.");
             await sock.sendMessage(jid,{video:fs.readFileSync(tOut),caption:bLine("🎬","Convertido!")},{quoted:seloBot});
             await reagir(sock,msg,"✅");
@@ -2157,9 +2586,10 @@ ${nomeEnviou}`;
           const tempId=Date.now();const tIn=`./downloads/wm_in_${tempId}.jpg`,tOut=`./downloads/wm_out_${tempId}.jpg`;
           try{
             const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+            if(!buf||buf.length<500)throw new Error("Não consegui obter esta imagem (pode ter expirado).");
             fs.writeFileSync(tIn,buf);
             const textoEscapado=textoWm.replace(/'/g,"\\'").replace(/:/g,"\\:");
-            await new Promise((res,rej)=>{exec(`${FFMPEG_CMD} -i "${tIn}" -vf "drawtext=text='${textoEscapado}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-th-20:box=1:boxcolor=black@0.5:boxborderw=8" "${tOut}" -y -loglevel error`,{timeout:20000},(err)=>err?rej(err):res());});
+            await execFFmpegLimpo(`${FFMPEG_CMD} -i "${tIn}" -vf "drawtext=text='${textoEscapado}':fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-th-20:box=1:boxcolor=black@0.5:boxborderw=8" "${tOut}" -y -loglevel error`);
             if(!fs.existsSync(tOut))throw new Error("Falha ao aplicar marca d'água.");
             const webpBuf=await criarSticker(fs.readFileSync(tOut),false);
             await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});
@@ -2187,11 +2617,12 @@ ${nomeEnviou}`;
             await reagir(sock,msg,"⏳");
             let buf=null;
             if(comando==="figanime"){
-              const{data}=await axios.get("https://api.waifu.pics/sfw/waifu",{timeout:15000,httpsAgent});
-              const img=await axios.get(data.url,{responseType:"arraybuffer",timeout:15000,httpsAgent});
+              const urlImg=await buscarImagemWaifuPics("waifu");
+              const img=await axios.get(urlImg,{responseType:"arraybuffer",timeout:15000,httpsAgent});
               buf=Buffer.from(img.data);
             }else if(comando==="figgato"){
-              const img=await axios.get("https://cataas.com/cat",{responseType:"arraybuffer",timeout:15000,httpsAgent});
+              const img=await axios.get("https://cataas.com/cat",{responseType:"arraybuffer",timeout:20000,httpsAgent,headers:{"User-Agent":"Mozilla/5.0"}});
+              if(!img.data||img.data.length<500)throw new Error("Imagem de gato inválida.");
               buf=Buffer.from(img.data);
             }else{
               const termos={figaleatoria:"aesthetic wallpaper",figmeme:"funny meme",figfutebol:"football wallpaper",figamor:"couple love aesthetic",figengracada:"funny animals"};
@@ -2336,10 +2767,10 @@ ${nomeEnviou}`;
 
         // ─── ALTERADORES ───
         if(comando==="vz"){const ctxVz=msg.message?.extendedTextMessage?.contextInfo,quotedVz=ctxVz?.quotedMessage;let textoParaFalar="";if(quotedVz)textoParaFalar=quotedVz.conversation||quotedVz.extendedTextMessage?.text||"";if(!textoParaFalar&&args.length>0)textoParaFalar=args.join(" ");if(!textoParaFalar){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}vz* [texto]`)},{quoted:seloBot});return;}let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("🔊 VOZ",[bLine("⏳","A converter..."),FRAMES_LOADING[2]])},{quoted:seloBot});}catch{}try{const audioPath=await textoParaFala(textoParaFalar);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("🔊 VOZ",[FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));await enviarAudio(sock,jid,audioPath,seloBot);try{fs.removeSync(audioPath);}catch{}await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="transcrever"||comando==="audiotexto"){const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio com *${CONFIG.PREFIXO}transcrever*`)},{quoted:seloBot});return;}let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("📝 A TRANSCREVER",[FRAMES_LOADING[2]])},{quoted:seloBot});}catch{}try{const t=await transcreverComGroq(d.buffer);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("📝 A TRANSCREVER",[FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));await sock.sendMessage(jid,{text:bBloco("📝 TRANSCRIÇÃO",[bLine("📝",t)])},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="resumiraudio"){const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio`)},{quoted:seloBot});return;}try{const t=await transcreverComGroq(d.buffer);const r=await chatIA(`Resume: "${t}"`);await sock.sendMessage(jid,{text:bBloco("🎙️ RESUMO",[bLine("📝",r)])},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="traduziraudio"){const idioma=args[0]||"português";const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio com *${CONFIG.PREFIXO}traduziraudio [idioma]*`)},{quoted:seloBot});return;}try{const t=await transcreverComGroq(d.buffer);const tr=await chatIA(`Traduz para ${idioma}: "${t}"`);await sock.sendMessage(jid,{text:bBloco("🌍 TRADUÇÃO",[bLine("🌍",tr)])},{quoted:seloBot});}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="audioparaia"){const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio`)},{quoted:seloBot});return;}try{const t=await transcreverComGroq(d.buffer);const r=await chatIA(t);await sock.sendMessage(jid,{text:bBloco("🧠 IA + ÁUDIO",[bLine("🧠",r)])},{quoted:seloBot});await reagir(sock,msg,"🧠");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
+        if(comando==="transcrever"||comando==="audiotexto"){const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio com *${CONFIG.PREFIXO}transcrever*`)},{quoted:seloBot});return;}let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("📝 A TRANSCREVER",[FRAMES_LOADING[2]])},{quoted:seloBot});}catch{}try{const t=await transcreverAudio(d.buffer);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("📝 A TRANSCREVER",[FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));await sock.sendMessage(jid,{text:bBloco("📝 TRANSCRIÇÃO",[bLine("📝",t)])},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
+        if(comando==="resumiraudio"){const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio`)},{quoted:seloBot});return;}try{const t=await transcreverAudio(d.buffer);const r=await chatIA(`Resume: "${t}"`);await sock.sendMessage(jid,{text:bBloco("🎙️ RESUMO",[bLine("📝",r)])},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
+        if(comando==="traduziraudio"){const idioma=args[0]||"português";const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio com *${CONFIG.PREFIXO}traduziraudio [idioma]*`)},{quoted:seloBot});return;}try{const t=await transcreverAudio(d.buffer);const tr=await chatIA(`Traduz para ${idioma}: "${t}"`);await sock.sendMessage(jid,{text:bBloco("🌍 TRADUÇÃO",[bLine("🌍",tr)])},{quoted:seloBot});}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
+        if(comando==="audioparaia"){const d=await downloadAudioDaMensagem(msg);if(!d){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde áudio`)},{quoted:seloBot});return;}try{const t=await transcreverAudio(d.buffer);const r=await chatIA(t);await sock.sendMessage(jid,{text:bBloco("🧠 IA + ÁUDIO",[bLine("🧠",r)])},{quoted:seloBot});await reagir(sock,msg,"🧠");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="ia"&&args.length>0){const pergunta=args.join(" ");let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("🧠 IA",[bLine("⏳","A processar..."),FRAMES_LOADING[1]])},{quoted:seloBot});}catch{}try{const resp=await chatIA(pergunta);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("🧠 IA",[FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));await sock.sendMessage(jid,{text:bBloco("🧠 IA",[bLine("🧠",resp)])},{quoted:seloBot});await reagir(sock,msg,"🧠");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="resumir"){const ctx2=msg.message?.extendedTextMessage?.contextInfo;const msgC=ctx2?.quotedMessage?.conversation||ctx2?.quotedMessage?.extendedTextMessage?.text||"";if(!msgC){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde mensagem com *${CONFIG.PREFIXO}resumir*`)},{quoted:seloBot});return;}try{const resp=await chatIA(`Resume: "${msgC}"`);await sock.sendMessage(jid,{text:bBloco("📝 RESUMO",[bLine("📝",resp)])},{quoted:seloBot});await reagir(sock,msg,"📝");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="traduzir"&&args.length>1){const idioma=args[0],textT=args.slice(1).join(" ");try{const resp=await chatIA(`Traduz para ${idioma}: "${textT}"`);await sock.sendMessage(jid,{text:bBloco("🌍 TRADUÇÃO",[bLine("🌍",resp)])},{quoted:seloBot});await reagir(sock,msg,"🌍");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
@@ -2528,8 +2959,8 @@ ${nomeEnviou}`;
         if(comando==="waifu"||comando==="husbando"){
           try{
             const cat=comando==="waifu"?"waifu":"husbando";
-            const{data}=await axios.get(`https://api.waifu.pics/sfw/${cat}`,{timeout:15000,httpsAgent});
-            await sock.sendMessage(jid,{image:{url:data.url},caption:bLine(comando==="waifu"?"💖":"💙",comando==="waifu"?"Waifu aleatória!":"Husbando aleatório!")},{quoted:seloBot});
+            const urlImg=await buscarImagemWaifuPics(cat);
+            await sock.sendMessage(jid,{image:{url:urlImg},caption:bLine(comando==="waifu"?"💖":"💙",comando==="waifu"?"Waifu aleatória!":"Husbando aleatório!")},{quoted:seloBot});
             await reagir(sock,msg,"💖");
           }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});}
           return;
@@ -3343,9 +3774,12 @@ ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`
             }
             if(!stickers.length)throw new Error("Nenhuma imagem convertida.");
 
-            for(const stk of stickers){try{await sock.sendMessage(jid,{sticker:stk},{quoted:seloBot});}catch{}await new Promise(r=>setTimeout(r,500));}
+            const enviouNativo=await enviarPackNativo(sock,jid,stickers,packName,packAuthor);
+            if(!enviouNativo){
+              for(const stk of stickers){try{await sock.sendMessage(jid,{sticker:stk},{quoted:seloBot});}catch{}await new Promise(r=>setTimeout(r,500));}
+            }
 
-            await sock.sendMessage(jid,{text:bBloco("✅ PACK PRONTO",[bLine("✅",`Pacote *${packName}* enviado de uma vez!`),bLine("📦",`${stickers.length} figurinha(s) dentro do pack`),bLine("👤",`Publicado por: *${packAuthor}*`),B_SEP,bLine("💡","Segura numa figurinha → *Adicionar às suas figurinhas*")])},{quoted:seloBot});
+            await sock.sendMessage(jid,{text:bBloco("✅ PACK PRONTO",[bLine("✅",`Pacote *${packName}* enviado${enviouNativo?" num só bloco":" de uma vez"}!`),bLine("📦",`${stickers.length} figurinha(s) dentro do pack`),bLine("👤",`Publicado por: *${packAuthor}*`),B_SEP,bLine("💡","Segura numa figurinha → *Adicionar às suas figurinhas*")])},{quoted:seloBot});
             await reagir(sock,msg,"✅");
           }catch(e){
             console.error("[PINPACK]",e.message);
@@ -3634,6 +4068,20 @@ ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`
         }
 
         // ─── STATUS (GRUPO) ───
+        // ─── REDES SOCIAIS: GERAÇÃO COM IA ───
+        if(IA_SOCIAL_COMANDOS[comando]){
+          const cfg=IA_SOCIAL_COMANDOS[comando];
+          const tema=args.join(" ").trim();
+          await reagir(sock,msg,"🧠");
+          try{
+            const resp=await chatIA(cfg.prompt(tema),cfg.sistema);
+            if(!resp||resp===IA_OFFLINE_MSG)throw new Error("IA indisponível no momento.");
+            await sock.sendMessage(jid,{text:bBloco(cfg.titulo,[bLine(cfg.emoji,resp)])},{quoted:seloBot});
+            await reagir(sock,msg,"✅");
+          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
+          return;
+        }
+
         if(comando==="totalcmd"){
           const nativos=TODOS_COMANDOS.size;
           const cases=carregarCases();
