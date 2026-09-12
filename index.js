@@ -365,7 +365,7 @@ async function verificarExpiracaoAluguel(sock,jid){
   if(Date.now()>al.expiraEm){
     delete d[jid];
     salvarAluguelData(d);
-    try{await sock.sendMessage(jid,{text:bBloco("⏰ ALUGUEL EXPIRADO",[bLine("❌","O aluguel deste grupo expirou!"),bLine("💰",`Contacta *${CONFIG.DONO_NUM}* para renovar.`)])});}catch{}
+    try{await sock.sendMessage(jid,{text:`Este grupo não tem aluguer ativo, contacte o dono pra alugar aqui, ${CONFIG.DONO_NUM}`});}catch{}
   }
 }
 
@@ -683,7 +683,7 @@ function gerarSubmenu(catId,P){
     bLine(em,`*${P}banir*`),bLine(em,`*${P}add*`),bLine(em,`*${P}addadmin*`),bLine(em,`*${P}removeadmin*`),
     bLine(em,`*${P}silenciar*`),bLine(em,`*${P}dessilenciar*`),bLine(em,`*${P}addvip*`),bLine(em,`*${P}vips*`),
     bLine(em,`*${P}all*`),bLine(em,`*${P}att*`),bLine(em,`*${P}aviso*`),bLine(em,`*${P}link*`),bLine(em,`*${P}sorteio*`),
-    bLine(em,`*${P}fechar*`),bLine(em,`*${P}abrir*`),bLine(em,`*${P}bot*`),
+    bLine(em,`*${P}fechar*`),bLine(em,`*${P}abrir*`),bLine(em,`*${P}bot off* → _dono: termina o aluguel_`),
     bLine(em,`*${P}nomegrupo*`),bLine(em,`*${P}descgrupo*`),bLine(em,`*${P}fotogrupo*`),bLine(em,`*${P}scanlink*`),
     B_SEP,bLine("🔗","*ANTI-LINK:*"),
     bLine(em,`*${P}anti-link easy* → _remove, sem banir_`),
@@ -1793,6 +1793,7 @@ async function startBot(){
 
         // ✅ BOTÕES PLAY (prioridade máxima)
         if(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage||msg.message?.templateButtonReplyMessage){
+          if(isGrupo&&!isDono&&!gruposAtivados.has(jid)&&!verificarAluguel(jid))return;
           const btnId=extrairBotaoClicado(msg);
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
           if(btnId&&btnId.startsWith("play1_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
@@ -1804,18 +1805,19 @@ async function startBot(){
 
         // List response (menu carrossel)
         const listResp=msg.message?.listResponseMessage;
-        if(listResp){const catId=listResp.singleSelectReply?.selectedRowId;if(catId&&catId.startsWith("cat_")){if(isGrupo&&!isDono&&!gruposAtivados.has(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;let isAdmin2=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));isAdmin2=admins.includes(sender);}catch{}}if(!isDono&&!senhasAprovadas.has(sender)){if(isGrupo&&isAdmin2){senhasAprovadas.add(sender);}else return;}await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}}
+        if(listResp){const catId=listResp.singleSelectReply?.selectedRowId;if(catId&&catId.startsWith("cat_")){if(isGrupo&&!isDono&&!gruposAtivados.has(jid)&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;let isAdmin2=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));isAdmin2=admins.includes(sender);}catch{}}if(!isDono&&!senhasAprovadas.has(sender)){if(isGrupo&&isAdmin2){senhasAprovadas.add(sender);}else return;}await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}}
 
         // Interactive response
         const interResp=msg.message?.interactiveResponseMessage;
         if(interResp){
+          if(isGrupo&&!isDono&&!gruposAtivados.has(jid)&&!verificarAluguel(jid))return;
           let catId=null;
           try{const nf=interResp.nativeFlowResponseMessage;if(nf?.paramsJson){const params=JSON.parse(nf.paramsJson);catId=params.id||params.selectedId||params.rowId||null;}}catch{}
           if(!catId)catId=interResp.body||null;
           if(catId){
             if(catId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
             if(catId.startsWith("play1_")){const partes=catId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
-            if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!gruposAtivados.has(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}
+            if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!gruposAtivados.has(jid)&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}
             if(catId.startsWith("use_prefix_"))return;
           }
           // ✅ Resposta interactiva não reconhecida (provavelmente de OUTRO bot no grupo) — ignora
@@ -1831,7 +1833,7 @@ async function startBot(){
           if(!aluguelActivo){
             // Notifica só se usou um comando com prefixo
             if(texto&&texto.startsWith(CONFIG.PREFIXO)&&texto.trim()!==CONFIG.PREFIXO){
-              await sock.sendMessage(jid,{text:bBloco("⏰ ALUGUEL INACTIVO",[bLine("❌","Bot sem aluguel activo neste grupo!"),bLine("💰",`Contacta *${CONFIG.DONO_NUM}* para alugar.`)])},{quoted:seloBot});
+              await sock.sendMessage(jid,{text:`Este grupo não tem aluguer ativo, contacte o dono pra alugar aqui, ${CONFIG.DONO_NUM}`},{quoted:seloBot});
             }
             return;
           }
@@ -2072,7 +2074,7 @@ ${nomeEnviou}`;
           return;
         }
 
-        const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","bot","link","sorteio","verifica","silenciar","dessilenciar","silenciados","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai","addvip","removevip","vips","bemvindo","bemvindo1","bemvindo2","grupoinfo","inactivos","marcaradmins","adms","status"];
+        const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","link","sorteio","verifica","silenciar","dessilenciar","silenciados","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai","addvip","removevip","vips","bemvindo","bemvindo1","bemvindo2","grupoinfo","inactivos","marcaradmins","adms","status"];
         if(CMDS_ADMIN.includes(comando)&&!isAdmin){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas administradores.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
         const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto","adddono","removedono","addsubdono","removesubdono","setletra","downcase"];
         if(CMDS_DONO.includes(comando)&&!isDono){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas o dono.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
@@ -2104,7 +2106,6 @@ ${nomeEnviou}`;
           const diasArg=parseInt(args[0]);
           if(isNaN(diasArg)||diasArg<1){await sock.sendMessage(jid,{text:bBloco("💰 ALUGUEL",[bLine("💡","Uso: *!alugar [dias]*"),bLine("💡","Ex: *!alugar 3* → 3 dias | *!alugar 30* → 1 mês")])},{quoted:seloBot});return;}
           const expira=ativarAluguel(jid,diasArg);
-          gruposAtivados.add(jid);
           const dataExpira=new Date(expira).toLocaleDateString("pt-AO",{timeZone:"Africa/Luanda",day:"2-digit",month:"2-digit",year:"numeric"});
           await sock.sendMessage(jid,{text:bBloco("✅ ALUGUEL ACTIVADO!",[bLine("📅",`Duração: *${diasArg} dias*`),bLine("⏳",`Expira: *${dataExpira}*`),bLine("🔓","Membros dispensados de *!pp*"),bLine("🤖","Bot activo neste grupo!")])},{quoted:seloBot});
           await reagir(sock,msg,"✅");
@@ -3962,7 +3963,24 @@ ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`
         // ─── ADM ───
         if(comando==="bloq"){comandosBloqueados.add(jid);await sock.sendMessage(jid,{text:bLine("🔒","*Comandos bloqueados!*")},{quoted:seloBot});return;}
         if(comando==="desbloq"){comandosBloqueados.delete(jid);await sock.sendMessage(jid,{text:bLine("🔓","*Comandos desbloqueados!*")},{quoted:seloBot});return;}
-        if(comando==="bot"){const op=args.join(" ").toLowerCase();if(op.includes("off")){chatsDesativados.add(jid);await sock.sendMessage(jid,{text:bLine("🔴","*BOT OFF!*")},{quoted:seloBot});}else if(op.includes("on")){chatsDesativados.delete(jid);await sock.sendMessage(jid,{text:bLine("✅","*BOT ON!*")},{quoted:seloBot});}return;}
+        if(comando==="bot"){
+          const op=args.join(" ").toLowerCase();
+          if(op.includes("off")){
+            if(!isDono){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono pode terminar o aluguel.")},{quoted:seloBot});return;}
+            const d=carregarAluguel();
+            delete d[jid];
+            salvarAluguelData(d);
+            gruposAtivados.delete(jid);
+            await sock.sendMessage(jid,{text:bBloco("🔴 ALUGUEL TERMINADO",[bLine("🔴","O aluguel deste grupo foi terminado."),bLine("💬",`Ao usar um comando, o grupo verá: _"Este grupo não tem aluguer ativo..."_`)])},{quoted:seloBot});
+            await reagir(sock,msg,"🔴");
+          }else if(op.includes("on")){
+            chatsDesativados.delete(jid);
+            await sock.sendMessage(jid,{text:bLine("✅","*BOT ON!*")},{quoted:seloBot});
+          }else{
+            await sock.sendMessage(jid,{text:bBloco("⚙️ BOT",[bLine("💡",`*${CONFIG.PREFIXO}bot off* → _termina o aluguel deste grupo_`),bLine("💡",`*${CONFIG.PREFIXO}bot on* → _reactiva (requer aluguel)_`)])},{quoted:seloBot});
+          }
+          return;
+        }
         if(comando==="anti-link"){
           const op=args[0]?.toLowerCase();
           if(op==="off"){antiLinkDesativado.add(jid);await sock.sendMessage(jid,{text:bLine("⚠️","*Anti-link DESACTIVADO!*")},{quoted:seloBot});return;}
