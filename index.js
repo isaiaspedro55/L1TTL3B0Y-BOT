@@ -42,6 +42,10 @@ const CONFIG = {
 };
 
 const httpsAgent = new https.Agent({rejectUnauthorized:false,keepAlive:true,timeout:60000});
+const ARQUIVO_CONFIG_BOT="./dados/config_bot.json";
+function carregarConfigBot(){try{return fs.readJsonSync(ARQUIVO_CONFIG_BOT);}catch{return{};}}
+function salvarConfigBot(dados){try{fs.ensureDirSync("./dados");fs.writeJsonSync(ARQUIVO_CONFIG_BOT,dados);}catch(e){console.log("❌ salvarConfigBot:",e.message);}}
+try{const cfgSalva=carregarConfigBot();if(cfgSalva.prefixo&&typeof cfgSalva.prefixo==="string")CONFIG.PREFIXO=cfgSalva.prefixo;}catch{}
 const silentLogger={level:"silent",child:()=>silentLogger,info:()=>{},warn:()=>{},error:()=>{},debug:()=>{},trace:()=>{},fatal:()=>{}};
 const errosComando={};
 let ppBotUrl=null, botFotoBuffer=null;
@@ -558,12 +562,13 @@ function gerarSubmenu(catId,P){
     bLine("🎵","*YOUTUBE*"),
     bLine(em,`*${P}play* [música] → _baixa e envia directo_`),
     bLine(em,`*${P}play1* [música] → _carrossel com 5 opções_`),
+    bLine(em,`*${P}play2* [música] → _carrossel MP3/MP4/DOC_`),
     bLine(em,`*${P}mp3*`),bLine(em,`*${P}mp4*`),bLine(em,`*${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),
     B_SEP,bLine("📱","*REDES SOCIAIS*"),
     bLine(em,`*${P}tiktok*`),bLine(em,`*${P}tt* [link] → _download rápido_`),
     bLine(em,`*${P}instagram*`),bLine(em,`*${P}twitter*`),bLine(em,`*${P}facebook*`),bLine(em,`*${P}kwai*`),bLine(em,`*${P}spotify*`),bLine(em,`*${P}soundcloud*`),
     B_SEP,bLine("📌","*PINTEREST*"),
-    bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),
+    bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pinterest* [busca] → _carrossel com sticker_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),
     B_SEP,bLine("🖼️","*FICHEIROS*"),
     bLine(em,`*${P}mediafire*`),bLine(em,`*${P}apk*`),bLine(em,`*${P}qr*`),bLine(em,`*${P}tourl*`),bLine(em,`*${P}mostre*`),
   ]);
@@ -732,7 +737,7 @@ function gerarSubmenu(catId,P){
   ]);
   if(catId==="cat_dono")return bBloco(`𝐃𝐎𝐍𝐎 【${em}】`,[
     bLine(em,`*${CONFIG.PREFIXO}set*`),bLine(em,`*${CONFIG.PREFIXO}out*`),
-    bLine(em,`*${CONFIG.PREFIXO}prefixo*`),bLine(em,`*${CONFIG.PREFIXO}setfoto*`),bLine(em,`*${CONFIG.PREFIXO}chaton*`),
+    bLine(em,`*${CONFIG.PREFIXO}prefixo*`),bLine(em,`*${CONFIG.PREFIXO}setprefixo* [novo]`),bLine(em,`*${CONFIG.PREFIXO}setfoto*`),bLine(em,`*${CONFIG.PREFIXO}chaton*`),
     bLine(em,`*${CONFIG.PREFIXO}sms*`),bLine(em,`*${CONFIG.PREFIXO}gsms*`),
     bLine(em,`*${CONFIG.PREFIXO}setmenu* [emoji] → _mudar emojis_`),
     bLine(em,`*${CONFIG.PREFIXO}setletra* [nome]`),bLine(em,`*${CONFIG.PREFIXO}verletras*`),
@@ -1148,9 +1153,11 @@ async function buscarPinterest(busca,qtd=5){
     const{data}=await axios.get(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(busca)}`,{timeout:20000,httpsAgent});
     imagens=(data?.data||[]).map(x=>x?.image_url||x?.images_url||x?.url).filter(u=>typeof u==="string"&&/^https?:\/\//i.test(u)).slice(0,qtd);
   }catch(e){console.log("⚠️ Pinterest API1:",e.message);}
-  // Fonte 2 — Scraper Hub
+  // Fonte 2 — lolhuman
+  if(!imagens.length){try{const{data}=await axios.get(`https://api.lolhuman.xyz/api/pinterest?query=${encodeURIComponent(busca)}&apikey=darkbot`,{timeout:15000,httpsAgent});imagens=(data?.result||[]).map(x=>x?.image_url||x?.url).filter(u=>typeof u==="string"&&/^https?:\/\//i.test(u)).slice(0,qtd);}catch(e){console.log("⚠️ Pinterest API2:",e.message);}}
+  // Fonte 3 — Scraper Hub
   if(!imagens.length){try{const data=await scraperHub(`/api/pinterest/search?q=${encodeURIComponent(busca)}&limit=${qtd}&type=image`);const r=data?.resultados||data?.results||data?.pins||[];imagens=r.map(x=>{if(typeof x==="string")return x;return x?.image_url||x?.url||x?.src||"";}).filter(u=>u&&/^https?:\/\//i.test(u)).slice(0,qtd);}catch(e){console.log("⚠️ Pinterest Hub:",e.message);}}
-  // Fonte 3 — Wikipedia fallback
+  // Fonte 4 — Wikipedia fallback
   if(!imagens.length){try{const imgUrl=await buscarImagemInternet(busca);if(imgUrl)imagens=[imgUrl];}catch{}}
   return imagens;
 }
@@ -1572,6 +1579,169 @@ async function processarBotaoPlay1(sock,msg,formato,url){
   }
 }
 
+async function processarComandoPlay2(sock,chatJid,msg,sender,query){
+  const seloBotL=criarSeloBot(chatJid);
+  try{
+    if(!query||!query.trim()){await sock.sendMessage(chatJid,{text:bBloco("⚠️ PLAY2",[bLine("💡",`*${CONFIG.PREFIXO}play2* [nome da música]`)])},{quoted:seloBotL});return;}
+    if(!yts)throw new Error("Módulo yt-search não instalado. Corre: npm i yt-search");
+    await reagir(sock,msg,"🔍");
+
+    const busca=await yts(query);
+    const resultados=(busca.all||busca.videos||[]).slice(0,15);
+    if(!resultados.length){await reagir(sock,msg,"❌");await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY2",[bLine("💡","Nenhuma música encontrada!")])},{quoted:seloBotL});return;}
+
+    const montarRows=(formato)=>resultados.map((m,i)=>({
+      header:"",
+      title:`${i+1}. ${(m.title||"Sem título").slice(0,45)}`,
+      description:`⏱️ ${m.timestamp||"N/A"} • 👤 ${m.author?.name||"?"}`,
+      id:`play2_${formato}_${encodeURIComponent(m.url)}`,
+    }));
+
+    const buttons=[
+      {name:"single_select",buttonParamsJson:JSON.stringify({title:"🎵 MP3",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp3")}]})},
+      {name:"single_select",buttonParamsJson:JSON.stringify({title:"🎬 MP4",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp4")}]})},
+      {name:"single_select",buttonParamsJson:JSON.stringify({title:"📄 DOC",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("doc")}]})},
+    ];
+    const messageParamsJson=JSON.stringify({bottom_sheet:{in_thread_buttons_limit:3,divider_indices:[0,1,2],list_title:"📄 Selecionar opção",button_title:"≡ FORMATO"}});
+
+    const primeiraMusica=resultados[0];
+    const fotoUrl=primeiraMusica?.thumbnail;
+    const textoMenu=`🎵 *RESULTADOS DA BUSCA:* _"${query}"_\n\nAbra a lista, escolha a secção (MP3, MP4 ou Documento) e depois a música desejada.`;
+    const contextInfo=seloBotL?{stanzaId:seloBotL.key?.id,participant:seloBotL.key?.participant||seloBotL.key?.remoteJid,quotedMessage:seloBotL.message,mentionedJid:[sender]}:{mentionedJid:[sender]};
+
+    let headerContent={hasMediaAttachment:false};
+    try{
+      const{prepareWAMessageMedia}=require("@itsliaaa/baileys");
+      const mediaPrep=await prepareWAMessageMedia({image:{url:fotoUrl||CONFIG.CANAL_URL}},{upload:sock.waUploadToServer});
+      headerContent={hasMediaAttachment:true,imageMessage:mediaPrep.imageMessage};
+    }catch{headerContent={hasMediaAttachment:false};}
+
+    const content={
+      viewOnceMessage:{
+        message:{
+          interactiveMessage:{
+            header:headerContent,
+            body:{text:textoMenu},
+            footer:{text:nomeBotEstilizado()},
+            nativeFlowMessage:{buttons,messageParamsJson},
+            contextInfo,
+          },
+        },
+      },
+    };
+
+    const fullMsg=generateWAMessageFromContent(chatJid,content,{});
+    const bizNode={tag:"biz",attrs:{},content:[{tag:"interactive",attrs:{type:"native_flow",v:"1"},content:[{tag:"native_flow",attrs:{name:"mixed",v:"9"}}]}]};
+    await sock.relayMessage(chatJid,fullMsg.message,{messageId:fullMsg.key.id,additionalNodes:[bizNode]});
+    await reagir(sock,msg,"✅");
+  }catch(e){
+    console.error("❌ play2:",e.message);
+    await reagir(sock,msg,"❌");
+    await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY2",[bLine("💡","Erro ao buscar músicas!"),bLine("🔴",e.message)])},{quoted:seloBotL});
+  }
+}
+async function processarBotaoPlay2(sock,msg,formato,url){
+  const chatJid=msg.key.remoteJid;
+  const seloBotL=criarSeloBot(chatJid);
+  await reagir(sock,msg,formato==="mp4"?"🎬":formato==="doc"?"📄":"🎧");
+  try{
+    if(formato==="mp3"){
+      const arq=await barraCarregamento(sock,chatJid,seloBotL,"A baixar áudio",()=>downloadMusica(url,false));
+      if(!arq||!fs.existsSync(arq))throw new Error("Áudio não encontrado. Tenta outro link.");
+      await enviarAudio(sock,chatJid,arq,seloBotL);
+      await reagir(sock,msg,"✅");
+      setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+    }else if(formato==="doc"){
+      const arq=await barraCarregamento(sock,chatJid,seloBotL,"A baixar documento",()=>downloadVideo(url,480));
+      if(!arq||!fs.existsSync(arq))throw new Error("Ficheiro não encontrado. Tenta outro link.");
+      await sock.sendMessage(chatJid,{document:fs.readFileSync(arq),mimetype:"video/mp4",fileName:"video.mp4",caption:bLine("📄",`_© ${nomeBotEstilizado()}_`)},{quoted:seloBotL});
+      await reagir(sock,msg,"✅");
+      setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+    }else{
+      const arq=await barraCarregamento(sock,chatJid,seloBotL,"A baixar vídeo",()=>downloadVideo(url,480));
+      if(!arq||!fs.existsSync(arq))throw new Error("Vídeo não encontrado. Tenta outro link.");
+      await enviarVideo(sock,chatJid,arq,bLine("🎬",`_© ${nomeBotEstilizado()}_`),[],seloBotL);
+      await reagir(sock,msg,"✅");
+      setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+    }
+  }catch(e){
+    await sock.sendMessage(chatJid,{text:bBloco("❌ ERRO",[bLine("💡",e.message||"Erro ao baixar.")])},{quoted:seloBotL});
+    await reagir(sock,msg,"❌");
+  }
+}
+
+async function processarComandoPinterest(sock,chatJid,msg,sender,query){
+  const seloBotL=criarSeloBot(chatJid);
+  try{
+    if(!query||!query.trim()){await sock.sendMessage(chatJid,{text:bBloco("📌 PINTEREST",[bLine("💡",`*${CONFIG.PREFIXO}pinterest* [busca]`),bLine("💡",`Ex: *${CONFIG.PREFIXO}pinterest* anime dark aesthetic`),B_SEP,bLine("📌",`*${CONFIG.PREFIXO}pinpack* [busca] → _pack de stickers_`),bLine("📌",`*${CONFIG.PREFIXO}pinvideo* [link] → _vídeo do Pinterest_`)])},{quoted:seloBotL});return;}
+    await reagir(sock,msg,"⏳");
+
+    const imagens=await buscarPinterest(query,8);
+    if(!imagens.length)throw new Error("Sem imagens encontradas.");
+
+    const{prepareWAMessageMedia}=require("@itsliaaa/baileys");
+    const cards=[];
+    for(const imgUrl of imagens){
+      let imageMessage=null;
+      try{const media=await prepareWAMessageMedia({image:{url:imgUrl}},{upload:sock.waUploadToServer});imageMessage=media?.imageMessage||null;}catch{}
+      cards.push({
+        header:imageMessage?{hasMediaAttachment:true,imageMessage}:{hasMediaAttachment:false},
+        body:{text:query.slice(0,80)},
+        footer:{text:`📌 Pinterest × ${nomeBotEstilizado()}`},
+        nativeFlowMessage:{
+          buttons:[
+            {name:"quick_reply",buttonParamsJson:JSON.stringify({display_text:"🎨 Criar Sticker",id:`pinsticker_${encodeURIComponent(imgUrl)}`})},
+            {name:"cta_url",buttonParamsJson:JSON.stringify({display_text:"🔗 Abrir link",url:imgUrl,merchant_url:imgUrl})},
+          ],
+        },
+      });
+    }
+
+    const content={
+      interactiveMessage:{
+        body:{text:`📌 *Pinterest — ${query}*\n${imagens.length} imagens encontradas`},
+        footer:{text:nomeBotEstilizado()+" 🕸️"},
+        carouselMessage:{cards},
+      },
+    };
+    const fullMsg=generateWAMessageFromContent(chatJid,content,{userJid:sock.user?.id});
+    const bizNode={tag:"biz",attrs:{},content:[{tag:"interactive",attrs:{type:"native_flow",v:"1"},content:[{tag:"native_flow",attrs:{v:"9",name:"mixed"}}]}]};
+    await sock.relayMessage(chatJid,fullMsg.message,{messageId:fullMsg.key.id,additionalNodes:[bizNode]});
+    await reagir(sock,msg,"✅");
+  }catch(e){
+    console.error("❌ pinterest:",e.message);
+    // Fallback: envia individualmente
+    try{
+      const imgs=await buscarPinterest(query,5);
+      if(imgs.length){
+        await sock.sendMessage(chatJid,{text:`📌 *Pinterest* — ${query}\n${imgs.length} imagens`},{quoted:seloBotL});
+        for(let i=0;i<imgs.length;i++){
+          await sock.sendMessage(chatJid,{image:{url:imgs[i]},caption:`📌 ${i+1}/${imgs.length}\n\n🎨 *${CONFIG.PREFIXO}pin* para mais imagens`},{quoted:seloBotL});
+          await new Promise(r=>setTimeout(r,500));
+        }
+        await reagir(sock,msg,"✅");
+        return;
+      }
+    }catch{}
+    await reagir(sock,msg,"❌");
+    await sock.sendMessage(chatJid,{text:bLine("❌","Pinterest falhou. Tenta de novo.")},{quoted:seloBotL});
+  }
+}
+async function processarBotaoPinSticker(sock,msg,imgUrl){
+  const chatJid=msg.key.remoteJid;
+  const seloBotL=criarSeloBot(chatJid);
+  await reagir(sock,msg,"🎨");
+  try{
+    const{data}=await axios.get(imgUrl,{responseType:"arraybuffer",timeout:15000,httpsAgent});
+    const webpBuf=await criarSticker(Buffer.from(data),false);
+    await sock.sendMessage(chatJid,{sticker:webpBuf},{quoted:seloBotL});
+    await reagir(sock,msg,"✅");
+  }catch(e){
+    await sock.sendMessage(chatJid,{text:bLine("❌",e.message||"Erro ao criar sticker.")},{quoted:seloBotL});
+    await reagir(sock,msg,"❌");
+  }
+}
+
 function extrairCodigoComando(source,nomeComando){
   const regex=new RegExp(`if\\(+comando===["'\`]${nomeComando.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}["'\`]`);
   const match=regex.exec(source);
@@ -1650,14 +1820,14 @@ async function processarBotaoPlay(sock,msg){
 // ════════════════════════════════════════════════
 // ✅ TODOS OS COMANDOS
 // ════════════════════════════════════════════════
-const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","set","out","prefixo","prefixos","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd",
+const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","set","out","prefixo","prefixos","setprefixo","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd",
 "classe","classes","atributos","level","equipar","desequipar","ranking","lutar","duelo","boss","hunt","aventura","masmorra","raid","fugir","daily","quest","quests","vender","doar","saldo","analisar",
 "sticker2","toimg","tovideo","take","wm","figurinhas","figaleatoria","figanime","figmeme","figgato","figfutebol","figamor","figengracada","colecao","figrank","figdaily","figtroca","figvender","figcomprar","figduelo","rankwaifu",
 "manga","personagem","autor","estudio","episodio","temporada","personagemaleatorio","villain","protagonista","waifu","husbando","casar","divorcio","beijar","abracar","morder","matar","animerpg","confissao","provocacao","fantasia",
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -1797,15 +1967,25 @@ async function startBot(){
           const btnId=extrairBotaoClicado(msg);
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
           if(btnId&&btnId.startsWith("play1_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
+          if(btnId&&btnId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(btnId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
           if(btnId&&btnId.startsWith("cat_")){await enviarSubmenu(sock,jid,msg,btnId,seloBot,sender,isDono);return;}
-          if(btnId&&btnId.startsWith("use_prefix_"))return;
+          if(btnId&&btnId.startsWith("use_prefix_")){const pref=btnId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
           // ✅ Botão não reconhecido (provavelmente de OUTRO bot no grupo) — ignora silenciosamente
           if(btnId!==null)return;
         }
 
         // List response (menu carrossel)
         const listResp=msg.message?.listResponseMessage;
-        if(listResp){const catId=listResp.singleSelectReply?.selectedRowId;if(catId&&catId.startsWith("cat_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;let isAdmin2=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));isAdmin2=admins.includes(sender);}catch{}}if(!isDono&&!senhasAprovadas.has(sender)){if(isGrupo&&isAdmin2){senhasAprovadas.add(sender);}else return;}await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}}
+        if(listResp){
+          const rowId=listResp.singleSelectReply?.selectedRowId;
+          if(rowId&&rowId.startsWith("play2_")){
+            if(isGrupo&&!isDono&&!verificarAluguel(jid))return;
+            const partes=rowId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));
+            await processarBotaoPlay2(sock,msg,formato,url);
+            return;
+          }
+          if(rowId&&rowId.startsWith("cat_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;let isAdmin2=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));isAdmin2=admins.includes(sender);}catch{}}if(!isDono&&!senhasAprovadas.has(sender)){if(isGrupo&&isAdmin2){senhasAprovadas.add(sender);}else return;}await enviarSubmenu(sock,jid,msg,rowId,seloBot,sender,isDono);return;}
+        }
 
         // Interactive response
         const interResp=msg.message?.interactiveResponseMessage;
@@ -1817,8 +1997,10 @@ async function startBot(){
           if(catId){
             if(catId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
             if(catId.startsWith("play1_")){const partes=catId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
+            if(catId.startsWith("play2_")){const partes=catId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay2(sock,msg,formato,url);return;}
+            if(catId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(catId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
             if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}
-            if(catId.startsWith("use_prefix_"))return;
+            if(catId.startsWith("use_prefix_")){const pref=catId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
           }
           // ✅ Resposta interactiva não reconhecida (provavelmente de OUTRO bot no grupo) — ignora
           return;
@@ -2075,7 +2257,7 @@ ${nomeEnviou}`;
 
         const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","link","sorteio","verifica","silenciar","dessilenciar","silenciados","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai","addvip","removevip","vips","bemvindo","bemvindo1","bemvindo2","grupoinfo","inactivos","marcaradmins","adms","status"];
         if(CMDS_ADMIN.includes(comando)&&!isAdmin){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas administradores.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
-        const CMDS_DONO=["out","prefixo","prefixos","set","chaton","sms","gsms","setfoto","adddono","removedono","addsubdono","removesubdono","setletra","downcase"];
+        const CMDS_DONO=["out","set","chaton","sms","gsms","setfoto","adddono","removedono","addsubdono","removesubdono","setletra","downcase","setprefixo"];
         if(CMDS_DONO.includes(comando)&&!isDono){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas o dono.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
         const CMDS_18=["piada18","truth","dare","crush","seduzir","beijo","beijar","abraco","abracar","tapa","flirt","casal","confissao","provocacao","fantasia"];
         if(CMDS_18.includes(comando)&&!isDono&&!isVip(sender)){await sock.sendMessage(jid,{text:bBloco("🔞 VIP EXCLUSIVO",[bLine("💡",`Usa *${CONFIG.PREFIXO}alugar* para ser VIP 💎`)])},{quoted:seloBot});await reagir(sock,msg,"🔞");return;}
@@ -2133,24 +2315,40 @@ ${nomeEnviou}`;
         if(comando==="id"){await sock.sendMessage(jid,{text:bBloco("📱 INFO",[bLine("📱",`_${sender}_`),bLine("👑",`Dono: ${isDono?"✅":"❌"} | 👮 Admin: ${isAdmin?"✅":"❌"}`),bLine("💎",`VIP: ${isVip(sender)?"✅":"❌"}`),bLine("🔑",`Acesso: ${senhasAprovadas.has(sender)||isDono?"✅":"❌"}`)])},{quoted:seloBot});return;}
         if(comando==="out"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Só em grupos.")},{quoted:seloBot});return;}try{await sock.sendMessage(jid,{text:bLine("👋","*Bot a sair...*")},{quoted:seloBot});await new Promise(r=>setTimeout(r,1000));await sock.groupLeave(jid);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="prefixo"||comando==="prefixos"){
-          if(!args[0]){
-            // Só mostra o prefixo com botão copiar
-            const msgPref=`*${CONFIG.PREFIXO}*`;
-            try{
-              await sock.sendMessage(jid,{
-                text:msgPref,
-                footer:`Prefixo do ${CONFIG.NOME_BOT}`,
-                buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
-                headerType:1
-              },{quoted:seloBot});
-            }catch{
-              await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
-            }
+          // Apenas mostra o prefixo com botão de copiar. Para trocar, usa !setprefixo
+          const msgPref=`*${CONFIG.PREFIXO}*`;
+          try{
+            await sock.sendMessage(jid,{
+              text:msgPref,
+              footer:`Prefixo do ${CONFIG.NOME_BOT}${args[0]?` • Usa *${CONFIG.PREFIXO}setprefixo* para trocar`:""}`,
+              buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
+              headerType:1
+            },{quoted:seloBot});
+          }catch{
+            await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
+          }
+          return;
+        }
+        if(comando==="setprefixo"){
+          if(!isDono){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono pode trocar o prefixo.")},{quoted:seloBot});return;}
+          const novoPrefixo=(args[0]||"").trim();
+          if(!novoPrefixo||novoPrefixo.length>3||/\s/.test(novoPrefixo)){
+            await sock.sendMessage(jid,{text:bBloco("⚙️ SETPREFIXO",[bLine("💡",`Uso: *${CONFIG.PREFIXO}setprefixo* [novo prefixo]`),bLine("💡",`Ex: *${CONFIG.PREFIXO}setprefixo* !`),bLine("⚠️","Máx. 3 caracteres, sem espaços.")])},{quoted:seloBot});
             return;
           }
-          const novoPref=args[0].trim().charAt(0);
-          CONFIG.PREFIXO=novoPref;
-          await sock.sendMessage(jid,{text:`✅ Prefixo alterado para *${novoPref}*`},{quoted:seloBot});
+          CONFIG.PREFIXO=novoPrefixo;
+          salvarConfigBot({...carregarConfigBot(),prefixo:novoPrefixo});
+          try{
+            await sock.sendMessage(jid,{
+              text:`✅ Prefixo trocado com sucesso!\nNovo prefixo: *${novoPrefixo}*`,
+              footer:`Prefixo do ${CONFIG.NOME_BOT}`,
+              buttons:[{buttonId:`use_prefix_${novoPrefixo}`,buttonText:{displayText:`『 ${novoPrefixo} 』`},type:1}],
+              headerType:1
+            },{quoted:seloBot});
+          }catch{
+            await sock.sendMessage(jid,{text:`✅ Prefixo trocado para *${novoPrefixo}*!`},{quoted:seloBot});
+          }
+          await reagir(sock,msg,"✅");
           return;
         }
         if(comando==="ping"){
@@ -2170,6 +2368,8 @@ ${nomeEnviou}`;
         // ─── PLAY ───
         if(comando==="play"){await processarComandoPlay(sock,jid,msg,args.join(" ").trim());return;}
         if(comando==="play1"){await processarComandoPlay1(sock,jid,msg,sender,args.join(" ").trim());return;}
+        if(comando==="play2"){await processarComandoPlay2(sock,jid,msg,sender,args.join(" ").trim());return;}
+        if(comando==="pinterest"){await processarComandoPinterest(sock,jid,msg,sender,args.join(" ").trim());return;}
         if(comando==="mp3"&&args.length>0){
           const entrada=args.join(" ");
           await reagir(sock,msg,"🎵");
@@ -2473,7 +2673,7 @@ ${nomeEnviou}`;
         // (handler antigo de !ttuser removido — duplicado, agora tratado acima)
 
         // ─── PINTEREST ───
-        if(comando==="pinterest"&&args.length>0){const query=args.join(" ");let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("📌 PINTEREST",[bLine("🔍",`_${query}_`),FRAMES_LOADING[0]])},{quoted:seloBot});}catch{}const pins=await buscarPinterest(query,1);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("📌 PINTEREST",[bLine("🔍",`_${query}_`),FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));if(!pins.length){await sock.sendMessage(jid,{text:bLine("❌","Nenhuma imagem.")},{quoted:seloBot});return;}try{await sock.sendMessage(jid,{image:{url:pins[0]},caption:bLine("📌",`Pinterest: ${query}`)},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
+        // (handler antigo de !pinterest removido — duplicado, agora tratado acima com carrossel)
 
         // ─── !pin — PINTEREST MULTI-IMAGEM ───
         if(comando==="pin"){
