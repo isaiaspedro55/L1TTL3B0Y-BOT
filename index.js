@@ -1579,6 +1579,8 @@ async function processarBotaoPlay1(sock,msg,formato,url){
   }
 }
 
+const PLAY2_CACHE=new Map(); // chatJid -> {expiraEm, itens:[{chave,formato,url}]}
+const PLAY2_MARCA={mp3:"🎧 Áudio",mp4:"🎬 Vídeo",doc:"📄 Documento"};
 async function processarComandoPlay2(sock,chatJid,msg,sender,query){
   const seloBotL=criarSeloBot(chatJid);
   try{
@@ -1590,18 +1592,22 @@ async function processarComandoPlay2(sock,chatJid,msg,sender,query){
     const resultados=(busca.all||busca.videos||[]).slice(0,15);
     if(!resultados.length){await reagir(sock,msg,"❌");await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY2",[bLine("💡","Nenhuma música encontrada!")])},{quoted:seloBotL});return;}
 
-    const montarRows=(formato)=>resultados.map((m,i)=>({
-      header:"",
-      title:`${i+1}. ${(m.title||"Sem título").slice(0,45)}`,
-      description:`⏱️ ${m.timestamp||"N/A"} • 👤 ${m.author?.name||"?"}`,
-      id:`play2_${formato}_${encodeURIComponent(m.url)}`,
-    }));
+    // ✅ Cache texto→(formato,url) — fallback fiável, já que a resposta do WhatsApp
+    // para listas single_select nem sempre traz metadata (id) legível, mas TRAZ o texto visível.
+    const itensCache=[];
+    const montarRows=(formato)=>resultados.map((m,i)=>{
+      const titulo=`${i+1}. ${(m.title||"Sem título").slice(0,45)}`;
+      const descricao=`${PLAY2_MARCA[formato]} • ⏱️ ${m.timestamp||"N/A"}`;
+      itensCache.push({chave:`${titulo}\n${descricao}`,formato,url:m.url});
+      return{header:"",title:titulo,description:descricao,id:`play2_${formato}_${encodeURIComponent(m.url)}`};
+    });
 
     const buttons=[
       {name:"single_select",buttonParamsJson:JSON.stringify({title:"🎵 MP3",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp3")}]})},
       {name:"single_select",buttonParamsJson:JSON.stringify({title:"🎬 MP4",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp4")}]})},
       {name:"single_select",buttonParamsJson:JSON.stringify({title:"📄 DOC",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("doc")}]})},
     ];
+    PLAY2_CACHE.set(chatJid,{expiraEm:Date.now()+15*60*1000,itens:itensCache});
     const messageParamsJson=JSON.stringify({bottom_sheet:{in_thread_buttons_limit:3,divider_indices:[0,1,2],list_title:"📄 Selecionar opção",button_title:"≡ FORMATO"}});
 
     const primeiraMusica=resultados[0];
@@ -1993,7 +1999,7 @@ async function startBot(){
           if(isGrupo&&!isDono&&!verificarAluguel(jid))return;
           let catId=null;
           try{const nf=interResp.nativeFlowResponseMessage;if(nf?.paramsJson){const params=JSON.parse(nf.paramsJson);catId=params.id||params.selectedId||params.rowId||null;}}catch{}
-          if(!catId)catId=interResp.body||null;
+          if(!catId&&typeof interResp.body==="string")catId=interResp.body;
           if(catId){
             if(catId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
             if(catId.startsWith("play1_")){const partes=catId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
@@ -2001,6 +2007,16 @@ async function startBot(){
             if(catId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(catId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
             if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}
             if(catId.startsWith("use_prefix_")){const pref=catId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
+          }
+          // ✅ PLAY2 — fallback: tenta casar pelo texto visível desta resposta interactiva, antes de desistir
+          if(PLAY2_CACHE.has(jid)){
+            const cache=PLAY2_CACHE.get(jid);
+            if(Date.now()<=cache.expiraEm){
+              try{console.log("🔍 [PLAY2 DEBUG] interResp bruto:",JSON.stringify(interResp).slice(0,2000));}catch{}
+              const textoInter=[interResp.body?.text,interResp.body,JSON.stringify(interResp)].filter(Boolean).join(" ");
+              const item=cache.itens.find(it=>textoInter.includes(it.chave));
+              if(item){await processarBotaoPlay2(sock,msg,item.formato,item.url);return;}
+            }
           }
           // ✅ Resposta interactiva não reconhecida (provavelmente de OUTRO bot no grupo) — ignora
           return;
@@ -2040,6 +2056,28 @@ async function startBot(){
             try{await sock.sendMessage(jid,{text:bLine("🔗",`Links não são permitidos aqui, @${sender.split("@")[0]}! _(Antilink Easy)_`),mentions:[sender]});}catch{}
           }
           return;
+        }
+
+        // ✅ PLAY2 — fallback por texto visível (a resposta da lista single_select nem sempre traz metadata)
+        if(PLAY2_CACHE.has(jid)){
+          const cache=PLAY2_CACHE.get(jid);
+          if(Date.now()>cache.expiraEm){PLAY2_CACHE.delete(jid);}
+          else{
+            // 🔍 DEBUG TEMPORÁRIO — apaga isto depois de resolvido. Mostra a estrutura real da mensagem.
+            try{console.log("🔍 [PLAY2 DEBUG] texto:",JSON.stringify(texto),"| msg.message:",JSON.stringify(msg.message).slice(0,2000));}catch{}
+            if(texto){
+              const item=cache.itens.find(it=>texto.includes(it.chave));
+              if(item){await processarBotaoPlay2(sock,msg,item.formato,item.url);return;}
+            }
+            // Tenta também via extendedTextMessage.contextInfo (caso o texto real esteja só na citação)
+            const textoCitado=msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation
+              ||msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.interactiveMessage?.body?.text
+              ||"";
+            if(textoCitado){
+              const item2=cache.itens.find(it=>textoCitado.includes(it.chave)||(msg.message?.extendedTextMessage?.text||"").includes(it.chave));
+              if(item2){await processarBotaoPlay2(sock,msg,item2.formato,item2.url);return;}
+            }
+          }
         }
 
         // No PRIVADO — a senha (!pp) ainda é necessária (tratada abaixo)
