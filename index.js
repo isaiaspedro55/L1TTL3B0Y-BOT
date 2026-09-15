@@ -52,6 +52,17 @@ let ppBotUrl=null, botFotoBuffer=null;
 const BOT_FOTO_PATH="./dados/bot_foto.jpg";
 if(fs.existsSync(BOT_FOTO_PATH)){try{botFotoBuffer=fs.readFileSync(BOT_FOTO_PATH);}catch{}}
 let YTDLP_CMD="yt-dlp", FFMPEG_CMD="ffmpeg", EDGETTS_CMD="edge-tts";
+// ✅ Contorno de bloqueio de IP (servidores/VPN são frequentemente bloqueados pelo YouTube, dados móveis não).
+// Opcional: define a variável de ambiente YTDLP_PROXY (ex: http://user:pass@host:porta) no teu serviço de hospedagem.
+// Opcional: coloca um ficheiro "cookies.txt" (exportado de uma conta YouTube logada) na raiz do projecto.
+const YTDLP_PROXY=process.env.YTDLP_PROXY||"";
+const YTDLP_COOKIES_PATH="./cookies.txt";
+function ytdlpExtras(){
+  let extras="";
+  if(YTDLP_PROXY)extras+=` --proxy "${YTDLP_PROXY}"`;
+  if(fs.existsSync(YTDLP_COOKIES_PATH))extras+=` --cookies "${YTDLP_COOKIES_PATH}"`;
+  return extras;
+}
 
 process.on("uncaughtException",e=>{if(e.code==="ENOENT"&&e.path&&(e.path.includes("-enc")||e.path.includes("/tmp/"))) return;console.error("❌",e.message);});
 process.on("unhandledRejection",r=>{const m=r?.message||String(r);if(m.includes("-enc")||m.includes("Media upload")) return;console.error("❌",m);});
@@ -170,7 +181,10 @@ async function autoSetup(){
   const edgePaths=["edge-tts","python3 -m edge_tts"];
   for(const cmd of edgePaths){try{execSync(`${cmd} --version`,{stdio:"pipe",timeout:5000});EDGETTS_CMD=cmd;console.log(`✅ edge-tts: ${cmd}`);break;}catch{}}
   if(ytFound){try{execSync(`${YTDLP_CMD} -U`,{stdio:"pipe",timeout:60000});console.log("✅ yt-dlp actualizado!");}catch{}}
-  if(CONFIG.IS_SERVER)console.log("\n⚠️ SERVIDOR — usando proxies para YouTube\n");
+  if(CONFIG.IS_SERVER){
+    if(YTDLP_PROXY)console.log("\n✅ SERVIDOR — proxy configurado para YouTube (YTDLP_PROXY)\n");
+    else console.log("\n⚠️ SERVIDOR — sem proxy configurado! Downloads do YouTube podem falhar (IP de datacenter costuma ser bloqueado). Define YTDLP_PROXY se acontecer.\n");
+  }
   console.log("✅ Setup concluído!\n");
 }
 
@@ -182,7 +196,7 @@ const INVIDIOUS_INSTANCES=["https://yewtu.be","https://invidious.io.lol","https:
 async function buscarYouTubePiped(query){for(const inst of PIPED_INSTANCES){try{const{data}=await axios.get(`${inst}/search?q=${encodeURIComponent(query)}&filter=videos`,{timeout:10000,httpsAgent});const vs=data?.items?.filter(i=>i.type==="stream")||[];if(vs.length)return vs.slice(0,5).map(v=>({title:v.title,url:`https://www.youtube.com/watch?v=${v.url?.replace("/watch?v=","")||v.videoId}`,duration:v.duration,uploader:v.uploaderName||"N/A",thumbnail:v.thumbnail||null,pipedUrl:`${inst}${v.url}`}));}catch{continue;}}return[];}
 function getYtDlpArgs(){
   // ios player client bypasses YouTube "Sign in to confirm you're not a bot"
-  return '--no-check-certificate --no-playlist --no-warnings --force-ipv4 --geo-bypass --extractor-args "youtube:player_client=ios,android_vr,tv_embedded" --retries 3 --sleep-interval 1';
+  return '--no-check-certificate --no-playlist --no-warnings --force-ipv4 --geo-bypass --extractor-args "youtube:player_client=ios,android_vr,tv_embedded" --retries 3 --sleep-interval 1'+ytdlpExtras();
 }
 
 // ════════════════════════════════════════════════
@@ -1012,6 +1026,7 @@ async function downloadMusica(entrada,altaQualidade=false){
       "--geo-bypass --force-ipv4",
       `--add-header "User-Agent:Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36"`,
       "--retries 2 --fragment-retries 2",
+      ytdlpExtras(),
       `-o "${saida}"`,
       `"${query}"`,
     ].join(" ");
@@ -1110,6 +1125,7 @@ async function downloadVideo(entrada,height=480){
       `--extractor-args "youtube:player_client=${client}"`,
       "--no-playlist --no-warnings --no-check-certificate --geo-bypass --force-ipv4",
       "--merge-output-format mp4 --retries 2",
+      ytdlpExtras(),
       `-o "${saida}" "${query}"`].join(" ");
     try{
       await new Promise((res,rej)=>require("child_process").exec(cmd,{timeout:120000,maxBuffer:200*1024*1024},(err,stdout,stderr)=>err?rej(new Error((stderr||err.message).slice(0,200))):res(stdout)));
@@ -1579,8 +1595,6 @@ async function processarBotaoPlay1(sock,msg,formato,url){
   }
 }
 
-const PLAY2_CACHE=new Map(); // chatJid -> {expiraEm, itens:[{chave,formato,url}]}
-const PLAY2_MARCA={mp3:"🎧 Áudio",mp4:"🎬 Vídeo",doc:"📄 Documento"};
 async function processarComandoPlay2(sock,chatJid,msg,sender,query){
   const seloBotL=criarSeloBot(chatJid);
   try{
@@ -1592,22 +1606,22 @@ async function processarComandoPlay2(sock,chatJid,msg,sender,query){
     const resultados=(busca.all||busca.videos||[]).slice(0,15);
     if(!resultados.length){await reagir(sock,msg,"❌");await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY2",[bLine("💡","Nenhuma música encontrada!")])},{quoted:seloBotL});return;}
 
-    // ✅ Cache texto→(formato,url) — fallback fiável, já que a resposta do WhatsApp
-    // para listas single_select nem sempre traz metadata (id) legível, mas TRAZ o texto visível.
-    const itensCache=[];
-    const montarRows=(formato)=>resultados.map((m,i)=>{
-      const titulo=`${i+1}. ${(m.title||"Sem título").slice(0,45)}`;
-      const descricao=`${PLAY2_MARCA[formato]} • ⏱️ ${m.timestamp||"N/A"}`;
-      itensCache.push({chave:`${titulo}\n${descricao}`,formato,url:m.url});
-      return{header:"",title:titulo,description:descricao,id:`play2_${formato}_${encodeURIComponent(m.url)}`};
-    });
+    const montarRows=(formato)=>resultados.map((m,i)=>({
+      header:"",
+      title:`${i+1}. ${(m.title||"Sem título").slice(0,45)}`,
+      description:`⏱️ ${m.timestamp||"N/A"} • 👤 ${m.author?.name||"?"}`,
+      id:`play2_${formato}_${encodeURIComponent(m.url)}`,
+    }));
+
+    const listaMp3={title:"🎵 MP3",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp3")}]};
+    const listaMp4={title:"🎬 MP4",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp4")}]};
+    const listaDoc={title:"📄 DOC",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("doc")}]};
 
     const buttons=[
-      {name:"single_select",buttonParamsJson:JSON.stringify({title:"🎵 MP3",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp3")}]})},
-      {name:"single_select",buttonParamsJson:JSON.stringify({title:"🎬 MP4",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp4")}]})},
-      {name:"single_select",buttonParamsJson:JSON.stringify({title:"📄 DOC",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("doc")}]})},
+      {name:"single_select",buttonParamsJson:JSON.stringify(listaMp3)},
+      {name:"single_select",buttonParamsJson:JSON.stringify(listaMp4)},
+      {name:"single_select",buttonParamsJson:JSON.stringify(listaDoc)},
     ];
-    PLAY2_CACHE.set(chatJid,{expiraEm:Date.now()+15*60*1000,itens:itensCache});
     const messageParamsJson=JSON.stringify({bottom_sheet:{in_thread_buttons_limit:3,divider_indices:[0,1,2],list_title:"📄 Selecionar opção",button_title:"≡ FORMATO"}});
 
     const primeiraMusica=resultados[0];
@@ -1635,7 +1649,6 @@ async function processarComandoPlay2(sock,chatJid,msg,sender,query){
         },
       },
     };
-
     const fullMsg=generateWAMessageFromContent(chatJid,content,{});
     const bizNode={tag:"biz",attrs:{},content:[{tag:"interactive",attrs:{type:"native_flow",v:"1"},content:[{tag:"native_flow",attrs:{name:"mixed",v:"9"}}]}]};
     await sock.relayMessage(chatJid,fullMsg.message,{messageId:fullMsg.key.id,additionalNodes:[bizNode]});
@@ -1973,6 +1986,7 @@ async function startBot(){
           const btnId=extrairBotaoClicado(msg);
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
           if(btnId&&btnId.startsWith("play1_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
+          if(btnId&&btnId.startsWith("play2_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay2(sock,msg,formato,url);return;}
           if(btnId&&btnId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(btnId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
           if(btnId&&btnId.startsWith("cat_")){await enviarSubmenu(sock,jid,msg,btnId,seloBot,sender,isDono);return;}
           if(btnId&&btnId.startsWith("use_prefix_")){const pref=btnId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
@@ -2007,16 +2021,6 @@ async function startBot(){
             if(catId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(catId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
             if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}
             if(catId.startsWith("use_prefix_")){const pref=catId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
-          }
-          // ✅ PLAY2 — fallback: tenta casar pelo texto visível desta resposta interactiva, antes de desistir
-          if(PLAY2_CACHE.has(jid)){
-            const cache=PLAY2_CACHE.get(jid);
-            if(Date.now()<=cache.expiraEm){
-              try{console.log("🔍 [PLAY2 DEBUG] interResp bruto:",JSON.stringify(interResp).slice(0,2000));}catch{}
-              const textoInter=[interResp.body?.text,interResp.body,JSON.stringify(interResp)].filter(Boolean).join(" ");
-              const item=cache.itens.find(it=>textoInter.includes(it.chave));
-              if(item){await processarBotaoPlay2(sock,msg,item.formato,item.url);return;}
-            }
           }
           // ✅ Resposta interactiva não reconhecida (provavelmente de OUTRO bot no grupo) — ignora
           return;
@@ -2056,28 +2060,6 @@ async function startBot(){
             try{await sock.sendMessage(jid,{text:bLine("🔗",`Links não são permitidos aqui, @${sender.split("@")[0]}! _(Antilink Easy)_`),mentions:[sender]});}catch{}
           }
           return;
-        }
-
-        // ✅ PLAY2 — fallback por texto visível (a resposta da lista single_select nem sempre traz metadata)
-        if(PLAY2_CACHE.has(jid)){
-          const cache=PLAY2_CACHE.get(jid);
-          if(Date.now()>cache.expiraEm){PLAY2_CACHE.delete(jid);}
-          else{
-            // 🔍 DEBUG TEMPORÁRIO — apaga isto depois de resolvido. Mostra a estrutura real da mensagem.
-            try{console.log("🔍 [PLAY2 DEBUG] texto:",JSON.stringify(texto),"| msg.message:",JSON.stringify(msg.message).slice(0,2000));}catch{}
-            if(texto){
-              const item=cache.itens.find(it=>texto.includes(it.chave));
-              if(item){await processarBotaoPlay2(sock,msg,item.formato,item.url);return;}
-            }
-            // Tenta também via extendedTextMessage.contextInfo (caso o texto real esteja só na citação)
-            const textoCitado=msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation
-              ||msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.interactiveMessage?.body?.text
-              ||"";
-            if(textoCitado){
-              const item2=cache.itens.find(it=>textoCitado.includes(it.chave)||(msg.message?.extendedTextMessage?.text||"").includes(it.chave));
-              if(item2){await processarBotaoPlay2(sock,msg,item2.formato,item2.url);return;}
-            }
-          }
         }
 
         // No PRIVADO — a senha (!pp) ainda é necessária (tratada abaixo)
