@@ -18,6 +18,7 @@ const https    = require("https");
 const FormData = require("form-data");
 let yts=null; try{yts=require("yt-search");}catch{console.log("⚠️ yt-search não instalado — !play1 não vai funcionar. Corre: npm i yt-search");}
 const { enviarDino } = require("./comando_dino.js");
+const { processarComandoEp } = require("./comando_anime.js");
 const { enviarPiano } = require("./comando_piano.js");
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 
@@ -645,6 +646,8 @@ function gerarSubmenu(catId,P){
   if(catId==="cat_animes")return bBloco(`𝐀𝐍𝐈𝐌𝐄𝐬 【${em}】`,[
     bLine("🔎","*PESQUISA*"),
     bLine(em,`*${P}anime* [nome]`),bLine(em,`*${P}manga* [nome]`),bLine(em,`*${P}personagem* [nome]`),bLine(em,`*${P}autor* [nome]`),bLine(em,`*${P}estudio* [nome]`),bLine(em,`*${P}episodio* [anime]`),bLine(em,`*${P}temporada*`),
+    B_SEP,bLine("📥","*DOWNLOAD DE EPISÓDIOS*"),
+    bLine(em,`*${P}ep* [anime] [nº] → _baixa o episódio_`),
     B_SEP,bLine("🎲","*ALEATÓRIOS*"),
     bLine(em,`*${P}animealeatorio*`),bLine(em,`*${P}personagemaleatorio*`),bLine(em,`*${P}waifu*`),bLine(em,`*${P}husbando*`),bLine(em,`*${P}villain*`),bLine(em,`*${P}protagonista*`),
     B_SEP,bLine("❤️","*INTERACÇÃO*"),
@@ -1008,6 +1011,9 @@ async function downloadViaScraperHub(url,formato){
 // ════════════════════════════════════════════════
 async function downloadMusica(entrada,altaQualidade=false){
   const isUrl=entrada.startsWith("http")||entrada.includes("youtu.be")||entrada.includes("youtube.com");
+  if(isUrl&&/[?&]list=/.test(entrada)&&!/[?&]v=/.test(entrada)&&!entrada.includes("youtu.be/")){
+    throw new Error("Isto é um link de playlist, não de vídeo. Manda o link de uma música específica.");
+  }
   const outputDir="./downloads";
   const query=isUrl?entrada:`ytsearch1:${entrada}`;
 
@@ -1114,6 +1120,9 @@ async function buscarTituloYT(query){
 
 async function downloadVideo(entrada,height=480){
   const isUrl=entrada.startsWith("http")||entrada.includes("youtu");
+  if(isUrl&&/[?&]list=/.test(entrada)&&!/[?&]v=/.test(entrada)&&!entrada.includes("youtu.be/")){
+    throw new Error("Isto é um link de playlist, não de vídeo. Manda o link de um vídeo específico.");
+  }
   const outputDir="./downloads";
   const query=isUrl?entrada:`ytsearch1:${entrada}`;
   const playerClients=["android_vr","mweb","android_creator","ios","tv_embedded","android"];
@@ -1846,7 +1855,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativara
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -1875,6 +1884,12 @@ async function startBot(){
         if(content&&typeof content==="object"&&!Buffer.isBuffer(content)){
           if(typeof content.text==="string")content.text=protegerEEstilizar(content.text);
           if(typeof content.caption==="string")content.caption=protegerEEstilizar(content.caption);
+          // ✅ Bloqueia mensagens de texto vazias/só-espaço para evitar spam de bolhas em branco
+          const temOutraMidia=content.image||content.video||content.audio||content.sticker||content.stickerPack||content.document||content.react||content.delete||content.contacts||content.location||content.buttons||content.templateButtons||content.listMessage||content.viewOnceMessage||content.interactiveMessage||content.nativeFlowMessage;
+          if("text" in content&&(!content.text||!String(content.text).trim())&&!temOutraMidia){
+            console.log(`⚠️ Envio bloqueado: mensagem de texto vazia para ${destJid}`);
+            return Promise.resolve(null);
+          }
         }
       }catch{}
       return _sendMessageOriginal(destJid,content,options);
@@ -3218,6 +3233,15 @@ ${nomeEnviou}`;
         }
 
         // ─── ANIME RPG ───
+        if(comando==="ep"){
+          await processarComandoEp({
+            sock,jid,msg,seloBot,args,sender,
+            bLine,bBloco,reagir,enviarVideo,addXP,
+            CONFIG,YTDLP_CMD,FFMPEG_CMD,
+          });
+          return;
+        }
+
         if(comando==="animerpg"){
           const escolha=args.join(" ").toLowerCase().trim().replace(/\s+/g,"");
           if(!escolha){
