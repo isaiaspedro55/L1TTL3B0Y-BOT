@@ -27,7 +27,7 @@ fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./dados");
 
 const CONFIG = {
-  PREFIXO:         "!",
+  PREFIXO:         ":",
   NUMERO_BOT:      "244954260707",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
   GEMINI_KEY:      process.env.GEMINI_KEY || "", // ⚠️ Cola aqui a tua API key grátis do Gemini (https://aistudio.google.com/apikey)
