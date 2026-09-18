@@ -22,6 +22,7 @@ const { processarComandoEp } = require("./comando_anime.js");
 const { enviarPiano } = require("./comando_piano.js");
 const { enviarCobra } = require("./comando_cobra.js");
 const { enviarDama } = require("./comando_dama.js");
+const { enviarXO } = require("./comando_XO.js");
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 
 fs.ensureDirSync(process.env.TMPDIR);
@@ -398,6 +399,18 @@ const banEmCurso=new Set(),historyMsgs={},menuEsperandoResposta=new Map();
 const senhasAprovadas=new Set(),pedidoSenha=new Set();
 function listarGruposAtivos(){try{return Object.keys(carregarAluguel()).filter(g=>verificarAluguel(g));}catch{return[];}}
 const chatsDesativados=new Set(),vozBotDesativado=new Set(),comandosBloqueados=new Set();
+// ✅ Store real de mensagens enviadas — usado por getMessage() do baileys para reenviar
+// correctamente quando o destinatário não conseguiu decriptar à primeira (reduz "preciso repetir o comando")
+const storeMensagensEnviadas=new Map();
+function guardarMensagemEnviada(jid,id,mensagem){
+  try{
+    storeMensagensEnviadas.set(`${jid}:${id}`,mensagem);
+    if(storeMensagensEnviadas.size>800){
+      const primeiraChave=storeMensagensEnviadas.keys().next().value;
+      storeMensagensEnviadas.delete(primeiraChave);
+    }
+  }catch{}
+}
 const antiLinkDesativado=new Set(),cacheViewOnce={};
 const antiLinkModo=new Map(); // jid -> "easy" (padrão, sem ban) | "hard" (remove + bane)
 const bemVindoDesativado=new Set();
@@ -625,7 +638,7 @@ function gerarSubmenu(catId,P){
     bLine(em,`*${P}matematica*`),bLine(em,`*${P}jokenpo*`),bLine(em,`*${P}dado*`),bLine(em,`*${P}cara-coroa*`),bLine(em,`*${P}adivinhar*`),bLine(em,`*${P}velocidade*`),bLine(em,`*${P}roleta*`),bLine(em,`*${P}aki*`),bLine(em,`*${P}aposta*`),bLine(em,`*${P}8ball* [pergunta] 🎱`),
     B_SEP,bLine("🕹️","*JOGOS INTERACTIVOS:*"),
     bLine(em,`*${P}dino* 🦖 → _Dino Runner interactivo_`),bLine(em,`*${P}piano* 🎹 → _piano interactivo_`),
-    bLine(em,`*${P}cobra* 🐍 → _Snake interactivo_`),bLine(em,`*${P}dama* 🔴 → _damas, 2 jogadores_`),
+    bLine(em,`*${P}cobra* 🐍 → _Snake interactivo_`),bLine(em,`*${P}dama* 🔴 → _damas, 2 jogadores_`),bLine(em,`*${P}xo* ❌⭕ → _jogo da velha, 2 jogadores_`),
     B_SEP,bLine("😂","*DIVERSÃO:*"),
     bLine(em,`*${P}piada*`),bLine(em,`*${P}conselho*`),bLine(em,`*${P}poema*`),bLine(em,`*${P}historia*`),bLine(em,`*${P}analisar* @user`),bLine(em,`*${P}cara*`),bLine(em,`*${P}ship* @user`),bLine(em,`*${P}fofoca*`),
     bLine(em,`*${P}cantada* 💘`),bLine(em,`*${P}inunca* 🎯`),bLine(em,`*${P}conselhobiblico* 📖`),
@@ -1858,7 +1871,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativara
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep","cobra","snake","dama","damas"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep","cobra","snake","dama","damas","xo","jogodavelha","velha"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -1870,7 +1883,7 @@ async function startBot(){
   try{
     const{version}=await fetchLatestBaileysVersion();
     const{state,saveCreds}=await useMultiFileAuthState("./sessao");
-    const sock=makeWASocket({version,auth:state,printQRInTerminal:false,getMessage:async()=>({conversation:""}),generateHighQualityLinkPreview:false,fetchAgent:httpsAgent,logger:silentLogger,connectTimeoutMs:60000,keepAliveIntervalMs:10000,retryRequestDelayMs:2000,maxMsgRetryCount:3,defaultQueryTimeoutMs:180000});
+    const sock=makeWASocket({version,auth:state,printQRInTerminal:false,getMessage:async(key)=>{try{return storeMensagensEnviadas.get(`${key.remoteJid}:${key.id}`)||{conversation:""};}catch{return{conversation:""};}},generateHighQualityLinkPreview:false,fetchAgent:httpsAgent,logger:silentLogger,connectTimeoutMs:60000,keepAliveIntervalMs:10000,retryRequestDelayMs:2000,maxMsgRetryCount:3,defaultQueryTimeoutMs:180000});
     sock.ev.on("creds.update",saveCreds);
 
     // ✅ Aplica a letra/fonte escolhida (!setletra) a TODAS as mensagens de texto do bot
@@ -1895,7 +1908,11 @@ async function startBot(){
           }
         }
       }catch{}
-      return _sendMessageOriginal(destJid,content,options);
+      const resultado=_sendMessageOriginal(destJid,content,options);
+      resultado.then(msgEnviada=>{
+        try{if(msgEnviada?.key?.id&&msgEnviada?.message)guardarMensagemEnviada(destJid,msgEnviada.key.id,msgEnviada.message);}catch{}
+      }).catch(()=>{});
+      return resultado;
     };
 
     setInterval(()=>{try{const now=Date.now();for(const[k,v] of playCacheMap.entries()){if(now-v.criadoEm>15*60*1000)playCacheMap.delete(k);}}catch{}},5*60*1000);
@@ -1984,6 +2001,22 @@ async function startBot(){
         if(eMidiaSemTexto(msg)) return;
 
         const mencoes=msg.message?.extendedTextMessage?.contextInfo?.mentionedJid||[];
+
+        // ✅ "prefixo"/"prefix" — funciona para QUALQUER pessoa, mesmo sem aluguel activo (é só informativo)
+        if(texto&&!chatsDesativados.has(jid)&&(/^prefixo$/i.test(texto.trim())||/^prefix$/i.test(texto.trim()))){
+          const msgPref=`*${CONFIG.PREFIXO}*`;
+          try{
+            await sock.sendMessage(jid,{
+              text:msgPref,
+              footer:`Prefixo do ${CONFIG.NOME_BOT}`,
+              buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
+              headerType:1
+            },{quoted:seloBot});
+          }catch{
+            await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
+          }
+          return;
+        }
 
         // Cache msgs
         if(!cacheMsg[jid])cacheMsg[jid]={};
@@ -2119,21 +2152,7 @@ async function startBot(){
             return;
           }
 
-          // ✅ Detectar palavra "prefixo" sem prefixo → mostra só o prefixo com botão copiar
-          if(/^prefixo$/i.test(texto.trim())||/^prefix$/i.test(texto.trim())){
-            const msgPref=`*${CONFIG.PREFIXO}*`;
-            try{
-              await sock.sendMessage(jid,{
-                text:msgPref,
-                footer:`Prefixo do ${CONFIG.NOME_BOT}`,
-                buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
-                headerType:1
-              },{quoted:seloBot});
-            }catch{
-              await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
-            }
-            return;
-          }
+          // (deteção de "prefixo" movida para o topo, antes do gate de aluguel)
 
           // ✅ Tenta o assistente — passa isGrupo para lógica correcta
           const foiAssistente=await executarAssistente(sock,jid,msg,sender,seloBot,texto,isDono,isAdmin,isGrupo);
@@ -4440,6 +4459,11 @@ ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`
         if(comando==="dama"||comando==="damas"){
           try{await enviarDama(sock,jid);await reagir(sock,msg,"🔴");}
           catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar as Damas."),bLine("🔴",e.message)])},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="xo"||comando==="jogodavelha"||comando==="velha"){
+          try{await enviarXO(sock,jid);await reagir(sock,msg,"❌");}
+          catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar o Jogo da Velha."),bLine("🔴",e.message)])},{quoted:seloBot});}
           return;
         }
 

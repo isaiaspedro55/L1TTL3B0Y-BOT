@@ -1,324 +1,1586 @@
 // ════════════════════════════════════════════════
-// ✅ COMANDO !DAMA — Jogo de Damas interativo (2 jogadores, mesmo ecrã)
+// ♟️ COMANDO :DAMAS — DAMAS 10x10
+// 100 CASAS · 20 PEÇAS POR JOGADOR
+// Tela grande + controles abaixo
 // ════════════════════════════════════════════════
+
 const { generateWAMessageFromContent } = require("@itsliaaa/baileys");
 
-const DAMA_HTML = `<!DOCTYPE html>
-<html lang="pt">
+const DAMAS_HTML = `<!DOCTYPE html>
+<html lang="pt-BR">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>Damas</title>
+
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
+>
+
+<title>Damas 100 Casas</title>
+
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
-  html, body {
-    margin: 0; padding: 0; min-height: 100%;
-    background: radial-gradient(circle at 50% 0%, #2a1f16, #120b06 70%);
-    display: flex; align-items: center; justify-content: center;
-    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    color: #f5e9da;
-  }
-  .wrap { width: 100%; max-width: 420px; padding: 12px; }
-  .hud {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 8px; padding: 10px 14px; border-radius: 14px;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-    font-size: 14px;
-  }
-  .turno { display:flex; align-items:center; gap:8px; font-weight:600; }
-  .bolinha { width:16px; height:16px; border-radius:50%; display:inline-block; border: 2px solid rgba(255,255,255,.5); }
-  .bolinha.preta { background:#1b1b1b; }
-  .bolinha.branca { background:#eee0c8; }
-  #board {
-    width: 100%; aspect-ratio: 1/1; display: grid;
-    grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr);
-    border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.5);
-    border: 3px solid #5a3d24;
-  }
-  .sq { position: relative; display:flex; align-items:center; justify-content:center; }
-  .sq.light { background:#e8d3ab; }
-  .sq.dark { background:#7a4a26; }
-  .sq.hl { box-shadow: inset 0 0 0 3px #7CFC91; }
-  .sq.mv::after {
-    content:''; position:absolute; width:22%; height:22%; border-radius:50%;
-    background: rgba(124,252,145,0.75);
-  }
-  .peca {
-    width: 76%; height: 76%; border-radius: 50%;
-    box-shadow: 0 3px 6px rgba(0,0,0,.5), inset 0 -3px 6px rgba(0,0,0,.35), inset 0 3px 6px rgba(255,255,255,.15);
-    display:flex; align-items:center; justify-content:center; font-size: 16px;
-  }
-  .peca.preta { background: linear-gradient(160deg,#3a3a3a,#0d0d0d); }
-  .peca.branca { background: linear-gradient(160deg,#fff6e6,#d8c39a); color:#5a3d24; }
-  .msg { margin-top: 12px; text-align:center; font-size: 13px; opacity:.85; min-height: 18px; }
-  .btns { margin-top: 10px; display:flex; justify-content:center; gap:10px; }
-  .btns button {
-    padding: 10px 20px; border-radius: 20px; border: none; font-size: 13px; font-weight:600;
-    background: linear-gradient(180deg,#8a5a30,#5a3d24); color:#fff;
-  }
-  .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.75);
-    display: none; align-items: center; justify-content: center; flex-direction: column;
-    text-align: center; gap: 10px; z-index: 5;
-  }
-  .overlay.show { display: flex; }
-  .overlay h2 { margin: 0; font-size: 26px; color: #f0c987; }
-  .overlay button {
-    margin-top: 8px; padding: 12px 28px; border: none; border-radius: 30px;
-    background: #c98a3f; color: #2a1a0d; font-size: 16px; font-weight: 700;
-  }
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+
+html,body{
+  min-height:100%;
+}
+
+body{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:8px;
+  background:#17120f;
+  font-family:Arial,sans-serif;
+  color:#fff;
+  touch-action:manipulation;
+}
+
+.card{
+  width:100%;
+  max-width:620px;
+  background:#241b17;
+  border:1px solid #4b382d;
+  border-radius:18px;
+  padding:10px;
+  text-align:center;
+  box-shadow:0 12px 35px rgba(0,0,0,.45);
+}
+
+.title{
+  font-size:24px;
+  font-weight:900;
+  margin-bottom:3px;
+}
+
+.sub{
+  font-size:10px;
+  color:#c9b8aa;
+  margin-bottom:7px;
+}
+
+.info{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:5px;
+  margin-bottom:7px;
+}
+
+.turn{
+  flex:1;
+  padding:8px;
+  border-radius:10px;
+  background:#382a23;
+  font-size:12px;
+  font-weight:700;
+}
+
+.score{
+  font-size:10px;
+  color:#d8c9bf;
+}
+
+/* ═══════════════════════════════
+   TABULEIRO GRANDE
+   ═══════════════════════════════ */
+
+.board-wrap{
+  width:100%;
+  max-width:500px;
+  margin:auto;
+  padding:5px;
+  background:#120d0b;
+  border-radius:12px;
+  box-shadow:
+    inset 0 0 0 1px #5b4336;
+}
+
+.board{
+  width:100%;
+  aspect-ratio:1;
+
+  display:grid;
+
+  grid-template-columns:
+    repeat(10,1fr);
+
+  grid-template-rows:
+    repeat(10,1fr);
+
+  overflow:hidden;
+
+  border-radius:7px;
+}
+
+.cell{
+  position:relative;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  aspect-ratio:1;
+}
+
+.light{
+  background:#e7d7bd;
+}
+
+.dark{
+  background:#754c35;
+}
+
+.cell.selected{
+  box-shadow:
+    inset 0 0 0 4px #f4d35e;
+}
+
+.cell.move{
+  box-shadow:
+    inset 0 0 0 4px #7ee081;
+}
+
+.cell.capture{
+  box-shadow:
+    inset 0 0 0 4px #ff7777;
+}
+
+.piece{
+  width:76%;
+  height:76%;
+
+  border-radius:50%;
+
+  display:flex;
+
+  align-items:center;
+  justify-content:center;
+
+  font-size:
+    clamp(13px,4vw,25px);
+
+  font-weight:900;
+
+  border:2px solid rgba(0,0,0,.35);
+
+  box-shadow:
+    0 3px 5px rgba(0,0,0,.45),
+    inset 0 2px 3px rgba(255,255,255,.22);
+}
+
+.white-piece{
+  background:
+    linear-gradient(
+      #fff,
+      #d7d7d7
+    );
+
+  color:#4d3325;
+}
+
+.black-piece{
+  background:
+    linear-gradient(
+      #353535,
+      #111
+    );
+
+  color:#fff;
+}
+
+.king{
+  border:4px solid #e7b84b;
+}
+
+.number{
+  position:absolute;
+
+  top:2px;
+  left:3px;
+
+  font-size:7px;
+
+  opacity:.45;
+
+  color:#000;
+}
+
+/* ═══════════════════════════════
+   BOTÃO
+   ═══════════════════════════════ */
+
+button{
+  margin-top:9px;
+
+  border:0;
+
+  border-radius:999px;
+
+  padding:9px 20px;
+
+  background:#d49a52;
+
+  color:#21150f;
+
+  font-size:12px;
+
+  font-weight:900;
+
+  box-shadow:
+    0 3px 0 #8b5b2b;
+}
+
+button:active{
+  transform:translateY(2px);
+
+  box-shadow:
+    0 1px 0 #8b5b2b;
+}
+
+.help{
+  margin-top:7px;
+
+  font-size:9px;
+
+  color:#a99384;
+
+  line-height:1.4;
+}
+
 </style>
+
 </head>
+
 <body>
-<div class="wrap">
-  <div class="hud">
-    <div class="turno">Vez: <span class="bolinha preta" id="turnoBolinha"></span> <span id="turnoTexto">Pretas</span></div>
-    <div>🎯 <span id="placar">12 x 12</span></div>
-  </div>
-  <div id="board"></div>
-  <div class="msg" id="msg">Toca numa peça e depois na casa de destino.</div>
-  <div class="btns">
-    <button id="resetBtn">🔄 Reiniciar</button>
-  </div>
+
+<div class="card">
+
+<div class="title">
+♟️ DAMAS
 </div>
-<div class="overlay" id="overlay">
-  <h2 id="overlayTitle">🏆 Fim de Jogo</h2>
-  <div id="overlayMsg"></div>
-  <button id="startBtn">Jogar de novo</button>
+
+<div class="sub">
+10 × 10 · 100 CASAS · 20 PEÇAS
 </div>
+
+<div class="info">
+
+<div
+  class="turn"
+  id="turn">
+  Vez das brancas
+</div>
+
+<div
+  class="score"
+  id="score">
+  Brancas: 20 · Pretas: 20
+</div>
+
+</div>
+
+<div class="board-wrap">
+
+<div
+  class="board"
+  id="board">
+</div>
+
+</div>
+
+<button id="newGame">
+NOVO JOGO
+</button>
+
+<div class="help">
+
+Toque numa peça e depois numa casa destacada.<br>
+Capturas são obrigatórias.
+
+</div>
+
+</div>
+
 <script>
+
 (function(){
-  const N = 8;
-  let board, turno, selecionada, jogadasValidas, capturaObrigatoriaDeCadeia;
 
-  function novoTabuleiro(){
-    const b = Array.from({length:N}, () => Array(N).fill(null));
-    for (let y=0;y<3;y++){
-      for (let x=0;x<N;x++){
-        if ((x+y)%2===1) b[y][x] = { cor:'preta', dama:false };
+const SIZE = 10;
+
+const boardEl =
+document.getElementById("board");
+
+const turnEl =
+document.getElementById("turn");
+
+const scoreEl =
+document.getElementById("score");
+
+const newGame =
+document.getElementById("newGame");
+
+let board = [];
+
+let turn = "white";
+
+let selected = null;
+
+let gameOver = false;
+
+
+// ═══════════════════════════════
+// CRIAR TABULEIRO
+// ═══════════════════════════════
+
+function createBoard(){
+
+  board =
+  Array.from(
+    {length:SIZE},
+    function(){
+
+      return Array(SIZE).fill(null);
+
+    }
+  );
+
+
+  // PRETAS
+
+  for(
+    let r=0;
+    r<4;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      if(
+        (r+c)%2===1
+      ){
+
+        board[r][c] = {
+
+          color:"black",
+
+          king:false
+
+        };
+
       }
+
     }
-    for (let y=5;y<8;y++){
-      for (let x=0;x<N;x++){
-        if ((x+y)%2===1) b[y][x] = { cor:'branca', dama:false };
+
+  }
+
+
+  // BRANCAS
+
+  for(
+    let r=6;
+    r<10;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      if(
+        (r+c)%2===1
+      ){
+
+        board[r][c] = {
+
+          color:"white",
+
+          king:false
+
+        };
+
       }
-    }
-    return b;
-  }
 
-  function iniciar(){
-    board = novoTabuleiro();
-    turno = 'preta';
-    selecionada = null;
-    jogadasValidas = [];
-    capturaObrigatoriaDeCadeia = null;
-    atualizarHud();
-    render();
-    document.getElementById('msg').textContent = 'Toca numa peça e depois na casa de destino.';
-  }
-
-  function atualizarHud(){
-    document.getElementById('turnoBolinha').className = 'bolinha ' + turno;
-    document.getElementById('turnoTexto').textContent = turno === 'preta' ? 'Pretas' : 'Brancas';
-    let pretas = 0, brancas = 0;
-    for (let y=0;y<N;y++) for (let x=0;x<N;x++){
-      const p = board[y][x];
-      if (p) { if (p.cor==='preta') pretas++; else brancas++; }
-    }
-    document.getElementById('placar').textContent = pretas + ' x ' + brancas;
-    if (pretas===0 || brancas===0){
-      fimDeJogo(pretas===0 ? 'Brancas' : 'Pretas');
-    }
-  }
-
-  function fimDeJogo(vencedor){
-    document.getElementById('overlayTitle').textContent = '🏆 ' + vencedor + ' venceram!';
-    document.getElementById('overlayMsg').textContent = 'Toca em jogar de novo para recomeçar.';
-    document.getElementById('overlay').classList.add('show');
-  }
-
-  function dentro(x,y){ return x>=0 && x<N && y>=0 && y<N; }
-
-  function direcoesDe(peca){
-    if (peca.dama) return [[-1,-1],[-1,1],[1,-1],[1,1]];
-    return peca.cor === 'preta' ? [[1,-1],[1,1]] : [[-1,-1],[-1,1]];
-  }
-
-  // Devolve { simples:[{x,y}], capturas:[{x,y,capturada:{x,y}}] }
-  function movimentosDe(x,y){
-    const peca = board[y][x];
-    if (!peca) return { simples:[], capturas:[] };
-    const simples = [], capturas = [];
-    const dirs = peca.dama ? [[-1,-1],[-1,1],[1,-1],[1,1]] : direcoesDe(peca);
-    dirs.forEach(([dy,dx]) => {
-      const nx = x+dx, ny = y+dy;
-      if (dentro(nx,ny) && !board[ny][nx]) simples.push({x:nx,y:ny});
-      const mx = x+dx, my = y+dy, jx = x+dx*2, jy = y+dy*2;
-      if (dentro(jx,jy) && board[my] && board[my][mx] && board[my][mx].cor !== peca.cor && !board[jy][jx]) {
-        capturas.push({x:jx, y:jy, capturada:{x:mx,y:my}});
-      }
-    });
-    return { simples, capturas };
-  }
-
-  function existeCapturaObrigatoria(cor){
-    for (let y=0;y<N;y++) for (let x=0;x<N;x++){
-      const p = board[y][x];
-      if (p && p.cor===cor){
-        const mv = movimentosDe(x,y);
-        if (mv.capturas.length) return true;
-      }
-    }
-    return false;
-  }
-
-  function render(){
-    const el = document.getElementById('board');
-    el.innerHTML = '';
-    const obrigatorio = existeCapturaObrigatoria(turno);
-    for (let y=0;y<N;y++){
-      for (let x=0;x<N;x++){
-        const sq = document.createElement('div');
-        sq.className = 'sq ' + (((x+y)%2===0) ? 'light' : 'dark');
-        sq.dataset.x = x; sq.dataset.y = y;
-
-        if (selecionada && selecionada.x===x && selecionada.y===y) sq.classList.add('hl');
-        if (jogadasValidas.some(m => m.x===x && m.y===y)) sq.classList.add('mv');
-
-        const peca = board[y][x];
-        if (peca){
-          const pd = document.createElement('div');
-          pd.className = 'peca ' + peca.cor;
-          if (peca.dama) pd.textContent = '♛';
-          sq.appendChild(pd);
-        }
-        sq.addEventListener('click', () => onClickCasa(x,y,obrigatorio));
-        el.appendChild(sq);
-      }
-    }
-  }
-
-  function onClickCasa(x,y,obrigatorio){
-    const peca = board[y][x];
-
-    // Seleccionar peça própria
-    if (peca && peca.cor === turno){
-      const mv = movimentosDe(x,y);
-      let disponiveis = mv.capturas;
-      if (!disponiveis.length && !obrigatorio) disponiveis = mv.simples;
-      if (obrigatorio && !mv.capturas.length) {
-        document.getElementById('msg').textContent = 'Há captura obrigatória com outra peça!';
-        return;
-      }
-      selecionada = { x, y };
-      jogadasValidas = disponiveis;
-      render();
-      return;
     }
 
-    // Tentar mover para casa alvo
-    if (selecionada){
-      const alvo = jogadasValidas.find(m => m.x===x && m.y===y);
-      if (alvo){
-        const p = board[selecionada.y][selecionada.x];
-        board[y][x] = p;
-        board[selecionada.y][selecionada.x] = null;
-        let capturou = false;
-        if (alvo.capturada){
-          board[alvo.capturada.y][alvo.capturada.x] = null;
-          capturou = true;
-        }
-        // Promoção a dama
-        if ((p.cor==='preta' && y===N-1) || (p.cor==='branca' && y===0)) p.dama = true;
+  }
 
-        // Cadeia de capturas
-        if (capturou){
-          const seguinte = movimentosDe(x,y);
-          if (seguinte.capturas.length){
-            selecionada = { x, y };
-            jogadasValidas = seguinte.capturas;
-            document.getElementById('msg').textContent = 'Captura em cadeia! Continua a jogar.';
-            render();
-            atualizarHud();
-            return;
+
+  turn = "white";
+
+  selected = null;
+
+  gameOver = false;
+
+  render();
+
+}
+
+
+// ═══════════════════════════════
+// AUXILIARES
+// ═══════════════════════════════
+
+function inside(r,c){
+
+  return (
+    r>=0 &&
+    r<SIZE &&
+    c>=0 &&
+    c<SIZE
+  );
+
+}
+
+function enemy(color){
+
+  return color === "white"
+    ? "black"
+    : "white";
+
+}
+
+
+// ═══════════════════════════════
+// DIREÇÕES
+// ═══════════════════════════════
+
+function directions(){
+
+  return [
+
+    [-1,-1],
+    [-1,1],
+    [1,-1],
+    [1,1]
+
+  ];
+
+}
+
+
+// ═══════════════════════════════
+// MOVIMENTOS
+// ═══════════════════════════════
+
+function getMoves(
+  r,
+  c,
+  captureOnly
+){
+
+  const piece =
+  board[r][c];
+
+  if(!piece) return [];
+
+  if(
+    piece.color !== turn
+  ) return [];
+
+  const moves = [];
+
+
+  // ═══════════════════════════
+  // DAMA
+  // ═══════════════════════════
+
+  if(piece.king){
+
+    directions().forEach(
+    function(d){
+
+      let nr =
+      r+d[0];
+
+      let nc =
+      c+d[1];
+
+      let enemyPiece =
+      null;
+
+
+      while(
+        inside(nr,nc)
+      ){
+
+        const target =
+        board[nr][nc];
+
+
+        if(!target){
+
+          if(
+            !captureOnly &&
+            !enemyPiece
+          ){
+
+            moves.push({
+
+              r:nr,
+              c:nc,
+              capture:null
+
+            });
+
           }
+
+          else if(
+            enemyPiece
+          ){
+
+            moves.push({
+
+              r:nr,
+              c:nc,
+              capture:enemyPiece
+
+            });
+
+          }
+
         }
 
-        selecionada = null;
-        jogadasValidas = [];
-        turno = turno === 'preta' ? 'branca' : 'preta';
-        document.getElementById('msg').textContent = 'Toca numa peça e depois na casa de destino.';
-        render();
-        atualizarHud();
-        return;
-      }
-    }
+        else{
 
-    // Clique inválido: desseleciona
-    selecionada = null;
-    jogadasValidas = [];
-    render();
+          if(
+            target.color ===
+            piece.color ||
+            enemyPiece
+          ){
+
+            break;
+
+          }
+
+          enemyPiece = {
+
+            r:nr,
+            c:nc
+
+          };
+
+        }
+
+
+        nr += d[0];
+
+        nc += d[1];
+
+      }
+
+    });
+
+    return moves;
+
   }
 
-  document.getElementById('resetBtn').onclick = iniciar;
-  document.getElementById('startBtn').onclick = () => {
-    document.getElementById('overlay').classList.remove('show');
-    iniciar();
+
+  // ═══════════════════════════
+  // PEÇA NORMAL
+  // ═══════════════════════════
+
+  directions().forEach(
+  function(d){
+
+    const nr =
+    r+d[0];
+
+    const nc =
+    c+d[1];
+
+
+    // MOVIMENTO
+
+    if(
+      !captureOnly &&
+      inside(nr,nc) &&
+      !board[nr][nc]
+    ){
+
+      const forward =
+      piece.color === "white"
+      ? d[0] === -1
+      : d[0] === 1;
+
+
+      if(forward){
+
+        moves.push({
+
+          r:nr,
+          c:nc,
+          capture:null
+
+        });
+
+      }
+
+    }
+
+
+    // CAPTURA
+
+    const jr =
+    r+d[0]*2;
+
+    const jc =
+    c+d[1]*2;
+
+
+    if(
+      inside(nr,nc) &&
+      inside(jr,jc) &&
+      board[nr][nc] &&
+      board[nr][nc].color ===
+        enemy(piece.color) &&
+      !board[jr][jc]
+    ){
+
+      moves.push({
+
+        r:jr,
+        c:jc,
+
+        capture:{
+
+          r:nr,
+          c:nc
+
+        }
+
+      });
+
+    }
+
+  });
+
+
+  return moves;
+
+}
+
+
+// ═══════════════════════════════
+// CAPTURAS OBRIGATÓRIAS
+// ═══════════════════════════════
+
+function allCaptures(color){
+
+  const result = [];
+
+  const oldTurn =
+  turn;
+
+  turn = color;
+
+
+  for(
+    let r=0;
+    r<SIZE;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      if(
+        board[r][c] &&
+        board[r][c].color === color
+      ){
+
+        const moves =
+        getMoves(
+          r,
+          c,
+          true
+        );
+
+
+        if(moves.length){
+
+          result.push({
+
+            r:r,
+            c:c,
+            moves:moves
+
+          });
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  turn = oldTurn;
+
+  return result;
+
+}
+
+
+function captureRequired(){
+
+  return (
+    allCaptures(turn).length > 0
+  );
+
+}
+
+
+// ═══════════════════════════════
+// EXECUTAR MOVIMENTO
+// ═══════════════════════════════
+
+function executeMove(
+  from,
+  to
+){
+
+  const piece =
+  board[from.r][from.c];
+
+
+  const moves =
+  getMoves(
+    from.r,
+    from.c,
+    captureRequired()
+  );
+
+
+  const move =
+  moves.find(
+    function(m){
+
+      return (
+        m.r === to.r &&
+        m.c === to.c
+      );
+
+    }
+  );
+
+
+  if(!move) return false;
+
+
+  board[to.r][to.c] =
+  piece;
+
+  board[from.r][from.c] =
+  null;
+
+
+  // CAPTURA
+
+  if(move.capture){
+
+    board[
+      move.capture.r
+    ][
+      move.capture.c
+    ] = null;
+
+  }
+
+
+  // PROMOÇÃO
+
+  if(
+    !piece.king &&
+    (
+      (
+        piece.color === "white" &&
+        to.r === 0
+      )
+      ||
+      (
+        piece.color === "black" &&
+        to.r === 9
+      )
+    )
+  ){
+
+    piece.king = true;
+
+  }
+
+
+  // CAPTURA MÚLTIPLA
+
+  if(move.capture){
+
+    const next =
+    getMoves(
+      to.r,
+      to.c,
+      true
+    );
+
+
+    if(next.length){
+
+      selected = {
+
+        r:to.r,
+        c:to.c
+
+      };
+
+      render();
+
+      return true;
+
+    }
+
+  }
+
+
+  turn =
+  enemy(turn);
+
+  selected = null;
+
+  checkGameOver();
+
+  render();
+
+  return true;
+
+}
+
+
+// ═══════════════════════════════
+// VERIFICAR FIM
+// ═══════════════════════════════
+
+function checkGameOver(){
+
+  let white = 0;
+
+  let black = 0;
+
+
+  for(
+    let r=0;
+    r<SIZE;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      if(board[r][c]){
+
+        if(
+          board[r][c].color ===
+          "white"
+        ){
+
+          white++;
+
+        }
+
+        else{
+
+          black++;
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  if(!white){
+
+    gameOver = true;
+
+    turnEl.textContent =
+    "Pretas venceram! 🏆";
+
+    return;
+
+  }
+
+
+  if(!black){
+
+    gameOver = true;
+
+    turnEl.textContent =
+    "Brancas venceram! 🏆";
+
+    return;
+
+  }
+
+
+  // Verificar movimentos
+
+  const oldTurn =
+  turn;
+
+
+  turn = "white";
+
+  let whiteMoves = false;
+
+
+  for(
+    let r=0;
+    r<SIZE;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      if(
+        board[r][c] &&
+        board[r][c].color ===
+        "white" &&
+        getMoves(
+          r,
+          c,
+          false
+        ).length
+      ){
+
+        whiteMoves = true;
+
+      }
+
+    }
+
+  }
+
+
+  turn = "black";
+
+  let blackMoves = false;
+
+
+  for(
+    let r=0;
+    r<SIZE;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      if(
+        board[r][c] &&
+        board[r][c].color ===
+        "black" &&
+        getMoves(
+          r,
+          c,
+          false
+        ).length
+      ){
+
+        blackMoves = true;
+
+      }
+
+    }
+
+  }
+
+
+  turn = oldTurn;
+
+
+  if(!whiteMoves){
+
+    gameOver = true;
+
+    turnEl.textContent =
+    "Pretas venceram! 🏆";
+
+  }
+
+
+  if(!blackMoves){
+
+    gameOver = true;
+
+    turnEl.textContent =
+    "Brancas venceram! 🏆";
+
+  }
+
+}
+
+
+// ═══════════════════════════════
+// SELECIONAR PEÇA
+// ═══════════════════════════════
+
+function selectPiece(r,c){
+
+  if(gameOver) return;
+
+  const piece =
+  board[r][c];
+
+
+  if(
+    !piece ||
+    piece.color !== turn
+  ){
+
+    return;
+
+  }
+
+
+  const required =
+  captureRequired();
+
+
+  const moves =
+  getMoves(
+    r,
+    c,
+    required
+  );
+
+
+  if(!moves.length){
+
+    turnEl.textContent =
+    "Essa peça não pode mover.";
+
+    return;
+
+  }
+
+
+  selected = {
+
+    r:r,
+    c:c
+
   };
 
-  iniciar();
+
+  render();
+
+}
+
+
+// ═══════════════════════════════
+// CLIQUE
+// ═══════════════════════════════
+
+function clickCell(r,c){
+
+  if(gameOver)
+    return;
+
+
+  if(selected){
+
+    if(
+      board[r][c] &&
+      board[r][c].color === turn
+    ){
+
+      selectPiece(r,c);
+
+      return;
+
+    }
+
+
+    if(
+      executeMove(
+        selected,
+        {
+          r:r,
+          c:c
+        }
+      )
+    ){
+
+      return;
+
+    }
+
+
+    selected = null;
+
+    render();
+
+    return;
+
+  }
+
+
+  selectPiece(r,c);
+
+}
+
+
+// ═══════════════════════════════
+// DESENHAR
+// ═══════════════════════════════
+
+function render(){
+
+  boardEl.innerHTML = "";
+
+
+  let moves = [];
+
+
+  if(selected){
+
+    moves =
+    getMoves(
+      selected.r,
+      selected.c,
+      captureRequired()
+    );
+
+  }
+
+
+  for(
+    let r=0;
+    r<SIZE;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      const cell =
+      document.createElement(
+        "div"
+      );
+
+
+      cell.className =
+      "cell " +
+      (
+        (r+c)%2 === 0
+        ? "light"
+        : "dark"
+      );
+
+
+      cell.dataset.r = r;
+
+      cell.dataset.c = c;
+
+
+      // NÚMERO DA CASA
+
+      const number =
+      document.createElement(
+        "span"
+      );
+
+      number.className =
+      "number";
+
+      number.textContent =
+      r*SIZE+c+1;
+
+      cell.appendChild(
+        number
+      );
+
+
+      // SELECIONADA
+
+      if(
+        selected &&
+        selected.r === r &&
+        selected.c === c
+      ){
+
+        cell.classList.add(
+          "selected"
+        );
+
+      }
+
+
+      // MOVIMENTO
+
+      const possible =
+      moves.find(
+        function(m){
+
+          return (
+            m.r === r &&
+            m.c === c
+          );
+
+        }
+      );
+
+
+      if(possible){
+
+        cell.classList.add(
+          possible.capture
+          ? "capture"
+          : "move"
+        );
+
+      }
+
+
+      // PEÇA
+
+      if(board[r][c]){
+
+        const piece =
+        document.createElement(
+          "div"
+        );
+
+
+        piece.className =
+        "piece " +
+        (
+          board[r][c].color ===
+          "white"
+          ? "white-piece"
+          : "black-piece"
+        );
+
+
+        if(board[r][c].king){
+
+          piece.classList.add(
+            "king"
+          );
+
+          piece.textContent =
+          "♛";
+
+        }
+
+
+        cell.appendChild(
+          piece
+        );
+
+      }
+
+
+      cell.addEventListener(
+        "pointerdown",
+        function(e){
+
+          e.preventDefault();
+
+          clickCell(
+            parseInt(
+              this.dataset.r,
+              10
+            ),
+
+            parseInt(
+              this.dataset.c,
+              10
+            )
+          );
+
+        }
+      );
+
+
+      boardEl.appendChild(
+        cell
+      );
+
+    }
+
+  }
+
+
+  // PLACAR
+
+  let white = 0;
+
+  let black = 0;
+
+
+  for(
+    let r=0;
+    r<SIZE;
+    r++
+  ){
+
+    for(
+      let c=0;
+      c<SIZE;
+      c++
+    ){
+
+      if(board[r][c]){
+
+        if(
+          board[r][c].color ===
+          "white"
+        ){
+
+          white++;
+
+        }
+
+        else{
+
+          black++;
+
+        }
+
+      }
+
+    }
+
+  }
+
+
+  scoreEl.textContent =
+  "Brancas: " +
+  white +
+  " · Pretas: " +
+  black;
+
+
+  if(!gameOver){
+
+    turnEl.textContent =
+    turn === "white"
+    ? "Vez das brancas"
+    : "Vez das pretas";
+
+
+    if(captureRequired()){
+
+      turnEl.textContent +=
+      " · CAPTURA OBRIGATÓRIA";
+
+    }
+
+  }
+
+}
+
+
+// ═══════════════════════════════
+// NOVO JOGO
+// ═══════════════════════════════
+
+newGame.addEventListener(
+  "click",
+  createBoard
+);
+
+
+createBoard();
+
 })();
 </script>
+
 </body>
 </html>`;
 
-async function enviarDama(sock, jid, quotedMsg) {
+
+// ════════════════════════════════════════════════
+// ENVIAR DAMAS
+// ════════════════════════════════════════════════
+
+async function enviarDama(
+  sock,
+  jid,
+  quotedMsg
+){
+
   const htmlPayload = {
-    response_id: "dama_" + Date.now(),
-    sections: [
+
+    response_id:
+      "dama_" + Date.now(),
+
+    sections:[
+
       {
-        view_model: {
-          primitive: {
-            __typename: "GenAIaeacdsnwHtmlPrimitive",
-            payload: DAMA_HTML,
-            trusted_sources: ["nixel.dev"]
+
+        view_model:{
+
+          primitive:{
+
+            __typename:
+            "GenAIaeacdsnwHtmlPrimitive",
+
+            payload:
+            DAMAS_HTML,
+
+            trusted_sources:[
+              "nixel.dev"
+            ]
+
           },
-          __typename: "GenAISingleLayoutViewModel",
-          height: "full",
-          full_screen: true
+
+          __typename:
+          "GenAISingleLayoutViewModel",
+
+          height:"full",
+
+          full_screen:true
+
         }
+
       }
+
     ]
+
   };
+
 
   const content = {
-    botForwardedMessage: {
-      message: {
-        richResponseMessage: {
-          messageType: 1,
-          submessages: [{ messageType: 2, messageText: "🔴 Damas" }],
-          unifiedResponse: {
-            data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64")
+
+    botForwardedMessage:{
+
+      message:{
+
+        richResponseMessage:{
+
+          messageType:1,
+
+          submessages:[
+
+            {
+
+              messageType:2,
+
+              messageText:
+              "♟️ Damas — 100 Casas"
+
+            }
+
+          ],
+
+          unifiedResponse:{
+
+            data:
+            Buffer
+            .from(
+              JSON.stringify(
+                htmlPayload
+              )
+            )
+            .toString("base64")
+
           },
-          contextInfo: {
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" },
-            forwardOrigin: 4
+
+          contextInfo:{
+
+            forwardingScore:1,
+
+            isForwarded:true,
+
+            forwardedAiBotMessageInfo:{
+
+              botJid:
+              "867051314767696@bot"
+
+            },
+
+            forwardOrigin:4
+
           }
+
         }
+
       }
+
     }
+
   };
 
-  const fullMsg = generateWAMessageFromContent(jid, content, {
-    userJid: sock.authState?.creds?.me?.id || sock.user?.id,
-    timestamp: new Date(),
-  });
 
-  await sock.relayMessage(jid, fullMsg.message, { messageId: fullMsg.key.id });
+  const fullMsg =
+  generateWAMessageFromContent(
+    jid,
+    content,
+    {
+
+      userJid:
+      sock.authState?.creds?.me?.id ||
+      sock.user?.id,
+
+      timestamp:
+      new Date()
+
+    }
+  );
+
+
+  await sock.relayMessage(
+    jid,
+    fullMsg.message,
+    {
+      messageId:
+      fullMsg.key.id
+    }
+  );
+
+
   return fullMsg;
+
 }
 
-module.exports = { enviarDama };
 
+module.exports = {
+  enviarDama
+};
