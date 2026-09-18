@@ -1,20 +1,16 @@
 // ════════════════════════════════════════════════
-// ✅ comando_anime.js — Download de episódios de anime (!ep)
+// ✅ comando_anime.js — !ep <anime> <episódio>
 // ════════════════════════════════════════════════
-// Depende de uma API própria configurada pelo operador do bot,
-// via variável de ambiente ANIME_EPISODE_API. Este módulo NUNCA
-// inventa nem embute nenhuma fonte/URL de episódios.
+// Por padrão, NÃO baixa nada: procura o anime na Jikan API (dados
+// públicos do MyAnimeList, grátis, sem chave) e mostra em que
+// plataformas oficiais/legais dá para ver o anime, lembrando o
+// número do episódio pedido.
 //
-// Contrato esperado da API (GET):
-//   GET {ANIME_EPISODE_API}?anime=<nome>&episode=<numero>
-//   Resposta JSON esperada:
-//   {
-//     "anime": "Naruto",
-//     "episode": 1,
-//     "title": "Naruto - Episódio 1",
-//     "url": "https://.../naruto-001.mp4",
-//     "mimetype": "video/mp4"
-//   }
+// Só tenta baixar um ficheiro se o operador do bot tiver
+// explicitamente configurado ANIME_EPISODE_API, apontando para
+// uma fonte própria sobre a qual tenha autorização de distribuição
+// (ex: conteúdo licenciado hospedado pelo próprio operador).
+// Este módulo nunca inventa nem embute nenhuma fonte de vídeo.
 // ════════════════════════════════════════════════
 
 const fs = require("fs-extra");
@@ -33,7 +29,6 @@ function garantirPasta() {
   }
 }
 
-// Aceita apenas inteiros positivos (ex: "1", "12", "1000")
 function validarEpisodio(valor) {
   if (!/^\d+$/.test(String(valor).trim())) return null;
   const n = parseInt(valor, 10);
@@ -60,12 +55,30 @@ function encontrarArquivoGerado(pasta, prefixoNome) {
   }
 }
 
-// Consulta a API de episódios configurada pelo operador (nunca inventada aqui)
-async function buscarEpisodio(animeNome, numeroEpisodio) {
-  const apiUrl = process.env.ANIME_EPISODE_API;
-  if (!apiUrl) {
-    throw new Error("ANIME_EPISODE_API_NAO_CONFIGURADA");
+async function buscarAnimeJikan(nome) {
+  const { data } = await axios.get("https://api.jikan.moe/v4/anime", {
+    params: { q: nome, limit: 1 },
+    timeout: 15000,
+  });
+  const anime = data && data.data && data.data[0];
+  if (!anime) throw new Error("ANIME_NAO_ENCONTRADO");
+  return anime;
+}
+
+async function buscarStreamingJikan(malId) {
+  try {
+    const { data } = await axios.get(`https://api.jikan.moe/v4/anime/${malId}/streaming`, {
+      timeout: 15000,
+    });
+    return (data && data.data) || [];
+  } catch (e) {
+    return [];
   }
+}
+
+async function buscarEpisodioFontePropria(animeNome, numeroEpisodio) {
+  const apiUrl = process.env.ANIME_EPISODE_API;
+  if (!apiUrl) throw new Error("ANIME_EPISODE_API_NAO_CONFIGURADA");
   let resposta;
   try {
     resposta = await axios.get(apiUrl, {
@@ -83,7 +96,6 @@ async function buscarEpisodio(animeNome, numeroEpisodio) {
   return data;
 }
 
-// Baixa via yt-dlp (para fontes que ele suporta, ex: extractors genéricos/HLS)
 function baixarViaYtDlp(url, destinoBase, ytdlpCmd, ffmpegCmd) {
   return new Promise((resolve, reject) => {
     const saida = `${destinoBase}.%(ext)s`;
@@ -96,8 +108,7 @@ function baixarViaYtDlp(url, destinoBase, ytdlpCmd, ffmpegCmd) {
       `-o "${saida}"`,
       `"${url}"`,
     ].filter(Boolean);
-    const cmd = partesCmd.join(" ");
-    exec(cmd, { timeout: 180000, maxBuffer: 200 * 1024 * 1024 }, (err, stdout, stderr) => {
+    exec(partesCmd.join(" "), { timeout: 180000, maxBuffer: 200 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
         console.error("❌ [ep] yt-dlp falhou:", (stderr || err.message || "").slice(0, 500));
         return reject(new Error("ERRO_YTDLP"));
@@ -107,7 +118,6 @@ function baixarViaYtDlp(url, destinoBase, ytdlpCmd, ffmpegCmd) {
   });
 }
 
-// Baixa directamente via HTTP (para fontes que servem um .mp4 directo)
 async function baixarDireto(url, destinoFinal) {
   let resposta;
   try {
@@ -129,13 +139,6 @@ async function baixarDireto(url, destinoFinal) {
   }
 }
 
-/**
- * Processa o comando !ep <anime> <episódio>
- * ctx deve conter as dependências já existentes no index.js, para não duplicar nada:
- *   sock, jid, msg, seloBot, args, sender,
- *   bLine, bBloco, reagir, enviarVideo, addXP,
- *   CONFIG, YTDLP_CMD, FFMPEG_CMD
- */
 async function processarComandoEp(ctx) {
   const {
     sock, jid, msg, seloBot, args, sender,
@@ -143,12 +146,9 @@ async function processarComandoEp(ctx) {
     CONFIG, YTDLP_CMD, FFMPEG_CMD,
   } = ctx;
 
-  garantirPasta();
-
-  // ── Validações de uso ──
   if (!args || args.length === 0) {
     await sock.sendMessage(jid, {
-      text: bBloco("🍥 ANIME DOWNLOADER", [
+      text: bBloco("🍥 ANIME", [
         bLine("💡", `Uso: *${CONFIG.PREFIXO}ep* [anime] [episódio]`),
         bLine("💡", `Ex: *${CONFIG.PREFIXO}ep* Naruto 1`),
       ]),
@@ -176,135 +176,177 @@ async function processarComandoEp(ctx) {
     return;
   }
 
-  // ── Resposta inicial ──
   await reagir(sock, msg, "🍥");
+
+  // ═══ CAMINHO A: fonte própria licenciada do operador (opt-in via ANIME_EPISODE_API) ═══
+  if (process.env.ANIME_EPISODE_API) {
+    await sock.sendMessage(jid, {
+      text: bBloco("🍥 ANIME DOWNLOADER", [
+        bLine("🎌", `Anime: *${nomeAnime}*`),
+        bLine("🎬", `Episódio: *${numeroEpisodio}*`),
+        "",
+        bLine("🔎", "Procurando episódio..."),
+        bLine("⏳", "Aguarde..."),
+      ]),
+    }, { quoted: seloBot });
+
+    let dadosEpisodio;
+    try {
+      dadosEpisodio = await buscarEpisodioFontePropria(nomeAnime, numeroEpisodio);
+    } catch (e) {
+      console.error("❌ [ep] Busca (fonte própria) falhou:", e.message);
+      let msgErro = "Não encontrei este episódio na fonte configurada.";
+      if (e.message === "TIMEOUT_API") msgErro = "A fonte de episódios demorou demasiado a responder. Tenta novamente.";
+      else if (e.message === "EPISODIO_NAO_ENCONTRADO") msgErro = "Episódio não encontrado. Confirma o nome do anime e o número do episódio.";
+      else if (e.message === "URL_INVALIDA") msgErro = "A fonte devolveu uma URL de vídeo inválida.";
+      else if (e.message === "RESPOSTA_API_INVALIDA") msgErro = "A fonte de episódios devolveu uma resposta inválida.";
+      await sock.sendMessage(jid, { text: bLine("❌", msgErro) }, { quoted: seloBot });
+      await reagir(sock, msg, "❌");
+      return;
+    }
+
+    garantirPasta();
+    const animeExibido = dadosEpisodio.anime || nomeAnime;
+    const episodioExibido = dadosEpisodio.episode || numeroEpisodio;
+    const tituloExibido = dadosEpisodio.title || `${animeExibido} - Episódio ${episodioExibido}`;
+
+    await sock.sendMessage(jid, {
+      text: bBloco("🎌 " + animeExibido, [
+        bLine("🎬", `Episódio ${episodioExibido}`),
+        "",
+        bLine("⬇️", "Baixando..."),
+        bLine("📺", "Qualidade máxima: 720p"),
+      ]),
+    }, { quoted: seloBot });
+
+    const timestamp = Date.now();
+    const nomeSeguro = nomeAnime.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "anime";
+    const nomeBase = `${timestamp}_${nomeSeguro}_EP${numeroEpisodio}`;
+    const destinoBase = path.join(PASTA_ANIMES, nomeBase);
+    let arquivoFinal = null;
+
+    try {
+      const preferirYtDlp = dadosEpisodio.usarYtDlp === true || /\.m3u8($|\?)/i.test(dadosEpisodio.url);
+      if (preferirYtDlp) {
+        await baixarViaYtDlp(dadosEpisodio.url, destinoBase, YTDLP_CMD, FFMPEG_CMD);
+        arquivoFinal = encontrarArquivoGerado(PASTA_ANIMES, nomeBase);
+      } else {
+        arquivoFinal = `${destinoBase}.mp4`;
+        await baixarDireto(dadosEpisodio.url, arquivoFinal);
+      }
+    } catch (e) {
+      console.error("❌ [ep] Download falhou:", e.message);
+      limparArquivo(arquivoFinal);
+      await sock.sendMessage(jid, { text: bLine("❌", "Erro ao baixar o episódio. Tenta novamente mais tarde.") }, { quoted: seloBot });
+      await reagir(sock, msg, "❌");
+      return;
+    }
+
+    if (!arquivoFinal || !fs.existsSync(arquivoFinal)) {
+      await sock.sendMessage(jid, { text: bLine("❌", "Arquivo não encontrado após o download.") }, { quoted: seloBot });
+      await reagir(sock, msg, "❌");
+      return;
+    }
+
+    let tamanhoBytes;
+    try {
+      tamanhoBytes = fs.statSync(arquivoFinal).size;
+    } catch (e) {
+      limparArquivo(arquivoFinal);
+      await sock.sendMessage(jid, { text: bLine("❌", "Arquivo corrompido ou inacessível.") }, { quoted: seloBot });
+      await reagir(sock, msg, "❌");
+      return;
+    }
+
+    if (tamanhoBytes === 0) {
+      limparArquivo(arquivoFinal);
+      await sock.sendMessage(jid, { text: bLine("❌", "Arquivo corrompido (vazio).") }, { quoted: seloBot });
+      await reagir(sock, msg, "❌");
+      return;
+    }
+
+    if (tamanhoBytes > LIMITE_BYTES) {
+      limparArquivo(arquivoFinal);
+      await sock.sendMessage(jid, { text: bLine("❌", "O episódio ultrapassa o limite de 90 MB.") }, { quoted: seloBot });
+      await reagir(sock, msg, "❌");
+      return;
+    }
+
+    const tamanhoMB = (tamanhoBytes / (1024 * 1024)).toFixed(1);
+    await sock.sendMessage(jid, {
+      text: bBloco("🍥 " + animeExibido, [
+        bLine("🎬", `Episódio: ${episodioExibido}`),
+        bLine("📦", `Tamanho: ${tamanhoMB} MB`),
+      ]),
+    }, { quoted: seloBot });
+
+    try {
+      await enviarVideo(sock, jid, arquivoFinal, bLine("🍥", tituloExibido), [sender], seloBot);
+      await sock.sendMessage(jid, { text: bLine("✅", "Episódio enviado com sucesso!") }, { quoted: seloBot });
+      await reagir(sock, msg, "✅");
+      if (typeof addXP === "function") { try { addXP(sender, 5); } catch {} }
+    } catch (e) {
+      console.error("❌ [ep] Falha no envio:", e.message);
+      await sock.sendMessage(jid, { text: bLine("❌", "Falha ao enviar o episódio.") }, { quoted: seloBot });
+      await reagir(sock, msg, "❌");
+    } finally {
+      limparArquivo(arquivoFinal);
+    }
+    return;
+  }
+
+  // ═══ CAMINHO B (padrão): mostra onde assistir legalmente, sem baixar nada ═══
   await sock.sendMessage(jid, {
-    text: bBloco("🍥 ANIME DOWNLOADER", [
+    text: bBloco("🍥 ANIME", [
       bLine("🎌", `Anime: *${nomeAnime}*`),
       bLine("🎬", `Episódio: *${numeroEpisodio}*`),
       "",
-      bLine("🔎", "Procurando episódio..."),
-      bLine("⏳", "Aguarde..."),
+      bLine("🔎", "A procurar onde assistir..."),
     ]),
   }, { quoted: seloBot });
 
-  // ── Busca na API configurada ──
-  let dadosEpisodio;
+  let anime;
   try {
-    dadosEpisodio = await buscarEpisodio(nomeAnime, numeroEpisodio);
+    anime = await buscarAnimeJikan(nomeAnime);
   } catch (e) {
-    console.error("❌ [ep] Busca falhou:", e.message);
-    let msgErro = "❌ Não encontrei este episódio na fonte configurada.";
-    if (e.message === "ANIME_EPISODE_API_NAO_CONFIGURADA") {
-      msgErro = "❌ A fonte de episódios não está configurada neste bot. Contacta o dono.";
-    } else if (e.message === "TIMEOUT_API") {
-      msgErro = "❌ A fonte de episódios demorou demasiado a responder. Tenta novamente.";
-    } else if (e.message === "EPISODIO_NAO_ENCONTRADO") {
-      msgErro = "❌ Episódio não encontrado. Confirma o nome do anime e o número do episódio.";
-    } else if (e.message === "URL_INVALIDA") {
-      msgErro = "❌ A fonte devolveu uma URL de vídeo inválida.";
-    } else if (e.message === "RESPOSTA_API_INVALIDA") {
-      msgErro = "❌ A fonte de episódios devolveu uma resposta inválida.";
-    }
-    await sock.sendMessage(jid, { text: bLine("❌", msgErro.replace("❌ ", "")) }, { quoted: seloBot });
+    console.error("❌ [ep] Busca Jikan falhou:", e.message);
+    await sock.sendMessage(jid, { text: bLine("❌", "Não encontrei este anime.") }, { quoted: seloBot });
     await reagir(sock, msg, "❌");
     return;
   }
 
-  const animeExibido = dadosEpisodio.anime || nomeAnime;
-  const episodioExibido = dadosEpisodio.episode || numeroEpisodio;
-  const tituloExibido = dadosEpisodio.title || `${animeExibido} - Episódio ${episodioExibido}`;
+  const plataformas = await buscarStreamingJikan(anime.mal_id);
 
-  await sock.sendMessage(jid, {
-    text: bBloco("🎌 " + animeExibido, [
-      bLine("🎬", `Episódio ${episodioExibido}`),
-      "",
-      bLine("⬇️", "Baixando..."),
-      bLine("📺", "Qualidade máxima: 720p"),
-    ]),
-  }, { quoted: seloBot });
+  const linhas = [
+    bLine("🎌", `*${anime.title}*`),
+    bLine("🎬", `Procuras o episódio *${numeroEpisodio}*`),
+    "",
+  ];
 
-  // ── Download ──
-  const timestamp = Date.now();
-  const nomeSeguro = nomeAnime.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "anime";
-  const nomeBase = `${timestamp}_${nomeSeguro}_EP${numeroEpisodio}`;
-  const destinoBase = path.join(PASTA_ANIMES, nomeBase);
-  let arquivoFinal = null;
+  if (plataformas.length) {
+    linhas.push(bLine("📺", "*Disponível oficialmente em:*"));
+    for (const p of plataformas.slice(0, 6)) {
+      linhas.push(bLine("▶️", `*${p.name}* — ${p.url}`));
+    }
+  } else {
+    linhas.push(bLine("💡", "Não encontrei plataformas de streaming listadas para este anime no MyAnimeList."));
+    linhas.push(bLine("🔎", `Pesquisa por: *${anime.title} episódio ${numeroEpisodio}* numa plataforma licenciada (Crunchyroll, Netflix, etc).`));
+  }
 
+  linhas.push("");
+  linhas.push(bLine("⚠️", "Este bot não distribui episódios — só aponta para fontes oficiais/legais."));
+
+  const caption = bBloco("📺 ONDE ASSISTIR", linhas);
   try {
-    const preferirYtDlp = dadosEpisodio.usarYtDlp === true || /\.m3u8($|\?)/i.test(dadosEpisodio.url);
-    if (preferirYtDlp) {
-      await baixarViaYtDlp(dadosEpisodio.url, destinoBase, YTDLP_CMD, FFMPEG_CMD);
-      arquivoFinal = encontrarArquivoGerado(PASTA_ANIMES, nomeBase);
+    if (anime.images && anime.images.jpg && anime.images.jpg.image_url) {
+      await sock.sendMessage(jid, { image: { url: anime.images.jpg.image_url }, caption }, { quoted: seloBot });
     } else {
-      arquivoFinal = `${destinoBase}.mp4`;
-      await baixarDireto(dadosEpisodio.url, arquivoFinal);
+      await sock.sendMessage(jid, { text: caption }, { quoted: seloBot });
     }
-  } catch (e) {
-    console.error("❌ [ep] Download falhou:", e.message);
-    limparArquivo(arquivoFinal);
-    await sock.sendMessage(jid, {
-      text: bLine("❌", "Erro ao baixar o episódio. Tenta novamente mais tarde."),
-    }, { quoted: seloBot });
-    await reagir(sock, msg, "❌");
-    return;
-  }
-
-  if (!arquivoFinal || !fs.existsSync(arquivoFinal)) {
-    await sock.sendMessage(jid, { text: bLine("❌", "Arquivo não encontrado após o download.") }, { quoted: seloBot });
-    await reagir(sock, msg, "❌");
-    return;
-  }
-
-  // ── Validação do arquivo ──
-  let tamanhoBytes;
-  try {
-    tamanhoBytes = fs.statSync(arquivoFinal).size;
-  } catch (e) {
-    limparArquivo(arquivoFinal);
-    await sock.sendMessage(jid, { text: bLine("❌", "Arquivo corrompido ou inacessível.") }, { quoted: seloBot });
-    await reagir(sock, msg, "❌");
-    return;
-  }
-
-  if (tamanhoBytes === 0) {
-    limparArquivo(arquivoFinal);
-    await sock.sendMessage(jid, { text: bLine("❌", "Arquivo corrompido (vazio).") }, { quoted: seloBot });
-    await reagir(sock, msg, "❌");
-    return;
-  }
-
-  if (tamanhoBytes > LIMITE_BYTES) {
-    limparArquivo(arquivoFinal);
-    await sock.sendMessage(jid, {
-      text: bLine("❌", "O episódio ultrapassa o limite de 90 MB."),
-    }, { quoted: seloBot });
-    await reagir(sock, msg, "❌");
-    return;
-  }
-
-  const tamanhoMB = (tamanhoBytes / (1024 * 1024)).toFixed(1);
-  await sock.sendMessage(jid, {
-    text: bBloco("🍥 " + animeExibido, [
-      bLine("🎬", `Episódio: ${episodioExibido}`),
-      bLine("📦", `Tamanho: ${tamanhoMB} MB`),
-    ]),
-  }, { quoted: seloBot });
-
-  // ── Envio ──
-  try {
-    await enviarVideo(sock, jid, arquivoFinal, bLine("🍥", tituloExibido), [sender], seloBot);
-    await sock.sendMessage(jid, { text: bLine("✅", "Episódio enviado com sucesso!") }, { quoted: seloBot });
     await reagir(sock, msg, "✅");
-    if (typeof addXP === "function") {
-      try { addXP(sender, 5); } catch {}
-    }
   } catch (e) {
-    console.error("❌ [ep] Falha no envio:", e.message);
-    await sock.sendMessage(jid, { text: bLine("❌", "Falha ao enviar o episódio.") }, { quoted: seloBot });
-    await reagir(sock, msg, "❌");
-  } finally {
-    limparArquivo(arquivoFinal);
+    console.error("❌ [ep] Envio falhou:", e.message);
+    await sock.sendMessage(jid, { text: caption }, { quoted: seloBot });
   }
 }
 

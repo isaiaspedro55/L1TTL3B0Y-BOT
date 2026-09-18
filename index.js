@@ -20,6 +20,8 @@ let yts=null; try{yts=require("yt-search");}catch{console.log("⚠️ yt-search 
 const { enviarDino } = require("./comando_dino.js");
 const { processarComandoEp } = require("./comando_anime.js");
 const { enviarPiano } = require("./comando_piano.js");
+const { enviarCobra } = require("./comando_cobra.js");
+const { enviarDama } = require("./comando_dama.js");
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 
 fs.ensureDirSync(process.env.TMPDIR);
@@ -27,7 +29,7 @@ fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./dados");
 
 const CONFIG = {
-  PREFIXO:         ":",
+  PREFIXO:         "!",
   NUMERO_BOT:      "244954260707",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
   GEMINI_KEY:      process.env.GEMINI_KEY || "", // ⚠️ Cola aqui a tua API key grátis do Gemini (https://aistudio.google.com/apikey)
@@ -623,6 +625,7 @@ function gerarSubmenu(catId,P){
     bLine(em,`*${P}matematica*`),bLine(em,`*${P}jokenpo*`),bLine(em,`*${P}dado*`),bLine(em,`*${P}cara-coroa*`),bLine(em,`*${P}adivinhar*`),bLine(em,`*${P}velocidade*`),bLine(em,`*${P}roleta*`),bLine(em,`*${P}aki*`),bLine(em,`*${P}aposta*`),bLine(em,`*${P}8ball* [pergunta] 🎱`),
     B_SEP,bLine("🕹️","*JOGOS INTERACTIVOS:*"),
     bLine(em,`*${P}dino* 🦖 → _Dino Runner interactivo_`),bLine(em,`*${P}piano* 🎹 → _piano interactivo_`),
+    bLine(em,`*${P}cobra* 🐍 → _Snake interactivo_`),bLine(em,`*${P}dama* 🔴 → _damas, 2 jogadores_`),
     B_SEP,bLine("😂","*DIVERSÃO:*"),
     bLine(em,`*${P}piada*`),bLine(em,`*${P}conselho*`),bLine(em,`*${P}poema*`),bLine(em,`*${P}historia*`),bLine(em,`*${P}analisar* @user`),bLine(em,`*${P}cara*`),bLine(em,`*${P}ship* @user`),bLine(em,`*${P}fofoca*`),
     bLine(em,`*${P}cantada* 💘`),bLine(em,`*${P}inunca* 🎯`),bLine(em,`*${P}conselhobiblico* 📖`),
@@ -1855,7 +1858,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativara
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep","cobra","snake","dama","damas"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -4427,6 +4430,16 @@ ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`
         if(comando==="piano"||comando==="teclado"){
           try{await enviarPiano(sock,jid);await reagir(sock,msg,"🎹");}
           catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar o Piano."),bLine("🔴",e.message)])},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="cobra"||comando==="snake"){
+          try{await enviarCobra(sock,jid);await reagir(sock,msg,"🐍");}
+          catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar a Cobra."),bLine("🔴",e.message)])},{quoted:seloBot});}
+          return;
+        }
+        if(comando==="dama"||comando==="damas"){
+          try{await enviarDama(sock,jid);await reagir(sock,msg,"🔴");}
+          catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar as Damas."),bLine("🔴",e.message)])},{quoted:seloBot});}
           return;
         }
 
