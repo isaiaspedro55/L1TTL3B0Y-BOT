@@ -1,1586 +1,253 @@
 // ════════════════════════════════════════════════
-// ♟️ COMANDO :DAMAS — DAMAS 10x10
-// 100 CASAS · 20 PEÇAS POR JOGADOR
-// Tela grande + controles abaixo
+// ✅ COMANDO !DAMA — Dama Voadora (Rei Longo Alcance)
+// 100 casas | 368px | Captura à distância
 // ════════════════════════════════════════════════
-
 const { generateWAMessageFromContent } = require("@itsliaaa/baileys");
 
-const DAMAS_HTML = `<!DOCTYPE html>
+const DAMA_HTML = `<!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-  name="viewport"
-  content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"
->
-
-<title>Damas 100 Casas</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dama 100 - Rei Voador</title>
 <style>
-
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  user-select:none;
-  -webkit-user-select:none;
-  -webkit-tap-highlight-color:transparent;
-}
-
-html,body{
-  min-height:100%;
-}
-
-body{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding:8px;
-  background:#17120f;
-  font-family:Arial,sans-serif;
-  color:#fff;
-  touch-action:manipulation;
-}
-
-.card{
-  width:100%;
-  max-width:620px;
-  background:#241b17;
-  border:1px solid #4b382d;
-  border-radius:18px;
-  padding:10px;
-  text-align:center;
-  box-shadow:0 12px 35px rgba(0,0,0,.45);
-}
-
-.title{
-  font-size:24px;
-  font-weight:900;
-  margin-bottom:3px;
-}
-
-.sub{
-  font-size:10px;
-  color:#c9b8aa;
-  margin-bottom:7px;
-}
-
-.info{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:5px;
-  margin-bottom:7px;
-}
-
-.turn{
-  flex:1;
-  padding:8px;
-  border-radius:10px;
-  background:#382a23;
-  font-size:12px;
-  font-weight:700;
-}
-
-.score{
-  font-size:10px;
-  color:#d8c9bf;
-}
-
-/* ═══════════════════════════════
-   TABULEIRO GRANDE
-   ═══════════════════════════════ */
-
-.board-wrap{
-  width:100%;
-  max-width:500px;
-  margin:auto;
-  padding:5px;
-  background:#120d0b;
-  border-radius:12px;
-  box-shadow:
-    inset 0 0 0 1px #5b4336;
-}
-
-.board{
-  width:100%;
-  aspect-ratio:1;
-
-  display:grid;
-
-  grid-template-columns:
-    repeat(10,1fr);
-
-  grid-template-rows:
-    repeat(10,1fr);
-
-  overflow:hidden;
-
-  border-radius:7px;
-}
-
-.cell{
-  position:relative;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  aspect-ratio:1;
-}
-
-.light{
-  background:#e7d7bd;
-}
-
-.dark{
-  background:#754c35;
-}
-
-.cell.selected{
-  box-shadow:
-    inset 0 0 0 4px #f4d35e;
-}
-
-.cell.move{
-  box-shadow:
-    inset 0 0 0 4px #7ee081;
-}
-
-.cell.capture{
-  box-shadow:
-    inset 0 0 0 4px #ff7777;
-}
-
-.piece{
-  width:76%;
-  height:76%;
-
-  border-radius:50%;
-
-  display:flex;
-
-  align-items:center;
-  justify-content:center;
-
-  font-size:
-    clamp(13px,4vw,25px);
-
-  font-weight:900;
-
-  border:2px solid rgba(0,0,0,.35);
-
-  box-shadow:
-    0 3px 5px rgba(0,0,0,.45),
-    inset 0 2px 3px rgba(255,255,255,.22);
-}
-
-.white-piece{
-  background:
-    linear-gradient(
-      #fff,
-      #d7d7d7
-    );
-
-  color:#4d3325;
-}
-
-.black-piece{
-  background:
-    linear-gradient(
-      #353535,
-      #111
-    );
-
-  color:#fff;
-}
-
-.king{
-  border:4px solid #e7b84b;
-}
-
-.number{
-  position:absolute;
-
-  top:2px;
-  left:3px;
-
-  font-size:7px;
-
-  opacity:.45;
-
-  color:#000;
-}
-
-/* ═══════════════════════════════
-   BOTÃO
-   ═══════════════════════════════ */
-
-button{
-  margin-top:9px;
-
-  border:0;
-
-  border-radius:999px;
-
-  padding:9px 20px;
-
-  background:#d49a52;
-
-  color:#21150f;
-
-  font-size:12px;
-
-  font-weight:900;
-
-  box-shadow:
-    0 3px 0 #8b5b2b;
-}
-
-button:active{
-  transform:translateY(2px);
-
-  box-shadow:
-    0 1px 0 #8b5b2b;
-}
-
-.help{
-  margin-top:7px;
-
-  font-size:9px;
-
-  color:#a99384;
-
-  line-height:1.4;
-}
-
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+body{background:#F3ECE0;font-family:system-ui,sans-serif;display:flex;justify-content:center;padding:8px}
+.card{width:100%;max-width:390px;background:#FFFDF9;border-radius:18px;padding:10px;border:1px solid #E9DFCE;box-shadow:0 10px 30px rgba(61,42,24,.15);text-align:center}
+h1{font-size:19px;color:#3D2A18}
+.sub{color:#A9977E;font-size:10px;margin-bottom:8px}
+.mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.modeBtn{border:1px solid #E9DBBF;background:#F6EEDD;border-radius:999px;padding:7px;font-size:11px;font-weight:700;color:#8A6A3F}
+.modeBtn.active{background:#3D2A18;color:#fff;border-color:#3D2A18}
+.top{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px}
+.stat{background:#F6EEDD;border:1px solid #E9DBBF;border-radius:10px;padding:5px}
+.stat span{font-size:7px;color:#8A6A3F;display:block}
+.stat b{font-size:16px;color:#3D2A18;display:block;font-weight:900}
+.gameWrap{background:#2A1B0E;border-radius:14px;padding:6px}
+#board{width:100%;height:368px;display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(10,1fr);gap:0;background:#2A1B0E;border-radius:8px;overflow:hidden;border:2px solid #2A1B0E}
+.sq{width:100%;height:100%;display:flex;align-items:center;justify-content:center;position:relative}
+.sq.light{background:#F3E6C8}
+.sq.dark{background:#8C5A2B}
+.sq.sel{outline:3px solid #FFD23F;outline-offset:-3px;z-index:3}
+.sq.canMove::after{content:'';position:absolute;width:12px;height:12px;background:#00FF88;border-radius:50%;opacity:.9}
+.sq.canCapture::after{content:'';position:absolute;width:100%;height:100%;border:3px solid #FF3B3B;background:rgba(255,59,59,.25);border-radius:4px;box-sizing:border-box}
+.piece{width:82%;height:82%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;box-shadow:0 2px 0 rgba(0,0,0,.4), inset 0 2px 2px rgba(255,255,255,.5);cursor:pointer;z-index:1;position:relative}
+.piece.white{background:radial-gradient(circle at 30% 30%, #fff, #E8DCC3);color:#8C5A2B;border:1px solid #C9B896}
+.piece.black{background:radial-gradient(circle at 30% 30%, #5a3a1a, #2A1B0E);color:#FFD23F;border:1px solid #000}
+.piece.king{width:88%;height:88%;box-shadow:0 0 0 2px #FFD23F, 0 3px 6px rgba(0,0,0,.5), inset 0 2px 3px rgba(255,255,255,.6)}
+.piece.king::after{content:'♔';position:absolute;font-size:16px;top:50%;left:50%;transform:translate(-50%,-50%);text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.piece.white.king{background:radial-gradient(circle at 30% 30%, #FFF7E0, #FFD23F);color:#8C4A1E;border:2px solid #B5652E}
+.piece.black.king{background:radial-gradient(circle at 30% 30%, #7a4a1a, #1a0e02);color:#FFD23F;border:2px solid #FFD23F}
+.status{margin-top:8px;background:#F6EEDD;border:1px solid #E9DBBF;border-radius:999px;padding:6px 12px;font-size:11px;font-weight:700;color:#3D2A18;display:inline-block;min-width:160px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.btn{border:none;border-radius:999px;padding:10px;font-weight:700;font-size:11px}
+.btn-dark{background:#F6EEDD;color:#8A6A3F;border:1px solid #E9DBBF}
+.btn-play{background:#B5652E;color:#fff;box-shadow:0 3px 0 #8C4A1E}
+#overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(243,236,224,.96);display:flex;align-items:center;justify-content:center;padding:18px;z-index:999}
+#overlay.hide{display:none}
+.ovCard{background:#FFFDF9;border-radius:20px;padding:20px;width:100%;max-width:320px;text-align:center;border:1px solid #E9DFCE}
 </style>
-
 </head>
-
 <body>
-
 <div class="card">
-
-<div class="title">
-♟️ DAMAS
+<h1>♟️ Damas 100 - Dama Voadora</h1>
+<p class="sub">Dama anda infinito e come à distância</p>
+<div class="mode">
+<button class="modeBtn active" id="m1">🤖 1 Jogador</button>
+<button class="modeBtn" id="m2">👥 2 Jogadores</button>
 </div>
-
-<div class="sub">
-10 × 10 · 100 CASAS · 20 PEÇAS
+<div class="top">
+<div class="stat"><span id="lW">VOCÊ</span><b id="sw">0</b></div>
+<div class="stat"><span>CAPTURAS</span><b id="sc">0</b></div>
+<div class="stat"><span id="lB">ROBÔ</span><b id="sb">0</b></div>
 </div>
-
-<div class="info">
-
-<div
-  class="turn"
-  id="turn">
-  Vez das brancas
+<div class="gameWrap"><div id="board"></div></div>
+<div id="turn" class="status">Sua vez (Claras)</div>
+<div class="btns">
+<button class="btn btn-dark" id="resetBtn">🔄 Zerar</button>
+<button class="btn btn-dark" id="newBtn">🎮 Novo</button>
 </div>
-
-<div
-  class="score"
-  id="score">
-  Brancas: 20 · Pretas: 20
 </div>
-
+<div id="overlay">
+<div class="ovCard">
+<div id="ovEmoji" style="font-size:44px">♔</div>
+<h2 id="ovTitle" style="font-size:18px;color:#3D2A18;margin:8px 0">Damas 100 - Dama Voadora</h2>
+<p id="ovText" style="color:#A9977E;font-size:11px;margin-bottom:10px">Peão anda 1 • Dama anda infinito e come longe</p>
+<div id="startBtns" style="display:grid;gap:8px">
+<button class="btn btn-play" id="play1" style="padding:12px">🤖 Eu vs Robô</button>
+<button class="btn btn-dark" id="play2" style="padding:12px">👥 2 Jogadores</button>
 </div>
-
-<div class="board-wrap">
-
-<div
-  class="board"
-  id="board">
+<div id="endBtns" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+<button class="btn btn-dark" id="closeOv">Fechar</button>
+<button class="btn btn-play" id="again">De novo</button>
 </div>
-
 </div>
-
-<button id="newGame">
-NOVO JOGO
-</button>
-
-<div class="help">
-
-Toque numa peça e depois numa casa destacada.<br>
-Capturas são obrigatórias.
-
 </div>
-
-</div>
-
 <script>
-
-(function(){
-
-const SIZE = 10;
-
-const boardEl =
-document.getElementById("board");
-
-const turnEl =
-document.getElementById("turn");
-
-const scoreEl =
-document.getElementById("score");
-
-const newGame =
-document.getElementById("newGame");
-
-let board = [];
-
-let turn = "white";
-
-let selected = null;
-
-let gameOver = false;
-
-
-// ═══════════════════════════════
-// CRIAR TABULEIRO
-// ═══════════════════════════════
-
-function createBoard(){
-
-  board =
-  Array.from(
-    {length:SIZE},
-    function(){
-
-      return Array(SIZE).fill(null);
-
-    }
-  );
-
-
-  // PRETAS
-
-  for(
-    let r=0;
-    r<4;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      if(
-        (r+c)%2===1
-      ){
-
-        board[r][c] = {
-
-          color:"black",
-
-          king:false
-
-        };
-
-      }
-
-    }
-
-  }
-
-
-  // BRANCAS
-
-  for(
-    let r=6;
-    r<10;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      if(
-        (r+c)%2===1
-      ){
-
-        board[r][c] = {
-
-          color:"white",
-
-          king:false
-
-        };
-
-      }
-
-    }
-
-  }
-
-
-  turn = "white";
-
-  selected = null;
-
-  gameOver = false;
-
-  render();
-
-}
-
-
-// ═══════════════════════════════
-// AUXILIARES
-// ═══════════════════════════════
-
-function inside(r,c){
-
-  return (
-    r>=0 &&
-    r<SIZE &&
-    c>=0 &&
-    c<SIZE
-  );
-
-}
-
-function enemy(color){
-
-  return color === "white"
-    ? "black"
-    : "white";
-
-}
-
-
-// ═══════════════════════════════
-// DIREÇÕES
-// ═══════════════════════════════
-
-function directions(){
-
-  return [
-
-    [-1,-1],
-    [-1,1],
-    [1,-1],
-    [1,1]
-
-  ];
-
-}
-
-
-// ═══════════════════════════════
-// MOVIMENTOS
-// ═══════════════════════════════
-
-function getMoves(
-  r,
-  c,
-  captureOnly
-){
-
-  const piece =
-  board[r][c];
-
-  if(!piece) return [];
-
-  if(
-    piece.color !== turn
-  ) return [];
-
-  const moves = [];
-
-
-  // ═══════════════════════════
-  // DAMA
-  // ═══════════════════════════
-
-  if(piece.king){
-
-    directions().forEach(
-    function(d){
-
-      let nr =
-      r+d[0];
-
-      let nc =
-      c+d[1];
-
-      let enemyPiece =
-      null;
-
-
-      while(
-        inside(nr,nc)
-      ){
-
-        const target =
-        board[nr][nc];
-
-
-        if(!target){
-
-          if(
-            !captureOnly &&
-            !enemyPiece
-          ){
-
-            moves.push({
-
-              r:nr,
-              c:nc,
-              capture:null
-
-            });
-
-          }
-
-          else if(
-            enemyPiece
-          ){
-
-            moves.push({
-
-              r:nr,
-              c:nc,
-              capture:enemyPiece
-
-            });
-
-          }
-
-        }
-
-        else{
-
-          if(
-            target.color ===
-            piece.color ||
-            enemyPiece
-          ){
-
-            break;
-
-          }
-
-          enemyPiece = {
-
-            r:nr,
-            c:nc
-
-          };
-
-        }
-
-
-        nr += d[0];
-
-        nc += d[1];
-
-      }
-
-    });
-
-    return moves;
-
-  }
-
-
-  // ═══════════════════════════
-  // PEÇA NORMAL
-  // ═══════════════════════════
-
-  directions().forEach(
-  function(d){
-
-    const nr =
-    r+d[0];
-
-    const nc =
-    c+d[1];
-
-
-    // MOVIMENTO
-
-    if(
-      !captureOnly &&
-      inside(nr,nc) &&
-      !board[nr][nc]
-    ){
-
-      const forward =
-      piece.color === "white"
-      ? d[0] === -1
-      : d[0] === 1;
-
-
-      if(forward){
-
-        moves.push({
-
-          r:nr,
-          c:nc,
-          capture:null
-
-        });
-
-      }
-
-    }
-
-
-    // CAPTURA
-
-    const jr =
-    r+d[0]*2;
-
-    const jc =
-    c+d[1]*2;
-
-
-    if(
-      inside(nr,nc) &&
-      inside(jr,jc) &&
-      board[nr][nc] &&
-      board[nr][nc].color ===
-        enemy(piece.color) &&
-      !board[jr][jc]
-    ){
-
-      moves.push({
-
-        r:jr,
-        c:jc,
-
-        capture:{
-
-          r:nr,
-          c:nc
-
-        }
-
-      });
-
-    }
-
-  });
-
-
-  return moves;
-
-}
-
-
-// ═══════════════════════════════
-// CAPTURAS OBRIGATÓRIAS
-// ═══════════════════════════════
-
-function allCaptures(color){
-
-  const result = [];
-
-  const oldTurn =
-  turn;
-
-  turn = color;
-
-
-  for(
-    let r=0;
-    r<SIZE;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      if(
-        board[r][c] &&
-        board[r][c].color === color
-      ){
-
-        const moves =
-        getMoves(
-          r,
-          c,
-          true
-        );
-
-
-        if(moves.length){
-
-          result.push({
-
-            r:r,
-            c:c,
-            moves:moves
-
-          });
-
-        }
-
-      }
-
-    }
-
-  }
-
-
-  turn = oldTurn;
-
-  return result;
-
-}
-
-
-function captureRequired(){
-
-  return (
-    allCaptures(turn).length > 0
-  );
-
-}
-
-
-// ═══════════════════════════════
-// EXECUTAR MOVIMENTO
-// ═══════════════════════════════
-
-function executeMove(
-  from,
-  to
-){
-
-  const piece =
-  board[from.r][from.c];
-
-
-  const moves =
-  getMoves(
-    from.r,
-    from.c,
-    captureRequired()
-  );
-
-
-  const move =
-  moves.find(
-    function(m){
-
-      return (
-        m.r === to.r &&
-        m.c === to.c
-      );
-
-    }
-  );
-
-
-  if(!move) return false;
-
-
-  board[to.r][to.c] =
-  piece;
-
-  board[from.r][from.c] =
-  null;
-
-
-  // CAPTURA
-
-  if(move.capture){
-
-    board[
-      move.capture.r
-    ][
-      move.capture.c
-    ] = null;
-
-  }
-
-
-  // PROMOÇÃO
-
-  if(
-    !piece.king &&
-    (
-      (
-        piece.color === "white" &&
-        to.r === 0
-      )
-      ||
-      (
-        piece.color === "black" &&
-        to.r === 9
-      )
-    )
-  ){
-
-    piece.king = true;
-
-  }
-
-
-  // CAPTURA MÚLTIPLA
-
-  if(move.capture){
-
-    const next =
-    getMoves(
-      to.r,
-      to.c,
-      true
-    );
-
-
-    if(next.length){
-
-      selected = {
-
-        r:to.r,
-        c:to.c
-
-      };
-
-      render();
-
-      return true;
-
-    }
-
-  }
-
-
-  turn =
-  enemy(turn);
-
-  selected = null;
-
-  checkGameOver();
-
-  render();
-
-  return true;
-
-}
-
-
-// ═══════════════════════════════
-// VERIFICAR FIM
-// ═══════════════════════════════
-
-function checkGameOver(){
-
-  let white = 0;
-
-  let black = 0;
-
-
-  for(
-    let r=0;
-    r<SIZE;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      if(board[r][c]){
-
-        if(
-          board[r][c].color ===
-          "white"
-        ){
-
-          white++;
-
-        }
-
-        else{
-
-          black++;
-
-        }
-
-      }
-
-    }
-
-  }
-
-
-  if(!white){
-
-    gameOver = true;
-
-    turnEl.textContent =
-    "Pretas venceram! 🏆";
-
-    return;
-
-  }
-
-
-  if(!black){
-
-    gameOver = true;
-
-    turnEl.textContent =
-    "Brancas venceram! 🏆";
-
-    return;
-
-  }
-
-
-  // Verificar movimentos
-
-  const oldTurn =
-  turn;
-
-
-  turn = "white";
-
-  let whiteMoves = false;
-
-
-  for(
-    let r=0;
-    r<SIZE;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      if(
-        board[r][c] &&
-        board[r][c].color ===
-        "white" &&
-        getMoves(
-          r,
-          c,
-          false
-        ).length
-      ){
-
-        whiteMoves = true;
-
-      }
-
-    }
-
-  }
-
-
-  turn = "black";
-
-  let blackMoves = false;
-
-
-  for(
-    let r=0;
-    r<SIZE;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      if(
-        board[r][c] &&
-        board[r][c].color ===
-        "black" &&
-        getMoves(
-          r,
-          c,
-          false
-        ).length
-      ){
-
-        blackMoves = true;
-
-      }
-
-    }
-
-  }
-
-
-  turn = oldTurn;
-
-
-  if(!whiteMoves){
-
-    gameOver = true;
-
-    turnEl.textContent =
-    "Pretas venceram! 🏆";
-
-  }
-
-
-  if(!blackMoves){
-
-    gameOver = true;
-
-    turnEl.textContent =
-    "Brancas venceram! 🏆";
-
-  }
-
-}
-
-
-// ═══════════════════════════════
-// SELECIONAR PEÇA
-// ═══════════════════════════════
-
-function selectPiece(r,c){
-
-  if(gameOver) return;
-
-  const piece =
-  board[r][c];
-
-
-  if(
-    !piece ||
-    piece.color !== turn
-  ){
-
-    return;
-
-  }
-
-
-  const required =
-  captureRequired();
-
-
-  const moves =
-  getMoves(
-    r,
-    c,
-    required
-  );
-
-
-  if(!moves.length){
-
-    turnEl.textContent =
-    "Essa peça não pode mover.";
-
-    return;
-
-  }
-
-
-  selected = {
-
-    r:r,
-    c:c
-
-  };
-
-
-  render();
-
-}
-
-
-// ═══════════════════════════════
-// CLIQUE
-// ═══════════════════════════════
-
-function clickCell(r,c){
-
-  if(gameOver)
-    return;
-
-
-  if(selected){
-
-    if(
-      board[r][c] &&
-      board[r][c].color === turn
-    ){
-
-      selectPiece(r,c);
-
-      return;
-
-    }
-
-
-    if(
-      executeMove(
-        selected,
-        {
-          r:r,
-          c:c
-        }
-      )
-    ){
-
-      return;
-
-    }
-
-
-    selected = null;
-
-    render();
-
-    return;
-
-  }
-
-
-  selectPiece(r,c);
-
-}
-
-
-// ═══════════════════════════════
-// DESENHAR
-// ═══════════════════════════════
-
+var SIZE=10, board=[], selected=null, validMoves=[], turn='w', mode='1P', gameOver=false, captures=0, score={W:0,B:0};
+var boardEl=document.getElementById('board'), swEl=document.getElementById('sw'), sbEl=document.getElementById('sb'), scEl=document.getElementById('sc'), overlay=document.getElementById('overlay');
+function idx(r,c){return r*SIZE+c} function rc(i){return {r:Math.floor(i/SIZE),c:i%SIZE}} function isDark(r,c){return (r+c)%2===1}
+function updatePlacar(){swEl.textContent=score.W; sbEl.textContent=score.B; scEl.textContent=captures;}
+function initBoard(){board=new Array(100).fill(null);for(var r=0;r<4;r++)for(var c=0;c<SIZE;c++)if(isDark(r,c))board[idx(r,c)]={color:'b',king:false};for(var r=6;r<SIZE;r++)for(var c=0;c<SIZE;c++)if(isDark(r,c))board[idx(r,c)]={color:'w',king:false};turn='w';selected=null;validMoves=[];captures=0;gameOver=false;}
 function render(){
-
-  boardEl.innerHTML = "";
-
-
-  let moves = [];
-
-
-  if(selected){
-
-    moves =
-    getMoves(
-      selected.r,
-      selected.c,
-      captureRequired()
-    );
-
-  }
-
-
-  for(
-    let r=0;
-    r<SIZE;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      const cell =
-      document.createElement(
-        "div"
-      );
-
-
-      cell.className =
-      "cell " +
-      (
-        (r+c)%2 === 0
-        ? "light"
-        : "dark"
-      );
-
-
-      cell.dataset.r = r;
-
-      cell.dataset.c = c;
-
-
-      // NÚMERO DA CASA
-
-      const number =
-      document.createElement(
-        "span"
-      );
-
-      number.className =
-      "number";
-
-      number.textContent =
-      r*SIZE+c+1;
-
-      cell.appendChild(
-        number
-      );
-
-
-      // SELECIONADA
-
-      if(
-        selected &&
-        selected.r === r &&
-        selected.c === c
-      ){
-
-        cell.classList.add(
-          "selected"
-        );
-
-      }
-
-
-      // MOVIMENTO
-
-      const possible =
-      moves.find(
-        function(m){
-
-          return (
-            m.r === r &&
-            m.c === c
-          );
-
-        }
-      );
-
-
-      if(possible){
-
-        cell.classList.add(
-          possible.capture
-          ? "capture"
-          : "move"
-        );
-
-      }
-
-
-      // PEÇA
-
-      if(board[r][c]){
-
-        const piece =
-        document.createElement(
-          "div"
-        );
-
-
-        piece.className =
-        "piece " +
-        (
-          board[r][c].color ===
-          "white"
-          ? "white-piece"
-          : "black-piece"
-        );
-
-
-        if(board[r][c].king){
-
-          piece.classList.add(
-            "king"
-          );
-
-          piece.textContent =
-          "♛";
-
-        }
-
-
-        cell.appendChild(
-          piece
-        );
-
-      }
-
-
-      cell.addEventListener(
-        "pointerdown",
-        function(e){
-
-          e.preventDefault();
-
-          clickCell(
-            parseInt(
-              this.dataset.r,
-              10
-            ),
-
-            parseInt(
-              this.dataset.c,
-              10
-            )
-          );
-
-        }
-      );
-
-
-      boardEl.appendChild(
-        cell
-      );
-
-    }
-
-  }
-
-
-  // PLACAR
-
-  let white = 0;
-
-  let black = 0;
-
-
-  for(
-    let r=0;
-    r<SIZE;
-    r++
-  ){
-
-    for(
-      let c=0;
-      c<SIZE;
-      c++
-    ){
-
-      if(board[r][c]){
-
-        if(
-          board[r][c].color ===
-          "white"
-        ){
-
-          white++;
-
-        }
-
-        else{
-
-          black++;
-
-        }
-
-      }
-
-    }
-
-  }
-
-
-  scoreEl.textContent =
-  "Brancas: " +
-  white +
-  " · Pretas: " +
-  black;
-
-
-  if(!gameOver){
-
-    turnEl.textContent =
-    turn === "white"
-    ? "Vez das brancas"
-    : "Vez das pretas";
-
-
-    if(captureRequired()){
-
-      turnEl.textContent +=
-      " · CAPTURA OBRIGATÓRIA";
-
-    }
-
-  }
-
+ boardEl.innerHTML='';
+ for(var r=0;r<SIZE;r++)for(var c=0;c<SIZE;c++){
+  var i=idx(r,c); var sq=document.createElement('div'); sq.className='sq '+(isDark(r,c)?'dark':'light');
+  if(selected===i) sq.classList.add('sel');
+  var mv=validMoves.find(function(m){return m.to===i}); if(mv){ if(mv.captures.length) sq.classList.add('canCapture'); else sq.classList.add('canMove'); }
+  if(board[i]){var p=document.createElement('div'); p.className='piece '+(board[i].color==='w'?'white':'black')+(board[i].king?' king':''); sq.appendChild(p);}
+  (function(ii,el){el.addEventListener('click',function(){clickSq(ii)});})(i,sq);
+  boardEl.appendChild(sq);
+ }
+ document.getElementById('turn').textContent=gameOver?'Fim':(mode==='1P'?(turn==='w'?'Sua vez':'Robô'):(turn==='w'?'Claras':'Escuras')) + (selected!==null && board[selected] && board[selected].king ? ' • DAMA VOADORA ♔':'');
 }
 
+function clickSq(i){
+ if(gameOver) return; if(mode==='1P'&&turn==='b') return;
+ if(board[i]&&board[i].color===turn){ selected=i; validMoves=getMovesFor(i); var allCaps=getAllCaptures(turn); if(allCaps.length>0) validMoves=validMoves.filter(function(m){return m.captures.length>0}); render(); return; }
+ if(selected!==null){ var mv=validMoves.find(function(m){return m.to===i}); if(mv) doMove(selected,mv); else {selected=null; validMoves=[]; render();} }
+}
 
-// ═══════════════════════════════
-// NOVO JOGO
-// ═══════════════════════════════
+// ===== LÓGICA PEÃO (1 casa) + DAMA VOADORA (infinito) =====
+function getMovesFor(from){
+ var piece=board[from]; if(!piece) return [];
+ if(piece.king) return getKingMoves(from, piece);
+ // PEÃO normal
+ var fromRC=rc(from); var moves=[]; var dirs= piece.color==='w'?[[-1,-1],[-1,1]]:[[1,-1],[1,1]];
+ for(var d=0;d<dirs.length;d++){
+  var nr=fromRC.r+dirs[d][0], nc=fromRC.c+dirs[d][1];
+  if(nr>=0&&nr<SIZE&&nc>=0&&nc<SIZE&&isDark(nr,nc)){ var ni=idx(nr,nc); if(!board[ni]) moves.push({to:ni,captures:[]}); }
+ }
+ // captura de peão (pode capturar pra trás também na internacional)
+ var caps=findPawnCaptures(from, piece, []);
+ caps.forEach(function(c){moves.push(c);});
+ return moves;
+}
 
-newGame.addEventListener(
-  "click",
-  createBoard
-);
+function getKingMoves(from, piece){
+ var moves=[]; var fromRC=rc(from); var dirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+ // movimento livre infinito
+ for(var d=0;d<dirs.length;d++){
+  var r=fromRC.r+dirs[d][0], c=fromRC.c+dirs[d][1];
+  while(r>=0&&r<SIZE&&c>=0&&c<SIZE){
+   if(!isDark(r,c)) {r+=dirs[d][0]; c+=dirs[d][1]; continue;}
+   var ni=idx(r,c);
+   if(!board[ni]) moves.push({to:ni,captures:[]});
+   else break; // bloqueado
+   r+=dirs[d][0]; c+=dirs[d][1];
+  }
+ }
+ // captura à distância da dama
+ var caps=findKingCaptures(from, piece, [], []);
+ caps.forEach(function(c){moves.push(c);});
+ return moves;
+}
 
+function findPawnCaptures(from, piece, captured){
+ var res=[]; var fromRC=rc(from); var dirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+ for(var d=0;d<dirs.length;d++){
+  var mr=fromRC.r+dirs[d][0], mc=fromRC.c+dirs[d][1];
+  var nr=fromRC.r+dirs[d][0]*2, nc=fromRC.c+dirs[d][1]*2;
+  if(nr<0||nr>=SIZE||nc<0||nc>=SIZE||mr<0||mr>=SIZE||mc<0||mc>=SIZE) continue;
+  if(!isDark(nr,nc)) continue;
+  var mid=idx(mr,mc), to=idx(nr,nc);
+  if(board[mid]&&board[mid].color!==piece.color&&!captured.includes(mid)&&!board[to]){
+   var newCap=captured.concat([mid]);
+   var more=findPawnCaptures(to, {...piece, pos:to}, newCap);
+   var cont=more.filter(function(m){return m.captures.length>0});
+   if(cont.length>0){ cont.forEach(function(cm){ res.push({to:cm.to, captures:newCap.concat(cm.captures.filter(function(x){return !newCap.includes(x)}))}); }); }
+   else res.push({to:to, captures:newCap});
+  }
+ }
+ return res;
+}
 
-createBoard();
+function findKingCaptures(from, piece, captured, visited){
+ var res=[]; var fromRC=rc(from); var dirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+ for(var d=0;d<dirs.length;d++){
+  var r=fromRC.r+dirs[d][0], c=fromRC.c+dirs[d][1];
+  var foundEnemy=null, foundEnemyIdx=-1;
+  while(r>=0&&r<SIZE&&c>=0&&c<SIZE){
+   if(!isDark(r,c)){ r+=dirs[d][0]; c+=dirs[d][1]; continue; }
+   var curIdx=idx(r,c);
+   if(!board[curIdx]){
+    if(foundEnemy){ // casa vazia depois do inimigo = pode capturar aqui
+     if(!captured.includes(foundEnemyIdx)){
+      var newCap=captured.concat([foundEnemyIdx]);
+      // tenta continuar capturando a partir daqui
+      var more=findKingCaptures(curIdx, piece, newCap, []);
+      if(more.length>0){ more.forEach(function(cm){ res.push({to:cm.to, captures:newCap.concat(cm.captures.filter(function(x){return !newCap.includes(x)}))}); }); }
+      else{ res.push({to:curIdx, captures:newCap}); }
+     }
+    }
+   }else{
+    if(board[curIdx].color===piece.color) break; // aliado bloqueia
+    if(foundEnemy) break; // já tem inimigo, segundo bloqueia
+    if(captured.includes(curIdx)) break;
+    foundEnemy=board[curIdx]; foundEnemyIdx=curIdx;
+   }
+   r+=dirs[d][0]; c+=dirs[d][1];
+  }
+ }
+ return res;
+}
 
-})();
+function getAllCaptures(color){
+ var all=[]; for(var i=0;i<100;i++) if(board[i]&&board[i].color===color){ var ms=getMovesFor(i).filter(function(m){return m.captures.length>0}); ms.forEach(function(m){all.push({from:i,move:m});}); } return all;
+}
+function doMove(from,mv){
+ var piece=board[from]; board[mv.to]=piece; board[from]=null; mv.captures.forEach(function(ci){board[ci]=null;}); captures+=mv.captures.length;
+ var toRC=rc(mv.to); if(!piece.king){ if(piece.color==='w'&&toRC.r===0) piece.king=true; if(piece.color==='b'&&toRC.r===SIZE-1) piece.king=true; }
+ // multi captura obrigatória
+ var more; if(piece.king) more=findKingCaptures(mv.to, piece, mv.captures, []); else more=findPawnCaptures(mv.to, piece, mv.captures);
+ more=more.filter(function(m){return m.captures.length>mv.captures.length || (mv.captures.length===0&&m.captures.length>0)});
+ if(mv.captures.length>0 && more.length>0){ selected=mv.to; validMoves=more; render(); if(navigator.vibrate)navigator.vibrate(30); return; }
+ if(checkWin()){ gameOver=true; var winner=turn; if(winner==='w') score.W++; else score.B++; updatePlacar(); showEnd(winner==='w'?'Claras venceram!':'Escuras venceram!', 'Capturas: '+captures+' • '+(piece.king?'DAMA VOADORA ♔':'Peão'), winner==='w'?'⚪':'⚫'); render(); return; }
+ turn=turn==='w'?'b':'w'; selected=null; validMoves=[]; render(); if(mode==='1P'&&turn==='b'&&!gameOver) setTimeout(botPlay,400);
+}
+function checkWin(){ var hasW=false,hasB=false; for(var i=0;i<100;i++) if(board[i]){ if(board[i].color==='w')hasW=true; else hasB=true; } if(!hasW||!hasB) return true; var hasMove=false; for(var i=0;i<100;i++) if(board[i]&&board[i].color===turn) if(getMovesFor(i).length>0){hasMove=true;break;} return !hasMove; }
+function botPlay(){
+ if(gameOver) return; var all=[]; for(var i=0;i<100;i++) if(board[i]&&board[i].color==='b'){ var ms=getMovesFor(i); ms.forEach(function(m){all.push({from:i,move:m});}); }
+ var caps=all.filter(function(a){return a.move.captures.length>0}); if(caps.length>0) all=caps;
+ if(all.length===0){ gameOver=true; score.W++; updatePlacar(); showEnd('Claras venceram!','Robô sem movimentos','⚪'); return; }
+ all.sort(function(a,b){ return (b.move.captures.length - a.move.captures.length) || (board[b.from].king?1:0)-(board[a.from].king?1:0); });
+ var top=all[0].move.captures.length; var bests=all.filter(function(a){return a.move.captures.length===top}); var best=bests[Math.floor(Math.random()*bests.length)];
+ selected=best.from; validMoves=[best.move]; render(); setTimeout(function(){doMove(best.from,best.move);},280);
+}
+function showEnd(t,txt,em){ document.getElementById('ovEmoji').textContent=em; document.getElementById('ovTitle').textContent=t; document.getElementById('ovText').textContent=txt; document.getElementById('startBtns').style.display='none'; document.getElementById('endBtns').style.display='grid'; overlay.classList.remove('hide'); }
+function newGame(){ initBoard(); render(); document.getElementById('startBtns').style.display='grid'; document.getElementById('endBtns').style.display='none'; overlay.classList.add('hide'); }
+document.getElementById('play1').addEventListener('click',function(){mode='1P';newGame();});
+document.getElementById('play2').addEventListener('click',function(){mode='2P';newGame();});
+document.getElementById('again').addEventListener('click',function(){newGame();});
+document.getElementById('closeOv').addEventListener('click',function(){overlay.classList.add('hide');});
+document.getElementById('newBtn').addEventListener('click',function(){newGame();});
+document.getElementById('resetBtn').addEventListener('click',function(){score={W:0,B:0};captures=0;updatePlacar();newGame();});
+document.getElementById('m1').addEventListener('click',function(){mode='1P';document.getElementById('m1').classList.add('active');document.getElementById('m2').classList.remove('active');newGame();});
+document.getElementById('m2').addEventListener('click',function(){mode='2P';document.getElementById('m2').classList.add('active');document.getElementById('m1').classList.remove('active');newGame();});
+initBoard(); render();
 </script>
-
 </body>
 </html>`;
 
-
-// ════════════════════════════════════════════════
-// ENVIAR DAMAS
-// ════════════════════════════════════════════════
-
-async function enviarDama(
-  sock,
-  jid,
-  quotedMsg
-){
-
+async function enviarDama(sock, jid) {
   const htmlPayload = {
-
-    response_id:
-      "dama_" + Date.now(),
-
-    sections:[
-
-      {
-
-        view_model:{
-
-          primitive:{
-
-            __typename:
-            "GenAIaeacdsnwHtmlPrimitive",
-
-            payload:
-            DAMAS_HTML,
-
-            trusted_sources:[
-              "nixel.dev"
-            ]
-
-          },
-
-          __typename:
-          "GenAISingleLayoutViewModel",
-
-          height:"full",
-
-          full_screen:true
-
-        }
-
-      }
-
-    ]
-
+    response_id: "dama_" + Date.now(),
+    sections: [{ view_model: { primitive: { __typename: "GenAIaeacdsnwHtmlPrimitive", payload: DAMA_HTML, trusted_sources: ["nixel.dev"] }, __typename: "GenAISingleLayoutViewModel", height: "full", full_screen: true } }]
   };
-
-
   const content = {
-
-    botForwardedMessage:{
-
-      message:{
-
-        richResponseMessage:{
-
-          messageType:1,
-
-          submessages:[
-
-            {
-
-              messageType:2,
-
-              messageText:
-              "♟️ Damas — 100 Casas"
-
-            }
-
-          ],
-
-          unifiedResponse:{
-
-            data:
-            Buffer
-            .from(
-              JSON.stringify(
-                htmlPayload
-              )
-            )
-            .toString("base64")
-
-          },
-
-          contextInfo:{
-
-            forwardingScore:1,
-
-            isForwarded:true,
-
-            forwardedAiBotMessageInfo:{
-
-              botJid:
-              "867051314767696@bot"
-
-            },
-
-            forwardOrigin:4
-
-          }
-
+    botForwardedMessage: {
+      message: {
+        richResponseMessage: {
+          messageType: 1,
+          submessages: [{ messageText: "Damas 100 - Dama Voadora" }],
+          unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
+          contextInfo: { forwardingScore: 1, isForwarded: true, forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" }, forwardOrigin: 4 }
         }
-
       }
-
     }
-
   };
-
-
-  const fullMsg =
-  generateWAMessageFromContent(
-    jid,
-    content,
-    {
-
-      userJid:
-      sock.authState?.creds?.me?.id ||
-      sock.user?.id,
-
-      timestamp:
-      new Date()
-
-    }
-  );
-
-
-  await sock.relayMessage(
-    jid,
-    fullMsg.message,
-    {
-      messageId:
-      fullMsg.key.id
-    }
-  );
-
-
+  const fullMsg = generateWAMessageFromContent(jid, content, { userJid: sock.authState?.creds?.me?.id || sock.user?.id, timestamp: new Date() });
+  await sock.relayMessage(jid, fullMsg.message, { messageId: fullMsg.key.id });
   return fullMsg;
-
 }
-
-
-module.exports = {
-  enviarDama
-};
+module.exports = { enviarDama, enviarDamas: enviarDama };
