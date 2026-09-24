@@ -882,451 +882,347 @@ async function enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono){
 
 // ═══════════════════════════════════════════════════════════════
 // ✅ MENU JOGOS — REGISTRO CENTRAL DE TODOS OS JOGOS
-// ⚠️ ORDEM IGUAL À DOS REQUIRE() ACIMA
 // ═══════════════════════════════════════════════════════════════
 
 const GAMES_REGISTRY = {
 
-  // 01
+  // 🕹️ CLÁSSICOS
   dino: {
     nome: "Dino Runner",
     emoji: "🦖",
-    enviar: async (sock, jid, msg) =>
-      enviarDino(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarDino(sock, jid, msg)
   },
 
-  // 02
   piano: {
     nome: "Piano",
     emoji: "🎹",
-    enviar: async (sock, jid, msg) =>
-      enviarPiano(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarPiano(sock, jid, msg)
   },
 
-  // 03
   cobra: {
-    nome: "Cobra",
+    nome: "Cobrinha (Snake)",
     emoji: "🐍",
-    enviar: async (sock, jid, msg) =>
-      enviarCobra(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarCobra(sock, jid, msg)
   },
 
-  // 04
   dama: {
     nome: "Damas",
     emoji: "🔴",
-    enviar: async (sock, jid, msg) =>
-      enviarDama(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarDama(sock, jid, msg)
   },
 
-  // 05
   xo: {
     nome: "Jogo da Velha",
     emoji: "❌",
-    enviar: async (sock, jid, msg) =>
-      enviarXO(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarXO(sock, jid, msg)
   },
 
-  // 06
-  slot: {
-    nome: "Slot Machine",
-    emoji: "🎰",
-    enviar: async (sock, jid, msg) =>
-      enviarSlot(sock, jid, msg)
+  velha: {
+    nome: "Velha",
+    emoji: "⭕",
+    enviar: async (sock, jid, msg) => enviarVelha(sock, jid, msg)
   },
 
-  // 07
+  // 🧩 PUZZLE
   "2048": {
     nome: "2048",
     emoji: "🔢",
-    enviar: async (sock, jid, msg) =>
-      enviar2048(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviar2048(sock, jid, msg)
   },
 
-  // 08
   campominado: {
     nome: "Campo Minado",
     emoji: "💣",
-    enviar: async (sock, jid, msg) =>
-      enviarCampoMinado(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarCampoMinado(sock, jid, msg)
   },
 
-  // 09
   memoria: {
     nome: "Jogo da Memória",
     emoji: "🧠",
-    enviar: async (sock, jid, msg) =>
-      enviarMemoria(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarMemoria(sock, jid, msg)
   },
 
-  // 10
-  snake: {
-    nome: "Snake",
-    emoji: "🐍",
-    enviar: async (sock, jid, msg) =>
-      enviarSnake(sock, jid, msg)
-  },
-
-  // 11
-  connect4: {
-    nome: "Connect 4",
-    emoji: "🔵",
-    enviar: async (sock, jid, msg) =>
-      enviarConnect4(sock, jid, msg)
-  },
-
-  // 12
-  pacman: {
-    nome: "Pac-Man",
-    emoji: "👻",
-    enviar: async (sock, jid, msg) =>
-      enviarPacman(sock, jid, msg)
-  },
-
-  // 13
-  tiro: {
-    nome: "Tiro ao Alvo",
-    emoji: "🎯",
-    enviar: async (sock, jid, msg) =>
-      enviarTiro(sock, jid, msg)
-  },
-
-  // 14
-  aventura: {
-    nome: "Aventura",
-    emoji: "⚔️",
-    enviar: async (sock, jid, msg) =>
-      enviarAventura(sock, jid, msg)
-  },
-
-  // 15
-  tetris: {
-    nome: "Tetris",
-    emoji: "🧱",
-    enviar: async (sock, jid, msg) =>
-      enviarTetris(sock, jid, msg)
-  },
-
-  // 16
-  ludo: {
-    nome: "Ludo",
-    emoji: "🎲",
-    enviar: async (sock, jid, msg) =>
-      enviarLudo(sock, jid, msg)
-  },
-
-  // 17
-  flappy: {
-    nome: "Flappy Bird",
-    emoji: "🐤",
-    enviar: async (sock, jid, msg) =>
-      enviarFlappy(sock, jid, msg)
-  },
-
-  // 18
-  domino: {
-    nome: "Dominó",
-    emoji: "🁫",
-    enviar: async (sock, jid, msg) =>
-      enviarDomino(sock, jid, msg)
-  },
-
-  // 19
-  batalhanaval: {
-    nome: "Batalha Naval",
-    emoji: "🚢",
-    enviar: async (sock, jid, msg) =>
-      enviarBatalhaNaval(sock, jid, msg)
-  },
-
-  // 20
-  uno: {
-    nome: "UNO",
-    emoji: "🃏",
-    enviar: async (sock, jid, msg) =>
-      enviarUno(sock, jid, msg)
-  },
-
-  // 21
-  pingpong: {
-    nome: "Ping Pong",
-    emoji: "🏓",
-    enviar: async (sock, jid, msg) =>
-      enviarPingPong(sock, jid, msg)
-  },
-
-  // 22
-  futebol: {
-    nome: "Futebol",
-    emoji: "⚽",
-    enviar: async (sock, jid, msg) =>
-      enviarFutebol(sock, jid, msg)
-  },
-
-  // 23
-  bilhar: {
-    nome: "Bilhar",
-    emoji: "🎱",
-    enviar: async (sock, jid, msg) =>
-      enviarBilhar(sock, jid, msg)
-  },
-
-  // 24
-  xadrezchines: {
-    nome: "Xadrez Chinês",
-    emoji: "♟️",
-    enviar: async (sock, jid, msg) =>
-      enviarXadrezChines(sock, jid, msg)
-  },
-
-  // 25
-  ppt: {
-    nome: "Pedra, Papel, Tesoura",
-    emoji: "✊",
-    enviar: async (sock, jid, msg) =>
-      enviarPpt(sock, jid, msg)
-  },
-
-  // 26
-  caraoucoroa: {
-    nome: "Cara ou Coroa",
-    emoji: "🪙",
-    enviar: async (sock, jid, msg) =>
-      enviarCaraOuCoroa(sock, jid, msg)
-  },
-
-  // 27
-  othello: {
-    nome: "Othello / Reversi",
-    emoji: "⚫",
-    enviar: async (sock, jid, msg) =>
-      enviarOthello(sock, jid, msg)
-  },
-
-  // 28
-  adivinha: {
-    nome: "Adivinha",
-    emoji: "🤔",
-    enviar: async (sock, jid, msg) =>
-      enviarAdivinha(sock, jid, msg)
-  },
-
-  // 29
-  loteria: {
-    nome: "Lotaria",
-    emoji: "🎟️",
-    enviar: async (sock, jid, msg) =>
-      enviarLoteria(sock, jid, msg)
-  },
-
-  // 30
-  forca: {
-    nome: "Jogo da Forca",
-    emoji: "🪢",
-    enviar: async (sock, jid, msg) =>
-      enviarForca(sock, jid, msg)
-  },
-
-  // 31
-  digitacao: {
-    nome: "Teste de Digitação",
-    emoji: "⌨️",
-    enviar: async (sock, jid, msg) =>
-      enviarDigitacao(sock, jid, msg)
-  },
-
-  // 32
   deslizante: {
     nome: "Puzzle Deslizante",
     emoji: "🧩",
-    enviar: async (sock, jid, msg) =>
-      enviarDeslizante(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarDeslizante(sock, jid, msg)
   },
 
-  // 33
-  quiz: {
-    nome: "Quiz",
-    emoji: "❓",
-    enviar: async (sock, jid, msg) =>
-      enviarQuiz(sock, jid, msg)
-  },
-
-  // 34
-  sudoku: {
-    nome: "Sudoku",
-    emoji: "🔢",
-    enviar: async (sock, jid, msg) =>
-      enviarSudoku(sock, jid, msg)
-  },
-
-  // 35
-  mahjong: {
-    nome: "Mahjong",
-    emoji: "🀄",
-    enviar: async (sock, jid, msg) =>
-      enviarMahjong(sock, jid, msg)
-  },
-
-  // 36
-  dardos: {
-    nome: "Dardos",
-    emoji: "🎯",
-    enviar: async (sock, jid, msg) =>
-      enviarDardos(sock, jid, msg)
-  },
-
-  // 37
   blockblast: {
     nome: "Block Blast",
     emoji: "🧱",
-    enviar: async (sock, jid, msg) =>
-      enviarBlockBlast(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarBlockBlast(sock, jid, msg)
   },
 
-  // 38
-  cacabugs: {
-    nome: "Caça Bugs",
-    emoji: "🐛",
-    enviar: async (sock, jid, msg) =>
-      enviarCacaBugs(sock, jid, msg)
+  sudoku: {
+    nome: "Sudoku",
+    emoji: "🔢",
+    enviar: async (sock, jid, msg) => enviarSudoku(sock, jid, msg)
   },
 
-  // 39
-  cacapalavras: {
-    nome: "Caça-Palavras",
-    emoji: "🔤",
-    enviar: async (sock, jid, msg) =>
-      enviarCacaPalavras(sock, jid, msg)
-  },
-
-  // 40
-  avioes: {
-    nome: "Aviões",
-    emoji: "✈️",
-    enviar: async (sock, jid, msg) =>
-      enviarAvioes(sock, jid, msg)
-  },
-
-  // 41
-  minas: {
-    nome: "Minas",
-    emoji: "💣",
-    enviar: async (sock, jid, msg) =>
-      enviarMinas(sock, jid, msg)
-  },
-
-  // 42
-  ligar4: {
-    nome: "Ligar 4",
-    emoji: "🔴",
-    enviar: async (sock, jid, msg) =>
-      enviarLigar4(sock, jid, msg)
-  },
-
-  // 43
-  roleta: {
-    nome: "Roleta",
-    emoji: "🎡",
-    enviar: async (sock, jid, msg) =>
-      enviarRoleta(sock, jid, msg)
-  },
-
-  // 44
-  velha: {
-    nome: "Jogo da Velha",
-    emoji: "⭕",
-    enviar: async (sock, jid, msg) =>
-      enviarVelha(sock, jid, msg)
-  },
-
-  // 45
-  dado: {
-    nome: "Dado",
-    emoji: "🎲",
-    enviar: async (sock, jid, msg) =>
-      enviarDado(sock, jid, msg)
-  },
-
-  // 46
-  bolhas: {
-    nome: "Bolhas",
-    emoji: "🫧",
-    enviar: async (sock, jid, msg) =>
-      enviarBolhas(sock, jid, msg)
-  },
-
-  // 47
-  pong: {
-    nome: "Pong",
-    emoji: "🏓",
-    enviar: async (sock, jid, msg) =>
-      enviarPong(sock, jid, msg)
-  },
-
-  // 48
-  cobrinha: {
-    nome: "Cobrinha",
-    emoji: "🐍",
-    enviar: async (sock, jid, msg) =>
-      enviarCobrinha(sock, jid, msg)
-  },
-
-  // 49
-  labirinto: {
-    nome: "Labirinto",
-    emoji: "🌀",
-    enviar: async (sock, jid, msg) =>
-      enviarLabirinto(sock, jid, msg)
-  },
-
-  // 50
-  corrida: {
-    nome: "Corrida",
-    emoji: "🏎️",
-    enviar: async (sock, jid, msg) =>
-      enviarCorrida(sock, jid, msg)
-  },
-
-  // 51
-  basquete: {
-    nome: "Basquete",
-    emoji: "🏀",
-    enviar: async (sock, jid, msg) =>
-      enviarBasquete(sock, jid, msg)
-  },
-
-  // 52
-  boliche: {
-    nome: "Boliche",
-    emoji: "🎳",
-    enviar: async (sock, jid, msg) =>
-      enviarBoliche(sock, jid, msg)
-  },
-
-  // 53
-  sinuca: {
-    nome: "Sinuca",
-    emoji: "🎱",
-    enviar: async (sock, jid, msg) =>
-      enviarSinuca(sock, jid, msg)
-  },
-
-  // 54
   quebra: {
     nome: "Quebra-Cabeça",
     emoji: "🧩",
-    enviar: async (sock, jid, msg) =>
-      enviarQuebra(sock, jid, msg)
+    enviar: async (sock, jid, msg) => enviarQuebra(sock, jid, msg)
   },
 
-  // 55
+  // ♟️ TABULEIRO
+  connect4: {
+    nome: "Connect 4",
+    emoji: "🔵",
+    enviar: async (sock, jid, msg) => enviarConnect4(sock, jid, msg)
+  },
+
+  xadrezchines: {
+    nome: "Xadrez Chinês",
+    emoji: "♟️",
+    enviar: async (sock, jid, msg) => enviarXadrezChines(sock, jid, msg)
+  },
+
+  mahjong: {
+    nome: "Mahjong",
+    emoji: "🀄",
+    enviar: async (sock, jid, msg) => enviarMahjong(sock, jid, msg)
+  },
+
+  domino: {
+    nome: "Dominó",
+    emoji: "🁫",
+    enviar: async (sock, jid, msg) => enviarDomino(sock, jid, msg)
+  },
+
+  ludo: {
+    nome: "Ludo",
+    emoji: "🎲",
+    enviar: async (sock, jid, msg) => enviarLudo(sock, jid, msg)
+  },
+
+  batalhanaval: {
+    nome: "Batalha Naval",
+    emoji: "🚢",
+    enviar: async (sock, jid, msg) => enviarBatalhaNaval(sock, jid, msg)
+  },
+
+  uno: {
+    nome: "UNO",
+    emoji: "🃏",
+    enviar: async (sock, jid, msg) => enviarUno(sock, jid, msg)
+  },
+
+  othello: {
+    nome: "Othello / Reversi",
+    emoji: "⚫",
+    enviar: async (sock, jid, msg) => enviarOthello(sock, jid, msg)
+  },
+
+  ligar4: {
+    nome: "Ligar 4",
+    emoji: "🔴",
+    enviar: async (sock, jid, msg) => enviarLigar4(sock, jid, msg)
+  },
+
+  // 🎯 ARCADE & HABILIDADE
+  snake: {
+    nome: "Snake",
+    emoji: "🐍",
+    enviar: async (sock, jid, msg) => enviarSnake(sock, jid, msg)
+  },
+
+  cobrinha: {
+    nome: "Cobrinha",
+    emoji: "🐍",
+    enviar: async (sock, jid, msg) => enviarCobrinha(sock, jid, msg)
+  },
+
+  pong: {
+    nome: "Pong",
+    emoji: "🏓",
+    enviar: async (sock, jid, msg) => enviarPong(sock, jid, msg)
+  },
+
+  pingpong: {
+    nome: "Ping Pong",
+    emoji: "🏓",
+    enviar: async (sock, jid, msg) => enviarPingPong(sock, jid, msg)
+  },
+
+  pacman: {
+    nome: "Pac-Man",
+    emoji: "👾",
+    enviar: async (sock, jid, msg) => enviarPacman(sock, jid, msg)
+  },
+
+  tetris: {
+    nome: "Tetris",
+    emoji: "🧱",
+    enviar: async (sock, jid, msg) => enviarTetris(sock, jid, msg)
+  },
+
+  flappy: {
+    nome: "Flappy Bird",
+    emoji: "🐤",
+    enviar: async (sock, jid, msg) => enviarFlappy(sock, jid, msg)
+  },
+
+  tiro: {
+    nome: "Tiro ao Alvo",
+    emoji: "🎯",
+    enviar: async (sock, jid, msg) => enviarTiro(sock, jid, msg)
+  },
+
   invasores: {
     nome: "Space Invaders",
     emoji: "👾",
-    enviar: async (sock, jid, msg) =>
-      enviarInvasores(sock, jid, msg)
-  }
+    enviar: async (sock, jid, msg) => enviarInvasores(sock, jid, msg)
+  },
 
+  labirinto: {
+    nome: "Labirinto",
+    emoji: "🌀",
+    enviar: async (sock, jid, msg) => enviarLabirinto(sock, jid, msg)
+  },
+
+  corrida: {
+    nome: "Corrida",
+    emoji: "🏎️",
+    enviar: async (sock, jid, msg) => enviarCorrida(sock, jid, msg)
+  },
+
+  // ⚽ ESPORTES
+  futebol: {
+    nome: "Futebol",
+    emoji: "⚽",
+    enviar: async (sock, jid, msg) => enviarFutebol(sock, jid, msg)
+  },
+
+  basquete: {
+    nome: "Basquete",
+    emoji: "🏀",
+    enviar: async (sock, jid, msg) => enviarBasquete(sock, jid, msg)
+  },
+
+  boliche: {
+    nome: "Boliche",
+    emoji: "🎳",
+    enviar: async (sock, jid, msg) => enviarBoliche(sock, jid, msg)
+  },
+
+  bilhar: {
+    nome: "Bilhar",
+    emoji: "🎱",
+    enviar: async (sock, jid, msg) => enviarBilhar(sock, jid, msg)
+  },
+
+  sinuca: {
+    nome: "Sinuca",
+    emoji: "🎱",
+    enviar: async (sock, jid, msg) => enviarSinuca(sock, jid, msg)
+  },
+
+  dardos: {
+    nome: "Dardos",
+    emoji: "🎯",
+    enviar: async (sock, jid, msg) => enviarDardos(sock, jid, msg)
+  },
+
+  avioes: {
+    nome: "Aviões",
+    emoji: "✈️",
+    enviar: async (sock, jid, msg) => enviarAvioes(sock, jid, msg)
+  },
+
+  // 🎰 SORTE
+  slot: {
+    nome: "Slot Machine",
+    emoji: "🎰",
+    enviar: async (sock, jid, msg) => enviarSlot(sock, jid, msg)
+  },
+
+  roleta: {
+    nome: "Roleta",
+    emoji: "🎡",
+    enviar: async (sock, jid, msg) => enviarRoleta(sock, jid, msg)
+  },
+
+  loteria: {
+    nome: "Lotaria",
+    emoji: "🎟️",
+    enviar: async (sock, jid, msg) => enviarLoteria(sock, jid, msg)
+  },
+
+  dado: {
+    nome: "Dado",
+    emoji: "🎲",
+    enviar: async (sock, jid, msg) => enviarDado(sock, jid, msg)
+  },
+
+  caraoucoroa: {
+    nome: "Cara ou Coroa",
+    emoji: "🪙",
+    enviar: async (sock, jid, msg) => enviarCaraOuCoroa(sock, jid, msg)
+  },
+
+  bolhas: {
+    nome: "Bolhas",
+    emoji: "🫧",
+    enviar: async (sock, jid, msg) => enviarBolhas(sock, jid, msg)
+  },
+
+  // 📝 PALAVRAS & QUIZ
+  cacapalavras: {
+    nome: "Caça-Palavras",
+    emoji: "🔤",
+    enviar: async (sock, jid, msg) => enviarCacaPalavras(sock, jid, msg)
+  },
+
+  quiz: {
+    nome: "Quiz",
+    emoji: "❓",
+    enviar: async (sock, jid, msg) => enviarQuiz(sock, jid, msg)
+  },
+
+  forca: {
+    nome: "Jogo da Forca",
+    emoji: "🪢",
+    enviar: async (sock, jid, msg) => enviarForca(sock, jid, msg)
+  },
+
+  adivinha: {
+    nome: "Adivinha",
+    emoji: "🤔",
+    enviar: async (sock, jid, msg) => enviarAdivinha(sock, jid, msg)
+  },
+
+  digitacao: {
+    nome: "Teste de Digitação",
+    emoji: "⌨️",
+    enviar: async (sock, jid, msg) => enviarDigitacao(sock, jid, msg)
+  },
+
+  cacabugs: {
+    nome: "Caça Bugs",
+    emoji: "🐛",
+    enviar: async (sock, jid, msg) => enviarCacaBugs(sock, jid, msg)
+  },
+
+  ppt: {
+    nome: "Pedra, Papel, Tesoura",
+    emoji: "✊",
+    enviar: async (sock, jid, msg) => enviarPpt(sock, jid, msg)
+  },
+
+  // ⚔️ AVENTURA
+  aventura: {
+    nome: "Aventura",
+    emoji: "⚔️",
+    enviar: async (sock, jid, msg) => enviarAventura(sock, jid, msg)
+  },
+
+  minas: {
+    nome: "Minas",
+    emoji: "⛏️",
+    enviar: async (sock, jid, msg) => enviarMinas(sock, jid, msg)
+  }
 };
 
 function montarLinhaJogo(slug){
@@ -1336,96 +1232,69 @@ function montarLinhaJogo(slug){
 }
 async function enviarMenuJogos(sock, jid, seloBot) {
   const grupos = [
-
-    // ═══════════════════════════════════════════════
-    // 🕹️ CLÁSSICOS
-    // ═══════════════════════════════════════════════
     {
-      title: "🕹️ CLÁSSICOS",
+      title: "🕹️ JÁ DISPONÍVEIS",
       itens: [
         "dino",
         "piano",
         "cobra",
         "dama",
         "xo",
-        "velha"
+        "slot",
+        "2048"
       ]
     },
 
-    // ═══════════════════════════════════════════════
-    // 🧩 PUZZLE
-    // ═══════════════════════════════════════════════
     {
       title: "🧩 PUZZLE",
       itens: [
         "2048",
         "campominado",
         "memoria",
-        "deslizante",
         "sudoku",
         "blockblast",
+        "deslizante",
         "quebra"
       ]
     },
 
-    // ═══════════════════════════════════════════════
-    // ♟️ TABULEIRO
-    // ═══════════════════════════════════════════════
     {
       title: "♟️ TABULEIRO",
       itens: [
         "connect4",
         "xadrezchines",
-        "mahjong",
         "domino",
-        "ludo",
-        "batalhanaval",
         "uno",
         "othello",
-        "ligar4"
+        "ludo",
+        "ligar4",
+        "batalhanaval"
       ]
     },
 
-    // ═══════════════════════════════════════════════
-    // 🎯 HABILIDADE & ARCADE
-    // ═══════════════════════════════════════════════
     {
       title: "🎯 HABILIDADE & ARCADE",
       itens: [
         "snake",
-        "cobrinha",
         "pong",
         "pingpong",
         "pacman",
         "tetris",
         "flappy",
         "tiro",
-        "invasores",
-        "labirinto",
-        "corrida",
-        "bolhas"
-      ]
-    },
-
-    // ═══════════════════════════════════════════════
-    // ⚽ ESPORTES
-    // ═══════════════════════════════════════════════
-    {
-      title: "⚽ ESPORTES",
-      itens: [
         "futebol",
+        "bilhar",
+        "bilhar",
         "basquete",
         "boliche",
-        "bilhar",
-        "sinuca",
         "dardos",
+        "invasores",
+        "cobrinha",
+        "corrida",
         "avioes"
       ]
     },
 
-    // ═══════════════════════════════════════════════
-    // 🎰 CASINO & SORTE
-    // ═══════════════════════════════════════════════
     {
       title: "🎰 CASINO & SORTE",
       itens: [
@@ -1437,9 +1306,6 @@ async function enviarMenuJogos(sock, jid, seloBot) {
       ]
     },
 
-    // ═══════════════════════════════════════════════
-    // 📝 PALAVRAS & QUIZ
-    // ═══════════════════════════════════════════════
     {
       title: "📝 PALAVRAS & QUIZ",
       itens: [
@@ -1452,9 +1318,6 @@ async function enviarMenuJogos(sock, jid, seloBot) {
       ]
     },
 
-    // ═══════════════════════════════════════════════
-    // ⚔️ AVENTURA & BATALHA
-    // ═══════════════════════════════════════════════
     {
       title: "⚔️ AVENTURA & BATALHA",
       itens: [
@@ -1463,18 +1326,20 @@ async function enviarMenuJogos(sock, jid, seloBot) {
       ]
     },
 
-    // ═══════════════════════════════════════════════
-    // 🎮 DIVERSÃO
-    // ═══════════════════════════════════════════════
     {
-      title: "🎮 DIVERSÃO",
+      title: "🏓 ESPORTES",
       itens: [
-        "ppt"
+        "pingpong",
+        "pong",
+        "futebol",
+        "basquete",
+        "boliche",
+        "bilhar",
+        "sinuca",
+        "dardos"
       ]
     }
   ];
-
-
   const secoesJogos=grupos.map(g=>({title:g.title,highlight_label:"",rows:g.itens.map(montarLinhaJogo).filter(Boolean)}));
   const textoMenu=`${B_TOP}\n${bTitle("🎮 MENU JOGOS")}\n${B_MID}\n${bLine("🎮","Escolhe um jogo na lista abaixo!")}\n${bLine("💡","Jogos com 🚧 ainda vão ser adicionados.")}\n${B_BOT}`;
   try{
