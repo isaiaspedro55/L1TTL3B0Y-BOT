@@ -23,8 +23,58 @@ const { enviarPiano } = require("./comando_piano.js");
 const { enviarCobra } = require("./comando_cobra.js");
 const { enviarDama } = require("./comando_dama.js");
 const { enviarXO } = require("./comando_XO.js");
+//NOVOS JOGOS
+const { enviarSlot } = require("./comando_slot.js");
+const { enviar2048 } = require("./comando_2048.js");
+const { enviarCampoMinado } = require("./comando_campominado.js");
+const { enviarMemoria } = require("./comando_memoria.js");
+const { enviarSnake } = require("./comando_snake.js");
+const { enviarConnect4 } = require("./comando_connect4.js");
+const { enviarPacman } = require("./comando_pacman.js");
+const { enviarTiro } = require("./comando_tiro.js");
+const { enviarAventura } = require("./comando_aventura.js");
+const { enviarTetris } = require("./comando_tetris.js");
+const { enviarLudo } = require("./comando_ludo.js");
+const { enviarFlappy } = require("./comando_flappy.js");
+const { enviarDomino } = require("./comando_domino.js");
+const { enviarBatalhaNaval } = require("./comando_batalhanaval.js");
+const { enviarUno } = require("./comando_uno.js");
+const { enviarPingPong } = require("./comando_pingpong.js");
+const { enviarFutebol } = require("./comando_futebol.js");
+const { enviarBilhar } = require("./comando_bilhar.js");
+const { enviarXadrezChines } = require("./comando_xadrezchines.js");
+const { enviarPpt } = require("./comando_ppt.js");
+const { enviarCaraOuCoroa } = require("./comando_caraoucoroa.js");
+const { enviarOthello } = require("./comando_othello.js");
+const { enviarAdivinha } = require("./comando_adivinha.js");
+const { enviarLoteria } = require("./comando_loteria.js");
+const { enviarForca } = require("./comando_forca.js");
+const { enviarDigitacao } = require("./comando_digitacao.js");
+const { enviarDeslizante } = require("./comando_deslizante.js");
+const { enviarQuiz } = require("./comando_quiz.js");
+const { enviarSudoku } = require("./comando_sudoku.js");
+const { enviarMahjong } = require("./comando_mahjong.js");
+const { enviarDardos } = require("./comando_dardos.js");
+const { enviarBlockBlast } = require("./comando_blockblast.js");
+const { enviarCacaBugs } = require("./comando_cacabugs.js");
+const { enviarCacaPalavras } = require("./comando_cacapalavras.js");
+const { enviarAvioes } = require("./comando_avioes.js");
+const { enviarMinas } = require("./comando_minas.js");
+const { enviarLigar4 } = require("./comando_ligar4.js");
+const { enviarRoleta } = require("./comando_roleta.js");
+const { enviarVelha } = require("./comando_velha.js");
+const { enviarDado } = require("./comando_dado.js");
+const { enviarBolhas } = require("./comando_bolhas.js");
+const { enviarPong } = require("./comando_pong.js");
+const { enviarCobrinha } = require("./comando_cobrinha.js");
+const { enviarLabirinto } = require("./comando_labirinto.js");
+const { enviarCorrida } = require("./comando_corrida.js");
+const { enviarBasquete } = require("./comando_basquete.js");
+const { enviarBoliche } = require("./comando_boliche.js");
+const { enviarSinuca } = require("./comando_sinuca.js");
+const { enviarQuebra } = require("./comando_quebra.js");
+const { enviarInvasores } = require("./comando_invasores.js");
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
-
 fs.ensureDirSync(process.env.TMPDIR);
 fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./dados");
@@ -33,7 +83,7 @@ const CONFIG = {
   PREFIXO:         "!",
   NUMERO_BOT:      "244950898368",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
-  GEMINI_KEY:      process.env.GEMINI_KEY || "", // ⚠️ Cola aqui a tua API key grátis do Gemini (https://aistudio.google.com/apikey)
+  GEMINI_KEY: process.env.GEMINI_KEY || "",
   DONO_JID:        "169853876965546@lid",
   DONO_NOME:       "ISAÍAS PEDRO",
   DONO_NUM:        "926 612 801",
@@ -552,6 +602,7 @@ function buildSecoes(isDono){
     {header:`${E.musicas} MENU-MÚSICAS`,title:"_músicas, letras, bio._",id:"cat_musicas"},
     {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"_stickers e criações._",id:"cat_figurinhas"},
     {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"_jogos e diversão._",id:"cat_brincadeiras"},
+    {header:"🎮 MENU-JOGOS",title:"_jogos interactivos completos._",id:"cat_jogos"},
     {header:`${E.coins} MENU-COINS`,title:"_moedas e apostas._",id:"cat_coins"},
     {header:`${E.alteradores} MENU-ALTERADORES`,title:"_IA, voz, áudio, imagem._",id:"cat_alteradores"},
     {header:`${E.logos} MENU-LOGOS`,title:"_logos, memes, utilidades._",id:"cat_logos"},
@@ -814,6 +865,7 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
 
 
 async function enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono){
+  if(catId==="cat_jogos"){await enviarMenuJogos(sock,jid,seloBot);return;}
   if(catId==="cat_assistente"){await sock.sendMessage(jid,{text:bBloco("🤖 ISAÍAS IA",[bLine("💡","*Em grupos:* menciona o nome dele!"),bLine("💡","*No privado:* fala directamente!"),B_SEP,bLine("💬","_\"Isaías, baixa música do Calema\"_"),bLine("💬","_\"Isaías, que tempo em Luanda?\"_"),bLine("💡",`*!isaias-off* para desactivar no grupo`)])},{quoted:seloBot});return;}
   if(catId==="cat_ping"){await sock.sendMessage(jid,{text:gerarBlocoPing(msg)},{quoted:seloBot});return;}
   if(catId==="cat_donos"){await sock.sendMessage(jid,{text:bBloco("👑 DONOS",[bLine("👑",`*${CONFIG.DONO_NOME}*`),bLine("📞",CONFIG.DONO_NUM)])},{quoted:seloBot});return;}
@@ -826,6 +878,628 @@ async function enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono){
   if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:texto},{quoted:seloBot});
   else if(ppBotUrl)await sock.sendMessage(jid,{image:{url:ppBotUrl},caption:texto},{quoted:seloBot});
   else await sock.sendMessage(jid,{text:texto},{quoted:seloBot});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ✅ MENU JOGOS — REGISTRO CENTRAL DE TODOS OS JOGOS
+// ⚠️ ORDEM IGUAL À DOS REQUIRE() ACIMA
+// ═══════════════════════════════════════════════════════════════
+
+const GAMES_REGISTRY = {
+
+  // 01
+  dino: {
+    nome: "Dino Runner",
+    emoji: "🦖",
+    enviar: async (sock, jid, msg) =>
+      enviarDino(sock, jid, msg)
+  },
+
+  // 02
+  piano: {
+    nome: "Piano",
+    emoji: "🎹",
+    enviar: async (sock, jid, msg) =>
+      enviarPiano(sock, jid, msg)
+  },
+
+  // 03
+  cobra: {
+    nome: "Cobra",
+    emoji: "🐍",
+    enviar: async (sock, jid, msg) =>
+      enviarCobra(sock, jid, msg)
+  },
+
+  // 04
+  dama: {
+    nome: "Damas",
+    emoji: "🔴",
+    enviar: async (sock, jid, msg) =>
+      enviarDama(sock, jid, msg)
+  },
+
+  // 05
+  xo: {
+    nome: "Jogo da Velha",
+    emoji: "❌",
+    enviar: async (sock, jid, msg) =>
+      enviarXO(sock, jid, msg)
+  },
+
+  // 06
+  slot: {
+    nome: "Slot Machine",
+    emoji: "🎰",
+    enviar: async (sock, jid, msg) =>
+      enviarSlot(sock, jid, msg)
+  },
+
+  // 07
+  "2048": {
+    nome: "2048",
+    emoji: "🔢",
+    enviar: async (sock, jid, msg) =>
+      enviar2048(sock, jid, msg)
+  },
+
+  // 08
+  campominado: {
+    nome: "Campo Minado",
+    emoji: "💣",
+    enviar: async (sock, jid, msg) =>
+      enviarCampoMinado(sock, jid, msg)
+  },
+
+  // 09
+  memoria: {
+    nome: "Jogo da Memória",
+    emoji: "🧠",
+    enviar: async (sock, jid, msg) =>
+      enviarMemoria(sock, jid, msg)
+  },
+
+  // 10
+  snake: {
+    nome: "Snake",
+    emoji: "🐍",
+    enviar: async (sock, jid, msg) =>
+      enviarSnake(sock, jid, msg)
+  },
+
+  // 11
+  connect4: {
+    nome: "Connect 4",
+    emoji: "🔵",
+    enviar: async (sock, jid, msg) =>
+      enviarConnect4(sock, jid, msg)
+  },
+
+  // 12
+  pacman: {
+    nome: "Pac-Man",
+    emoji: "👻",
+    enviar: async (sock, jid, msg) =>
+      enviarPacman(sock, jid, msg)
+  },
+
+  // 13
+  tiro: {
+    nome: "Tiro ao Alvo",
+    emoji: "🎯",
+    enviar: async (sock, jid, msg) =>
+      enviarTiro(sock, jid, msg)
+  },
+
+  // 14
+  aventura: {
+    nome: "Aventura",
+    emoji: "⚔️",
+    enviar: async (sock, jid, msg) =>
+      enviarAventura(sock, jid, msg)
+  },
+
+  // 15
+  tetris: {
+    nome: "Tetris",
+    emoji: "🧱",
+    enviar: async (sock, jid, msg) =>
+      enviarTetris(sock, jid, msg)
+  },
+
+  // 16
+  ludo: {
+    nome: "Ludo",
+    emoji: "🎲",
+    enviar: async (sock, jid, msg) =>
+      enviarLudo(sock, jid, msg)
+  },
+
+  // 17
+  flappy: {
+    nome: "Flappy Bird",
+    emoji: "🐤",
+    enviar: async (sock, jid, msg) =>
+      enviarFlappy(sock, jid, msg)
+  },
+
+  // 18
+  domino: {
+    nome: "Dominó",
+    emoji: "🁫",
+    enviar: async (sock, jid, msg) =>
+      enviarDomino(sock, jid, msg)
+  },
+
+  // 19
+  batalhanaval: {
+    nome: "Batalha Naval",
+    emoji: "🚢",
+    enviar: async (sock, jid, msg) =>
+      enviarBatalhaNaval(sock, jid, msg)
+  },
+
+  // 20
+  uno: {
+    nome: "UNO",
+    emoji: "🃏",
+    enviar: async (sock, jid, msg) =>
+      enviarUno(sock, jid, msg)
+  },
+
+  // 21
+  pingpong: {
+    nome: "Ping Pong",
+    emoji: "🏓",
+    enviar: async (sock, jid, msg) =>
+      enviarPingPong(sock, jid, msg)
+  },
+
+  // 22
+  futebol: {
+    nome: "Futebol",
+    emoji: "⚽",
+    enviar: async (sock, jid, msg) =>
+      enviarFutebol(sock, jid, msg)
+  },
+
+  // 23
+  bilhar: {
+    nome: "Bilhar",
+    emoji: "🎱",
+    enviar: async (sock, jid, msg) =>
+      enviarBilhar(sock, jid, msg)
+  },
+
+  // 24
+  xadrezchines: {
+    nome: "Xadrez Chinês",
+    emoji: "♟️",
+    enviar: async (sock, jid, msg) =>
+      enviarXadrezChines(sock, jid, msg)
+  },
+
+  // 25
+  ppt: {
+    nome: "Pedra, Papel, Tesoura",
+    emoji: "✊",
+    enviar: async (sock, jid, msg) =>
+      enviarPpt(sock, jid, msg)
+  },
+
+  // 26
+  caraoucoroa: {
+    nome: "Cara ou Coroa",
+    emoji: "🪙",
+    enviar: async (sock, jid, msg) =>
+      enviarCaraOuCoroa(sock, jid, msg)
+  },
+
+  // 27
+  othello: {
+    nome: "Othello / Reversi",
+    emoji: "⚫",
+    enviar: async (sock, jid, msg) =>
+      enviarOthello(sock, jid, msg)
+  },
+
+  // 28
+  adivinha: {
+    nome: "Adivinha",
+    emoji: "🤔",
+    enviar: async (sock, jid, msg) =>
+      enviarAdivinha(sock, jid, msg)
+  },
+
+  // 29
+  loteria: {
+    nome: "Lotaria",
+    emoji: "🎟️",
+    enviar: async (sock, jid, msg) =>
+      enviarLoteria(sock, jid, msg)
+  },
+
+  // 30
+  forca: {
+    nome: "Jogo da Forca",
+    emoji: "🪢",
+    enviar: async (sock, jid, msg) =>
+      enviarForca(sock, jid, msg)
+  },
+
+  // 31
+  digitacao: {
+    nome: "Teste de Digitação",
+    emoji: "⌨️",
+    enviar: async (sock, jid, msg) =>
+      enviarDigitacao(sock, jid, msg)
+  },
+
+  // 32
+  deslizante: {
+    nome: "Puzzle Deslizante",
+    emoji: "🧩",
+    enviar: async (sock, jid, msg) =>
+      enviarDeslizante(sock, jid, msg)
+  },
+
+  // 33
+  quiz: {
+    nome: "Quiz",
+    emoji: "❓",
+    enviar: async (sock, jid, msg) =>
+      enviarQuiz(sock, jid, msg)
+  },
+
+  // 34
+  sudoku: {
+    nome: "Sudoku",
+    emoji: "🔢",
+    enviar: async (sock, jid, msg) =>
+      enviarSudoku(sock, jid, msg)
+  },
+
+  // 35
+  mahjong: {
+    nome: "Mahjong",
+    emoji: "🀄",
+    enviar: async (sock, jid, msg) =>
+      enviarMahjong(sock, jid, msg)
+  },
+
+  // 36
+  dardos: {
+    nome: "Dardos",
+    emoji: "🎯",
+    enviar: async (sock, jid, msg) =>
+      enviarDardos(sock, jid, msg)
+  },
+
+  // 37
+  blockblast: {
+    nome: "Block Blast",
+    emoji: "🧱",
+    enviar: async (sock, jid, msg) =>
+      enviarBlockBlast(sock, jid, msg)
+  },
+
+  // 38
+  cacabugs: {
+    nome: "Caça Bugs",
+    emoji: "🐛",
+    enviar: async (sock, jid, msg) =>
+      enviarCacaBugs(sock, jid, msg)
+  },
+
+  // 39
+  cacapalavras: {
+    nome: "Caça-Palavras",
+    emoji: "🔤",
+    enviar: async (sock, jid, msg) =>
+      enviarCacaPalavras(sock, jid, msg)
+  },
+
+  // 40
+  avioes: {
+    nome: "Aviões",
+    emoji: "✈️",
+    enviar: async (sock, jid, msg) =>
+      enviarAvioes(sock, jid, msg)
+  },
+
+  // 41
+  minas: {
+    nome: "Minas",
+    emoji: "💣",
+    enviar: async (sock, jid, msg) =>
+      enviarMinas(sock, jid, msg)
+  },
+
+  // 42
+  ligar4: {
+    nome: "Ligar 4",
+    emoji: "🔴",
+    enviar: async (sock, jid, msg) =>
+      enviarLigar4(sock, jid, msg)
+  },
+
+  // 43
+  roleta: {
+    nome: "Roleta",
+    emoji: "🎡",
+    enviar: async (sock, jid, msg) =>
+      enviarRoleta(sock, jid, msg)
+  },
+
+  // 44
+  velha: {
+    nome: "Jogo da Velha",
+    emoji: "⭕",
+    enviar: async (sock, jid, msg) =>
+      enviarVelha(sock, jid, msg)
+  },
+
+  // 45
+  dado: {
+    nome: "Dado",
+    emoji: "🎲",
+    enviar: async (sock, jid, msg) =>
+      enviarDado(sock, jid, msg)
+  },
+
+  // 46
+  bolhas: {
+    nome: "Bolhas",
+    emoji: "🫧",
+    enviar: async (sock, jid, msg) =>
+      enviarBolhas(sock, jid, msg)
+  },
+
+  // 47
+  pong: {
+    nome: "Pong",
+    emoji: "🏓",
+    enviar: async (sock, jid, msg) =>
+      enviarPong(sock, jid, msg)
+  },
+
+  // 48
+  cobrinha: {
+    nome: "Cobrinha",
+    emoji: "🐍",
+    enviar: async (sock, jid, msg) =>
+      enviarCobrinha(sock, jid, msg)
+  },
+
+  // 49
+  labirinto: {
+    nome: "Labirinto",
+    emoji: "🌀",
+    enviar: async (sock, jid, msg) =>
+      enviarLabirinto(sock, jid, msg)
+  },
+
+  // 50
+  corrida: {
+    nome: "Corrida",
+    emoji: "🏎️",
+    enviar: async (sock, jid, msg) =>
+      enviarCorrida(sock, jid, msg)
+  },
+
+  // 51
+  basquete: {
+    nome: "Basquete",
+    emoji: "🏀",
+    enviar: async (sock, jid, msg) =>
+      enviarBasquete(sock, jid, msg)
+  },
+
+  // 52
+  boliche: {
+    nome: "Boliche",
+    emoji: "🎳",
+    enviar: async (sock, jid, msg) =>
+      enviarBoliche(sock, jid, msg)
+  },
+
+  // 53
+  sinuca: {
+    nome: "Sinuca",
+    emoji: "🎱",
+    enviar: async (sock, jid, msg) =>
+      enviarSinuca(sock, jid, msg)
+  },
+
+  // 54
+  quebra: {
+    nome: "Quebra-Cabeça",
+    emoji: "🧩",
+    enviar: async (sock, jid, msg) =>
+      enviarQuebra(sock, jid, msg)
+  },
+
+  // 55
+  invasores: {
+    nome: "Space Invaders",
+    emoji: "👾",
+    enviar: async (sock, jid, msg) =>
+      enviarInvasores(sock, jid, msg)
+  }
+
+};
+
+function montarLinhaJogo(slug){
+  const g=GAMES_REGISTRY[slug];
+  if(!g)return null;
+  return{header:"",title:`${g.emoji} ${g.nome}`,description:g.enviar?"✅ Disponível agora":"🚧 Em breve",id:`jogo_${slug}`};
+}
+async function enviarMenuJogos(sock, jid, seloBot) {
+  const grupos = [
+
+    // ═══════════════════════════════════════════════
+    // 🕹️ CLÁSSICOS
+    // ═══════════════════════════════════════════════
+    {
+      title: "🕹️ CLÁSSICOS",
+      itens: [
+        "dino",
+        "piano",
+        "cobra",
+        "dama",
+        "xo",
+        "velha"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // 🧩 PUZZLE
+    // ═══════════════════════════════════════════════
+    {
+      title: "🧩 PUZZLE",
+      itens: [
+        "2048",
+        "campominado",
+        "memoria",
+        "deslizante",
+        "sudoku",
+        "blockblast",
+        "quebra"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // ♟️ TABULEIRO
+    // ═══════════════════════════════════════════════
+    {
+      title: "♟️ TABULEIRO",
+      itens: [
+        "connect4",
+        "xadrezchines",
+        "mahjong",
+        "domino",
+        "ludo",
+        "batalhanaval",
+        "uno",
+        "othello",
+        "ligar4"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // 🎯 HABILIDADE & ARCADE
+    // ═══════════════════════════════════════════════
+    {
+      title: "🎯 HABILIDADE & ARCADE",
+      itens: [
+        "snake",
+        "cobrinha",
+        "pong",
+        "pingpong",
+        "pacman",
+        "tetris",
+        "flappy",
+        "tiro",
+        "invasores",
+        "labirinto",
+        "corrida",
+        "bolhas"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // ⚽ ESPORTES
+    // ═══════════════════════════════════════════════
+    {
+      title: "⚽ ESPORTES",
+      itens: [
+        "futebol",
+        "basquete",
+        "boliche",
+        "bilhar",
+        "sinuca",
+        "dardos",
+        "avioes"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // 🎰 CASINO & SORTE
+    // ═══════════════════════════════════════════════
+    {
+      title: "🎰 CASINO & SORTE",
+      itens: [
+        "slot",
+        "roleta",
+        "loteria",
+        "dado",
+        "caraoucoroa"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // 📝 PALAVRAS & QUIZ
+    // ═══════════════════════════════════════════════
+    {
+      title: "📝 PALAVRAS & QUIZ",
+      itens: [
+        "quiz",
+        "forca",
+        "adivinha",
+        "digitacao",
+        "cacapalavras",
+        "cacabugs"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // ⚔️ AVENTURA & BATALHA
+    // ═══════════════════════════════════════════════
+    {
+      title: "⚔️ AVENTURA & BATALHA",
+      itens: [
+        "aventura",
+        "minas"
+      ]
+    },
+
+    // ═══════════════════════════════════════════════
+    // 🎮 DIVERSÃO
+    // ═══════════════════════════════════════════════
+    {
+      title: "🎮 DIVERSÃO",
+      itens: [
+        "ppt"
+      ]
+    }
+  ];
+
+
+  const secoesJogos=grupos.map(g=>({title:g.title,highlight_label:"",rows:g.itens.map(montarLinhaJogo).filter(Boolean)}));
+  const textoMenu=`${B_TOP}\n${bTitle("🎮 MENU JOGOS")}\n${B_MID}\n${bLine("🎮","Escolhe um jogo na lista abaixo!")}\n${bLine("💡","Jogos com 🚧 ainda vão ser adicionados.")}\n${B_BOT}`;
+  try{
+    const payload={caption:textoMenu,footer:nomeBotEstilizado(),optionText:"🎮 ABRIR JOGOS",nativeFlow:[{text:"🎮 Ver Jogos",sections:secoesJogos,icon:"default"}]};
+    if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
+    await sock.sendMessage(jid,payload,{quoted:seloBot});
+    return;
+  }catch(e){console.log("⚠️ NativeFlow jogos:",e.message);}
+  try{
+    if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:textoMenu},{quoted:seloBot});
+    else await sock.sendMessage(jid,{text:textoMenu},{quoted:seloBot});
+    await new Promise(r=>setTimeout(r,400));
+    await sock.sendMessage(jid,{listMessage:{title:"🎮 MENU JOGOS",description:"Escolhe um jogo:",footerText:nomeBotEstilizado(),buttonText:"🎮 JOGOS",listType:1,sections:secoesJogos}});
+  }catch(e){console.log("❌ enviarMenuJogos:",e.message);}
+}
+
+async function processarSelecaoJogo(sock,jid,msg,slug,seloBot){
+  const jogo=GAMES_REGISTRY[slug];
+  if(!jogo){await sock.sendMessage(jid,{text:bLine("❌","Jogo não encontrado.")},{quoted:seloBot});return;}
+  if(!jogo.enviar){
+    await sock.sendMessage(jid,{text:bBloco("🚧 EM BREVE",[bLine(jogo.emoji,`*${jogo.nome}* ainda não está disponível.`),bLine("💡","Este jogo vai ser adicionado em breve!")])},{quoted:seloBot});
+    return;
+  }
+  try{await jogo.enviar(sock,jid,msg);await reagir(sock,msg,jogo.emoji);}
+  catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡",`Não consegui abrir ${jogo.nome}.`),bLine("🔴",e.message)])},{quoted:seloBot});}
 }
 
 function gerarTextoAlugar(){return bBloco("💰 ALUGUEL BOT",[bLine("🎁","*Grátis* - 3 dias (KZ 0,00)"),bLine("🎈","*Lite* - 5 dias (KZ 500)"),bLine("🍀","*Basic* - 1 semana (KZ 700)"),bLine("🪙","*Gold* - 2 semanas (KZ 1200)"),bLine("💎","*Diamond* - 1 mês (KZ 2000)"),bLine("🚀","*Ultra* - 3 meses (KZ 3500)"),B_SEP,bLine("📲","+244926612801"),bLine("⏰","Suporte 24h")]);}
@@ -1871,7 +2545,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativara
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep","cobra","snake","dama","damas","xo","jogodavelha","velha"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","games"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -2040,6 +2714,7 @@ async function startBot(){
           if(btnId&&btnId.startsWith("play2_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay2(sock,msg,formato,url);return;}
           if(btnId&&btnId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(btnId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
           if(btnId&&btnId.startsWith("cat_")){await enviarSubmenu(sock,jid,msg,btnId,seloBot,sender,isDono);return;}
+          if(btnId&&btnId.startsWith("jogo_")){await processarSelecaoJogo(sock,jid,msg,btnId.replace("jogo_",""),seloBot);return;}
           if(btnId&&btnId.startsWith("use_prefix_")){const pref=btnId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
           // ✅ Botão não reconhecido (provavelmente de OUTRO bot no grupo) — ignora silenciosamente
           if(btnId!==null)return;
@@ -2056,6 +2731,7 @@ async function startBot(){
             return;
           }
           if(rowId&&rowId.startsWith("cat_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;let isAdmin2=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid),admins=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p));isAdmin2=admins.includes(sender);}catch{}}if(!isDono&&!senhasAprovadas.has(sender)){if(isGrupo&&isAdmin2){senhasAprovadas.add(sender);}else return;}await enviarSubmenu(sock,jid,msg,rowId,seloBot,sender,isDono);return;}
+          if(rowId&&rowId.startsWith("jogo_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;await processarSelecaoJogo(sock,jid,msg,rowId.replace("jogo_",""),seloBot);return;}
         }
 
         // Interactive response
@@ -2071,6 +2747,7 @@ async function startBot(){
             if(catId.startsWith("play2_")){const partes=catId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay2(sock,msg,formato,url);return;}
             if(catId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(catId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
             if(catId.startsWith("cat_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;if(chatsDesativados.has(jid)&&!isDono)return;await enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono);return;}
+            if(catId.startsWith("jogo_")){if(isGrupo&&!isDono&&!verificarAluguel(jid))return;await processarSelecaoJogo(sock,jid,msg,catId.replace("jogo_",""),seloBot);return;}
             if(catId.startsWith("use_prefix_")){const pref=catId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
           }
           // ✅ Resposta interactiva não reconhecida (provavelmente de OUTRO bot no grupo) — ignora
@@ -2366,7 +3043,8 @@ ${nomeEnviou}`;
           return;
         }
         if(comando==="addai"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Só em grupos.")},{quoted:seloBot});return;}try{await sock.groupParticipantsUpdate(jid,["867051314767696@bot"],"add");await sock.sendMessage(jid,{text:bLine("✅","Meta AI adicionada!")},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="menu"||comando==="ajuda"){const sub=args[0]?.toLowerCase();const catMap={principal:"cat_principal",downloads:"cat_downloads",redes:"cat_redes",musicas:"cat_musicas",figurinhas:"cat_figurinhas",brincadeiras:"cat_brincadeiras",coins:"cat_coins",alteradores:"cat_alteradores",logos:"cat_logos",pesquisas:"cat_pesquisas",animes:"cat_animes",rpg:"cat_rpg",ias:"cat_ias",plaquinhas:"cat_plaquinhas","18":"cat_18",adm:"cat_adm",dono:"cat_dono",assistente:"cat_assistente"};if(sub&&catMap[sub]){await enviarSubmenu(sock,jid,msg,catMap[sub],seloBot,sender,isDono);}else{await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot);}return;}
+        if(comando==="menu"||comando==="ajuda"){const sub=args[0]?.toLowerCase();const catMap={principal:"cat_principal",downloads:"cat_downloads",redes:"cat_redes",musicas:"cat_musicas",figurinhas:"cat_figurinhas",brincadeiras:"cat_brincadeiras",jogos:"cat_jogos",coins:"cat_coins",alteradores:"cat_alteradores",logos:"cat_logos",pesquisas:"cat_pesquisas",animes:"cat_animes",rpg:"cat_rpg",ias:"cat_ias",plaquinhas:"cat_plaquinhas","18":"cat_18",adm:"cat_adm",dono:"cat_dono",assistente:"cat_assistente"};if(sub&&catMap[sub]){await enviarSubmenu(sock,jid,msg,catMap[sub],seloBot,sender,isDono);}else{await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot);}return;}
+        if(comando==="jogos"||comando==="games"){await enviarMenuJogos(sock,jid,seloBot);return;}
         if(comando==="sobre"){await enviarComSelo(sock,jid,bBloco("🤖 SOBRE",[bLine("🤖",`*${CONFIG.NOME_BOT}*`),bLine("👑",`*${CONFIG.DONO_NOME}*`),bLine("📦","@itsliaaa/baileys"),bLine("✅","Estética cases.js style"),bLine("✅","Isaías só responde quando mencionado"),bLine("✅","!pin — Pinterest multi-imagem"),bLine("✅","30+ comandos"),bLine("🟢",`© ${CONFIG.NOME_BOT} — 24/7`)]),seloBot);return;}
         if(comando==="set"){const novaSenha=args.join(" ").replace(/['"]/g,"").trim();if(!novaSenha){await sock.sendMessage(jid,{text:bLine("🔑",`*${CONFIG.PREFIXO}set [nova_senha]*`)},{quoted:seloBot});return;}CONFIG.SENHA_BOT=novaSenha;senhasAprovadas.clear();await sock.sendMessage(jid,{text:bBloco("✅ SENHA ALTERADA",[bLine("🔑",`Senha: *${novaSenha}*`)])},{quoted:seloBot});await reagir(sock,msg,"🔑");return;}
         if(comando==="id"){await sock.sendMessage(jid,{text:bBloco("📱 INFO",[bLine("📱",`_${sender}_`),bLine("👑",`Dono: ${isDono?"✅":"❌"} | 👮 Admin: ${isAdmin?"✅":"❌"}`),bLine("💎",`VIP: ${isVip(sender)?"✅":"❌"}`),bLine("🔑",`Acesso: ${senhasAprovadas.has(sender)||isDono?"✅":"❌"}`)])},{quoted:seloBot});return;}
@@ -4466,6 +5144,258 @@ ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`
           catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡","Não consegui enviar o Jogo da Velha."),bLine("🔴",e.message)])},{quoted:seloBot});}
           return;
         }
+        // NOVOS JOGOS
+
+        if(comando==="slot"){
+try{await enviarSlot(sock,jid);await reagir(sock,msg,"🎰");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase slot*")])});}
+return;
+}
+if(comando==="2048"){
+try{await enviar2048(sock,jid);await reagir(sock,msg,"🔢");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase 2048*")])});}
+return;
+}
+if(comando==="campominado"){
+try{await enviarCampoMinado(sock,jid);await reagir(sock,msg,"💣");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase campominado*")])});}
+return;
+}
+if(comando==="memoria"){
+try{await enviarMemoria(sock,jid);await reagir(sock,msg,"🧠");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase memoria*")])});}
+return;
+}
+if(comando==="snake"){
+try{await enviarSnake(sock,jid);await reagir(sock,msg,"🐍");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase snake*")])});}
+return;
+}
+if(comando==="connect4"){
+try{await enviarConnect4(sock,jid);await reagir(sock,msg,"🔴");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase connect4*")])});}
+return;
+}
+if(comando==="pacman"){
+try{await enviarPacman(sock,jid);await reagir(sock,msg,"👾");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase pacman*")])});}
+return;
+}
+if(comando==="tiro"){
+try{await enviarTiro(sock,jid);await reagir(sock,msg,"🔫");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase tiro*")])});}
+return;
+}
+if(comando==="aventura"){
+try{await enviarAventura(sock,jid);await reagir(sock,msg,"🗺️");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase aventura*")])});}
+return;
+}
+if(comando==="tetris"){
+try{await enviarTetris(sock,jid);await reagir(sock,msg,"🧱");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase tetris*")])});}
+return;
+}
+if(comando==="ludo"){
+try{await enviarLudo(sock,jid);await reagir(sock,msg,"🎲");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase ludo*")])});}
+return;
+}
+if(comando==="flappy"){
+try{await enviarFlappy(sock,jid);await reagir(sock,msg,"🐦");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase flappy*")])});}
+return;
+}
+if(comando==="domino"){
+try{await enviarDomino(sock,jid);await reagir(sock,msg,"⬛");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase domino*")])});}
+return;
+}
+if(comando==="batalhanaval"){
+try{await enviarBatalhaNaval(sock,jid);await reagir(sock,msg,"🚢");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase batalhanaval*")])});}
+return;
+}
+if(comando==="uno"){
+try{await enviarUno(sock,jid);await reagir(sock,msg,"🃏");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase uno*")])});}
+return;
+}
+if(comando==="pingpong"){
+try{await enviarPingPong(sock,jid);await reagir(sock,msg,"🏓");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase pingpong*")])});}
+return;
+}
+if(comando==="futebol"){
+try{await enviarFutebol(sock,jid);await reagir(sock,msg,"⚽");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase futebol*")])});}
+return;
+}
+if(comando==="bilhar"){
+try{await enviarBilhar(sock,jid);await reagir(sock,msg,"🎱");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase bilhar*")])});}
+return;
+}
+if(comando==="xadrezchines"){
+try{await enviarXadrezChines(sock,jid);await reagir(sock,msg,"♟️");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase xadrezchines*")])});}
+return;
+}
+if(comando==="ppt"){
+try{await enviarPpt(sock,jid);await reagir(sock,msg,"✂️");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase ppt*")])});}
+return;
+}
+if(comando==="caraoucoroa"){
+try{await enviarCaraOuCoroa(sock,jid);await reagir(sock,msg,"🪙");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase caraoucoroa*")])});}
+return;
+}
+if(comando==="othello"){
+try{await enviarOthello(sock,jid);await reagir(sock,msg,"⚫");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase othello*")])});}
+return;
+}
+if(comando==="adivinha"){
+try{await enviarAdivinha(sock,jid);await reagir(sock,msg,"🔮");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase adivinha*")])});}
+return;
+}
+if(comando==="loteria"){
+try{await enviarLoteria(sock,jid);await reagir(sock,msg,"🎟️");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase loteria*")])});}
+return;
+}
+if(comando==="forca"){
+try{await enviarForca(sock,jid);await reagir(sock,msg,"🪢");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase forca*")])});}
+return;
+}
+if(comando==="digitacao"){
+try{await enviarDigitacao(sock,jid);await reagir(sock,msg,"⌨️");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase digitacao*")])});}
+return;
+}
+if(comando==="deslizante"){
+try{await enviarDeslizante(sock,jid);await reagir(sock,msg,"🧩");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase deslizante*")])});}
+return;
+}
+if(comando==="quiz"){
+try{await enviarQuiz(sock,jid);await reagir(sock,msg,"❓");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase quiz*")])});}
+return;
+}
+if(comando==="sudoku"){
+try{await enviarSudoku(sock,jid);await reagir(sock,msg,"🔢");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase sudoku*")])});}
+return;
+}
+if(comando==="mahjong"){
+try{await enviarMahjong(sock,jid);await reagir(sock,msg,"🀄");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase mahjong*")])});}
+return;
+}
+if(comando==="dardos"){
+try{await enviarDardos(sock,jid);await reagir(sock,msg,"🎯");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase dardos*")])});}
+return;
+}
+if(comando==="blockblast"){
+try{await enviarBlockBlast(sock,jid);await reagir(sock,msg,"💥");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase blockblast*")])});}
+return;
+}
+if(comando==="cacabugs"){
+try{await enviarCacaBugs(sock,jid);await reagir(sock,msg,"🐞");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase cacabugs*")])});}
+return;
+}
+if(comando==="cacapalavras"){
+try{await enviarCacaPalavras(sock,jid);await reagir(sock,msg,"🔍");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase cacapalavras*")])});}
+return;
+}
+if(comando==="avioes"){
+try{await enviarAvioes(sock,jid);await reagir(sock,msg,"✈️");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase avioes*")])});}
+return;
+}
+if(comando==="minas"){
+try{await enviarMinas(sock,jid);await reagir(sock,msg,"💣");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase minas*")])});}
+return;
+}
+if(comando==="ligar4"){
+try{await enviarLigar4(sock,jid);await reagir(sock,msg,"🔵");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase ligar4*")])});}
+return;
+}
+if(comando==="roleta"){
+try{await enviarRoleta(sock,jid);await reagir(sock,msg,"🎡");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase roleta*")])});}
+return;
+}
+if(comando==="velha"){
+try{await enviarVelha(sock,jid);await reagir(sock,msg,"⭕");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase velha*")])});}
+return;
+}
+if(comando==="dado"){
+try{await enviarDado(sock,jid);await reagir(sock,msg,"🎲");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase dado*")])});}
+return;
+}
+if(comando==="bolhas"){
+try{await enviarBolhas(sock,jid);await reagir(sock,msg,"🫧");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase bolhas*")])});}
+return;
+}
+if(comando==="pong"){
+try{await enviarPong(sock,jid);await reagir(sock,msg,"🏓");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase pong*")])});}
+return;
+}
+if(comando==="cobrinha"){
+try{await enviarCobrinha(sock,jid);await reagir(sock,msg,"🐍");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase cobrinha*")])});}
+return;
+}
+if(comando==="labirinto"){
+try{await enviarLabirinto(sock,jid);await reagir(sock,msg,"🌀");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase labirinto*")])});}
+return;
+}
+if(comando==="corrida"){
+try{await enviarCorrida(sock,jid);await reagir(sock,msg,"🏁");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase corrida*")])});}
+return;
+}
+if(comando==="basquete"){
+try{await enviarBasquete(sock,jid);await reagir(sock,msg,"🏀");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase basquete*")])});}
+return;
+}
+if(comando==="boliche"){
+try{await enviarBoliche(sock,jid);await reagir(sock,msg,"🎳");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase boliche*")])});}
+return;
+}
+if(comando==="sinuca"){
+try{await enviarSinuca(sock,jid);await reagir(sock,msg,"🎱");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase sinuca*")])});}
+return;
+}
+if(comando==="quebra"){
+try{await enviarQuebra(sock,jid);await reagir(sock,msg,"🧱");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase quebra*")])});}
+return;
+}
+if(comando==="invasores"){
+try{await enviarInvasores(sock,jid);await reagir(sock,msg,"👾");}
+catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase invasores*")])});}
+return;
+}
 
         // ─── TIKTOK (!tt) ───
         if(comando==="tt"){
@@ -4497,4 +5427,3 @@ ${B_BOT}`},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:`❌ Erro.`
 }
 
 startBot();
-
