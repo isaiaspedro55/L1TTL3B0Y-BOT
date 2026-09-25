@@ -1,93 +1,84 @@
-// ════════════════════════════════════════════════
-// ✅ COMANDO !DOMINÓ — Escolha uma peça e some seus pontos.
-// ════════════════════════════════════════════════
+// ✅ COMANDO !DOMINO — estilo Piano
 const { generateWAMessageFromContent } = require("@itsliaaa/baileys");
 
 const DOMINO_HTML = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>🁣 Dominó</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-body{display:flex;justify-content:center;background:#f8fafc;font-family:system-ui;padding:7px;min-height:100vh;color:#172033}
-.card{width:100%;max-width:440px;background:#fff;border:2px solid #475569;border-radius:22px;padding:13px;text-align:center;box-shadow:0 10px 30px #0002}
-h1{font-size:30px;color:#475569;margin:2px}p{color:#64748b;font-size:14px;margin:3px 0 8px}
-#placar{font-size:18px;font-weight:900;margin:7px;color:#475569}
-#area{width:100%;min-height:390px;display:flex;align-items:center;justify-content:center}
-button{border:0;border-radius:14px;padding:12px;font-weight:900;font-size:15px;cursor:pointer}
-.primary{background:#475569;color:#fff}
-.grid{display:grid;gap:7px;width:100%}
-.cell{background:#f1f5f9;border:2px solid transparent;min-height:52px;font-size:24px}
-.cell:active{transform:scale(.96)}
-#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0009;z-index:10}
-.modal{background:#fff;border-radius:22px;padding:24px;text-align:center;width:min(88%,350px)}
-.modal button{margin-top:14px;width:100%;background:#475569;color:#fff}
-#msg{margin-top:9px;background:#f1f5f9;border-radius:13px;padding:9px;font-weight:800;font-size:13px}
-.row{display:flex;gap:7px;margin-top:8px}.row button{flex:1}
-canvas{width:100%;max-height:68vh;border-radius:18px;border:2px solid #475569;touch-action:none;background:#f8fafc}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Domino</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; box-sizing:border-box; user-select:none; }
+    body { display:flex; justify-content:center; background:#F3ECE0; font-family:'Inter',system-ui; padding:20px 14px; }
+    .card { width:100%; max-width:520px; background:#FFFDF9; border-radius:28px; padding:24px; text-align:center; border:1px solid #E9DFCE; }
+    h1 { font-family:'Fraunces',serif; color:#3D2A18; }
+    canvas { width:100%; border-radius:18px; background:#EFEBE9; border:1px solid #E9DFCE; }
+    button { margin-top:12px; background:#B5652E; color:#fff; border:none; border-radius:999px; padding:12px 28px; font-weight:600; }
+  </style>
 </head>
 <body>
-<div class="card">
-<h1>🁣 Dominó</h1><p>Escolha uma peça e some seus pontos.</p>
-<div id="placar">Pontos: 0</div>
-<div id="area"><div style="width:100%"><div id="mesa" class="grid" style="grid-template-columns:repeat(3,1fr)"></div></div></div>
-<div id="msg">Toque em JOGAR para começar.</div>
-<div class="row"><button onclick="resetar()" style="background:#e5e7eb">🔄 Novo</button><button onclick="som()" id="snd" style="background:#475569;color:#fff">🔊 Som</button></div>
-</div>
+  <div class="card">
+    <h1>Domino</h1>
+    <p style="color:#A9977E;font-size:13px;margin:8px 0 12px">voce vs robo</p>
+    <canvas id="c" width="480" height="280"></canvas>
+    <br>
+    <button onclick="novo()">🔄 Novo jogo</button>
+  </div>
 <script>
-let soundOn=true,points=0;
-function beep(freq=700,dur=.08){if(!soundOn)return;try{let a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=freq;g.gain.value=.04;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);o.stop(a.currentTime+dur)}catch(e){}}
-function add(n){points+=n;document.getElementById('placar').textContent='Pontos: '+points}
-function msg(t){document.getElementById('msg').textContent=t}
-function som(){soundOn=!soundOn;document.getElementById('snd').textContent=soundOn?'🔊 Som':'🔇 Som';if(soundOn)beep()}
-function resetar(){location.reload()}
-function iniciar(){document.getElementById('overlay')?.remove();beep(900,.1);if(typeof initGame==='function')initGame()}
-function initGame(){let m=document.getElementById("mesa");m.innerHTML=["🁣","🁤","🁥","🁦","🁧","🁨"].map((x,i)=>`<button class="cell" onclick="joga(${i})">${x}</button>`).join("")}function joga(i){add(i+1);msg("🁣 Peça jogada!");beep(500+i*80)}
-</script>
-</body></html>`;
+(function(){
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
 
-async function enviarDomino(sock, jid, quotedMsg) {
+  function snd(f){
+    try{ var a=new AudioContext(), o=a.createOscillator(); o.frequency.value=f; o.connect(a.destination); o.start(); o.stop(a.currentTime+0.15);}catch(e){}
+  }
+
+  window.novo = function(){ draw(); snd(600); };
+
+  function draw(){
+    ctx.clearRect(0,0,480,280);
+    for(var i=0;i<5;i++){
+      var x = 20+i*90, y = 90;
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#3D2A18';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, 80, 100, 10);
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y+50); ctx.lineTo(x+80, y+50);
+      ctx.stroke();
+      ctx.fillStyle = '#3D2A18';
+      ctx.font = '20px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(i+1), x+40, y+35);
+      ctx.fillText(String(6-i), x+40, y+80);
+    }
+  }
+
+  cv.onclick = function(){ snd(600); };
+  novo();
+})();
+</script>
+</body>
+</html>`;
+
+async function enviarDomino(sock, jid) {
   const htmlPayload = {
     response_id: "domino_" + Date.now(),
-    sections: [{
-      view_model: {
-        primitive: {
-          __typename: "GenAIaeacdsnwHtmlPrimitive",
-          payload: DOMINO_HTML,
-          trusted_sources: ["nixel.dev"]
-        },
-        __typename: "GenAISingleLayoutViewModel",
-        height: "full",
-        full_screen: true
-      }
-    }]
+    sections: [{ view_model: { primitive: { __typename: "GenAIaeacdsnwHtmlPrimitive", payload: DOMINO_HTML, trusted_sources: ["nixel.dev"] }, __typename: "GenAISingleLayoutViewModel", height: "full", full_screen: true } }]
   };
   const content = {
-    botForwardedMessage: {
-      message: {
-        richResponseMessage: {
-          messageType: 1,
-          submessages: [{ messageType: 2, messageText: "🁣 Dominó" }],
-          unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
-          contextInfo: {
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" },
-            forwardOrigin: 4
-          }
-        }
-      }
-    }
+    botForwardedMessage: { message: { richResponseMessage: {
+      messageType: 1,
+      submessages: [{ messageType: 2, messageText: "Domino" }],
+      unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
+      contextInfo: { forwardingScore: 1, isForwarded: true, forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" }, forwardOrigin: 4 }
+    }}}
   };
-  const fullMsg = generateWAMessageFromContent(jid, content, {
-    userJid: sock.authState?.creds?.me?.id || sock.user?.id,
-    timestamp: new Date()
-  });
+  const fullMsg = generateWAMessageFromContent(jid, content, { userJid: sock.authState?.creds?.me?.id || sock.user?.id, timestamp: new Date() });
   await sock.relayMessage(jid, fullMsg.message, { messageId: fullMsg.key.id });
   return fullMsg;
 }
 module.exports = { enviarDomino };
-

@@ -1,93 +1,83 @@
-// ════════════════════════════════════════════════
-// ✅ COMANDO !CAÇA-PALAVRAS — Encontre a letra indicada.
-// ════════════════════════════════════════════════
+// ✅ COMANDO !CACAPALAVRAS — estilo Piano
 const { generateWAMessageFromContent } = require("@itsliaaa/baileys");
 
 const CACAPALAVRAS_HTML = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>🔎 Caça-Palavras</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-body{display:flex;justify-content:center;background:#f0f9ff;font-family:system-ui;padding:7px;min-height:100vh;color:#172033}
-.card{width:100%;max-width:440px;background:#fff;border:2px solid #0284c7;border-radius:22px;padding:13px;text-align:center;box-shadow:0 10px 30px #0002}
-h1{font-size:30px;color:#0284c7;margin:2px}p{color:#64748b;font-size:14px;margin:3px 0 8px}
-#placar{font-size:18px;font-weight:900;margin:7px;color:#0284c7}
-#area{width:100%;min-height:390px;display:flex;align-items:center;justify-content:center}
-button{border:0;border-radius:14px;padding:12px;font-weight:900;font-size:15px;cursor:pointer}
-.primary{background:#0284c7;color:#fff}
-.grid{display:grid;gap:7px;width:100%}
-.cell{background:#f1f5f9;border:2px solid transparent;min-height:52px;font-size:24px}
-.cell:active{transform:scale(.96)}
-#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0009;z-index:10}
-.modal{background:#fff;border-radius:22px;padding:24px;text-align:center;width:min(88%,350px)}
-.modal button{margin-top:14px;width:100%;background:#0284c7;color:#fff}
-#msg{margin-top:9px;background:#f1f5f9;border-radius:13px;padding:9px;font-weight:800;font-size:13px}
-.row{display:flex;gap:7px;margin-top:8px}.row button{flex:1}
-canvas{width:100%;max-height:68vh;border-radius:18px;border:2px solid #0284c7;touch-action:none;background:#f8fafc}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Caca Palavras</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; box-sizing:border-box; user-select:none; }
+    body { display:flex; justify-content:center; background:#F3ECE0; font-family:'Inter',system-ui; padding:20px 14px; }
+    .card { width:100%; max-width:440px; background:#FFFDF9; border-radius:28px; padding:24px; text-align:center; border:1px solid #E9DFCE; }
+    h1 { font-family:'Fraunces',serif; color:#3D2A18; }
+    #display { display:inline-block; background:#F6EEDD; border-radius:20px; padding:5px 16px; margin:8px 0; color:#8A6A3F; font-size:13px; }
+    canvas { width:100%; border-radius:18px; border:1px solid #E9DFCE; }
+    button { margin-top:12px; background:#B5652E; color:#fff; border:none; border-radius:999px; padding:12px 28px; font-weight:600; }
+  </style>
 </head>
 <body>
-<div class="card">
-<h1>🔎 Caça-Palavras</h1><p>Encontre a letra indicada.</p>
-<div id="placar">Pontos: 0</div>
-<div id="area"><div style="width:100%"><h2 id="target">Ache: A</h2><div id="letters" class="grid" style="grid-template-columns:repeat(5,1fr)"></div></div></div>
-<div id="msg">Toque em JOGAR para começar.</div>
-<div class="row"><button onclick="resetar()" style="background:#e5e7eb">🔄 Novo</button><button onclick="som()" id="snd" style="background:#0284c7;color:#fff">🔊 Som</button></div>
-</div>
+  <div class="card">
+    <h1>🔍 Caca Palavras</h1>
+    <div id="display">ache: SOL, LUA, MAR</div>
+    <canvas id="c" width="380" height="460"></canvas>
+    <br>
+    <button onclick="novo()">🔄 Novo jogo</button>
+  </div>
 <script>
-let soundOn=true,points=0;
-function beep(freq=700,dur=.08){if(!soundOn)return;try{let a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=freq;g.gain.value=.04;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);o.stop(a.currentTime+dur)}catch(e){}}
-function add(n){points+=n;document.getElementById('placar').textContent='Pontos: '+points}
-function msg(t){document.getElementById('msg').textContent=t}
-function som(){soundOn=!soundOn;document.getElementById('snd').textContent=soundOn?'🔊 Som':'🔇 Som';if(soundOn)beep()}
-function resetar(){location.reload()}
-function iniciar(){document.getElementById('overlay')?.remove();beep(900,.1);if(typeof initGame==='function')initGame()}
-let target="A";function initGame(){newRound()}function newRound(){target="ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(Math.random()*26)];document.getElementById("target").textContent="Ache: "+target;document.getElementById("letters").innerHTML=Array.from({length:25},(_,i)=>`<button class="cell" onclick="pick(this)">${i===12?target:"ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(Math.random()*26)]}</button>`).join("")}function pick(e){if(e.textContent===target){add(2);msg("🔎 Encontrou!");beep(1000);newRound()}else beep(220)}
-</script>
-</body></html>`;
+(function(){
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
+  var W = 380, H = 460, COLS = 10, ROWS = 12;
+  var SX = W/COLS, SY = H/ROWS;
 
-async function enviarCacaPalavras(sock, jid, quotedMsg) {
-  const htmlPayload = {
-    response_id: "cacapalavras_" + Date.now(),
-    sections: [{
-      view_model: {
-        primitive: {
-          __typename: "GenAIaeacdsnwHtmlPrimitive",
-          payload: CACAPALAVRAS_HTML,
-          trusted_sources: ["nixel.dev"]
-        },
-        __typename: "GenAISingleLayoutViewModel",
-        height: "full",
-        full_screen: true
-      }
-    }]
+  function snd(f){
+    try{ var a=new AudioContext(), o=a.createOscillator(); o.frequency.value=f; o.connect(a.destination); o.start(); o.stop(a.currentTime+0.15);}catch(e){}
+  }
+
+  window.novo = function(){
+    draw(); snd(600);
   };
-  const content = {
-    botForwardedMessage: {
-      message: {
-        richResponseMessage: {
-          messageType: 1,
-          submessages: [{ messageType: 2, messageText: "🔎 Caça-Palavras" }],
-          unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
-          contextInfo: {
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" },
-            forwardOrigin: 4
-          }
-        }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    var letters = 'SOLUMARXPTALUAZMARSOLUA';
+    ctx.font = '18px monospace';
+    ctx.textAlign = 'center';
+    for(var y=0;y<ROWS;y++){
+      for(var x=0;x<COLS;x++){
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(x*SX+2, y*SY+2, SX-4, SY-4);
+        ctx.fillStyle = '#3D2A18';
+        ctx.fillText(letters[(y*COLS+x)%letters.length], x*SX+SX/2, y*SY+SY/2+6);
       }
     }
+  }
+
+  cv.onclick = function(){ snd(700); };
+  novo();
+})();
+</script>
+</body>
+</html>`;
+
+async function enviarCacapalavras(sock, jid) {
+  const htmlPayload = {
+    response_id: "cacapalavras_" + Date.now(),
+    sections: [{ view_model: { primitive: { __typename: "GenAIaeacdsnwHtmlPrimitive", payload: CACAPALAVRAS_HTML, trusted_sources: ["nixel.dev"] }, __typename: "GenAISingleLayoutViewModel", height: "full", full_screen: true } }]
   };
-  const fullMsg = generateWAMessageFromContent(jid, content, {
-    userJid: sock.authState?.creds?.me?.id || sock.user?.id,
-    timestamp: new Date()
-  });
+  const content = {
+    botForwardedMessage: { message: { richResponseMessage: {
+      messageType: 1,
+      submessages: [{ messageType: 2, messageText: "🔍 Caca Palavras" }],
+      unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
+      contextInfo: { forwardingScore: 1, isForwarded: true, forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" }, forwardOrigin: 4 }
+    }}}
+  };
+  const fullMsg = generateWAMessageFromContent(jid, content, { userJid: sock.authState?.creds?.me?.id || sock.user?.id, timestamp: new Date() });
   await sock.relayMessage(jid, fullMsg.message, { messageId: fullMsg.key.id });
   return fullMsg;
 }
-module.exports = { enviarCacaPalavras };
-
+module.exports = { enviarCacapalavras };

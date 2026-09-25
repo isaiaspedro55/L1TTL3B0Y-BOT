@@ -1,55 +1,117 @@
 // ════════════════════════════════════════════════
-// ✅ COMANDO !BATALHA NAVAL — Encontre os navios escondidos.
+// ✅ COMANDO !BATALHANAVAL — estilo Piano
 // ════════════════════════════════════════════════
 const { generateWAMessageFromContent } = require("@itsliaaa/baileys");
 
 const BATALHANAVAL_HTML = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>🚢 Batalha Naval</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-body{display:flex;justify-content:center;background:#eff6ff;font-family:system-ui;padding:7px;min-height:100vh;color:#172033}
-.card{width:100%;max-width:440px;background:#fff;border:2px solid #2563eb;border-radius:22px;padding:13px;text-align:center;box-shadow:0 10px 30px #0002}
-h1{font-size:30px;color:#2563eb;margin:2px}p{color:#64748b;font-size:14px;margin:3px 0 8px}
-#placar{font-size:18px;font-weight:900;margin:7px;color:#2563eb}
-#area{width:100%;min-height:390px;display:flex;align-items:center;justify-content:center}
-button{border:0;border-radius:14px;padding:12px;font-weight:900;font-size:15px;cursor:pointer}
-.primary{background:#2563eb;color:#fff}
-.grid{display:grid;gap:7px;width:100%}
-.cell{background:#f1f5f9;border:2px solid transparent;min-height:52px;font-size:24px}
-.cell:active{transform:scale(.96)}
-#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0009;z-index:10}
-.modal{background:#fff;border-radius:22px;padding:24px;text-align:center;width:min(88%,350px)}
-.modal button{margin-top:14px;width:100%;background:#2563eb;color:#fff}
-#msg{margin-top:9px;background:#f1f5f9;border-radius:13px;padding:9px;font-weight:800;font-size:13px}
-.row{display:flex;gap:7px;margin-top:8px}.row button{flex:1}
-canvas{width:100%;max-height:68vh;border-radius:18px;border:2px solid #2563eb;touch-action:none;background:#f8fafc}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Batalha Naval</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+    body {
+      display:flex; align-items:center; justify-content:center;
+      min-height:100vh; padding:20px 14px;
+      background:#F3ECE0; font-family:'Inter',system-ui;
+    }
+    .card {
+      width:100%; max-width:440px; background:#FFFDF9;
+      border-radius:28px; padding:24px; text-align:center;
+      border:1px solid #E9DFCE;
+    }
+    h1 { font-family:'Fraunces',serif; color:#3D2A18; }
+    #display {
+      display:inline-block; background:#F6EEDD; border:1px solid #E9DBBF;
+      border-radius:20px; padding:5px 16px; color:#8A6A3F;
+      font-size:13px; margin:8px 0;
+    }
+    .sub { color:#A9977E; font-size:13px; margin-bottom:12px; }
+    canvas { width:100%; border-radius:18px; border:1px solid #E9DFCE; }
+    button {
+      margin-top:14px; background:#B5652E; color:#fff; border:none;
+      border-radius:999px; padding:13px 30px; font-weight:600;
+      box-shadow:0 4px 0 #8C4A1E; cursor:pointer;
+    }
+  </style>
 </head>
 <body>
-<div class="card">
-<h1>🚢 Batalha Naval</h1><p>Encontre os navios escondidos.</p>
-<div id="placar">Pontos: 0</div>
-<div id="area"><div style="width:100%"><div id="sea" class="grid" style="grid-template-columns:repeat(6,1fr)"></div></div></div>
-<div id="msg">Toque em JOGAR para começar.</div>
-<div class="row"><button onclick="resetar()" style="background:#e5e7eb">🔄 Novo</button><button onclick="som()" id="snd" style="background:#2563eb;color:#fff">🔊 Som</button></div>
-</div>
+  <div class="card">
+    <h1>🚢 Batalha Naval</h1>
+    <div id="display">pronto</div>
+    <p class="sub">toque para atirar · 5 navios escondidos</p>
+    <canvas id="c" width="380" height="380"></canvas>
+    <button onclick="novo()">🔄 Novo jogo</button>
+  </div>
 <script>
-let soundOn=true,points=0;
-function beep(freq=700,dur=.08){if(!soundOn)return;try{let a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=freq;g.gain.value=.04;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);o.stop(a.currentTime+dur)}catch(e){}}
-function add(n){points+=n;document.getElementById('placar').textContent='Pontos: '+points}
-function msg(t){document.getElementById('msg').textContent=t}
-function som(){soundOn=!soundOn;document.getElementById('snd').textContent=soundOn?'🔊 Som':'🔇 Som';if(soundOn)beep()}
-function resetar(){location.reload()}
-function iniciar(){document.getElementById('overlay')?.remove();beep(900,.1);if(typeof initGame==='function')initGame()}
-let ships=new Set();function initGame(){while(ships.size<5)ships.add(Math.floor(Math.random()*36));document.getElementById("sea").innerHTML=Array.from({length:36},(_,i)=>`<button class="cell" onclick="fire(${i},this)">🌊</button>`).join("")}function fire(i,e){if(e.dataset.x)return;e.dataset.x=1;if(ships.has(i)){e.textContent="🚢";add(3);msg("💥 Navio atingido!");beep(1000)}else{e.textContent="💧";msg("Água!");beep(250)}}
-</script>
-</body></html>`;
+(function(){
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
+  var disp = document.getElementById('display');
+  var N = 8, S = 380 / N, navios = [], hits = 0;
 
-async function enviarBatalhaNaval(sock, jid, quotedMsg) {
+  function snd(f){
+    try{
+      var a = new AudioContext();
+      var o = a.createOscillator();
+      var g = a.createGain();
+      o.frequency.value = f;
+      o.connect(g); g.connect(a.destination);
+      o.start();
+      g.gain.exponentialRampToValueAtTime(0.001, a.currentTime+0.2);
+      o.stop(a.currentTime+0.2);
+    }catch(e){}
+  }
+
+  window.novo = function(){
+    navios = []; hits = 0;
+    for(let i=0;i<5;i++){
+      navios.push({ x: Math.floor(Math.random()*N), y: Math.floor(Math.random()*N), hit:false });
+    }
+    disp.textContent = 'acertos 0/5';
+    draw();
+  };
+
+  function draw(){
+    ctx.clearRect(0,0,380,380);
+    for(let y=0;y<N;y++){
+      for(let x=0;x<N;x++){
+        ctx.fillStyle = '#E8F0FE';
+        ctx.fillRect(x*S+2, y*S+2, S-4, S-4);
+        let n = navios.find(n=>n.x==x && n.y==y && n.hit);
+        if(n){
+          ctx.fillStyle = '#B5652E';
+          ctx.beginPath();
+          ctx.arc(x*S+S/2, y*S+S/2, 12, 0, 7);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  cv.onclick = function(e){
+    var r = cv.getBoundingClientRect();
+    var x = Math.floor((e.clientX-r.left)/r.width*N);
+    var y = Math.floor((e.clientY-r.top)/r.height*N);
+    var n = navios.find(n=>n.x==x && n.y==y);
+    if(n && !n.hit){
+      n.hit = true; hits++; snd(880);
+      disp.textContent = 'acertos '+hits+'/5';
+    } else {
+      snd(200);
+    }
+    draw();
+  };
+
+  novo();
+})();
+</script>
+</body>
+</html>`;
+
+async function enviarBatalhanaval(sock, jid, quotedMsg) {
   const htmlPayload = {
     response_id: "batalhanaval_" + Date.now(),
     sections: [{
@@ -65,13 +127,16 @@ async function enviarBatalhaNaval(sock, jid, quotedMsg) {
       }
     }]
   };
+
   const content = {
     botForwardedMessage: {
       message: {
         richResponseMessage: {
           messageType: 1,
           submessages: [{ messageType: 2, messageText: "🚢 Batalha Naval" }],
-          unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
+          unifiedResponse: {
+            data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64")
+          },
           contextInfo: {
             forwardingScore: 1,
             isForwarded: true,
@@ -82,12 +147,14 @@ async function enviarBatalhaNaval(sock, jid, quotedMsg) {
       }
     }
   };
+
   const fullMsg = generateWAMessageFromContent(jid, content, {
     userJid: sock.authState?.creds?.me?.id || sock.user?.id,
-    timestamp: new Date()
+    timestamp: new Date(),
   });
+
   await sock.relayMessage(jid, fullMsg.message, { messageId: fullMsg.key.id });
   return fullMsg;
 }
-module.exports = { enviarBatalhaNaval };
 
+module.exports = { enviarBatalhanaval };

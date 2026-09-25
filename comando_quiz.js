@@ -1,93 +1,111 @@
-// ════════════════════════════════════════════════
-// ✅ COMANDO !QUIZ — Responda perguntas e marque pontos.
-// ════════════════════════════════════════════════
+// ✅ COMANDO !QUIZ — estilo Piano
 const { generateWAMessageFromContent } = require("@itsliaaa/baileys");
 
 const QUIZ_HTML = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>❓ Quiz</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-body{display:flex;justify-content:center;background:#f5f3ff;font-family:system-ui;padding:7px;min-height:100vh;color:#172033}
-.card{width:100%;max-width:440px;background:#fff;border:2px solid #7c3aed;border-radius:22px;padding:13px;text-align:center;box-shadow:0 10px 30px #0002}
-h1{font-size:30px;color:#7c3aed;margin:2px}p{color:#64748b;font-size:14px;margin:3px 0 8px}
-#placar{font-size:18px;font-weight:900;margin:7px;color:#7c3aed}
-#area{width:100%;min-height:390px;display:flex;align-items:center;justify-content:center}
-button{border:0;border-radius:14px;padding:12px;font-weight:900;font-size:15px;cursor:pointer}
-.primary{background:#7c3aed;color:#fff}
-.grid{display:grid;gap:7px;width:100%}
-.cell{background:#f1f5f9;border:2px solid transparent;min-height:52px;font-size:24px}
-.cell:active{transform:scale(.96)}
-#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0009;z-index:10}
-.modal{background:#fff;border-radius:22px;padding:24px;text-align:center;width:min(88%,350px)}
-.modal button{margin-top:14px;width:100%;background:#7c3aed;color:#fff}
-#msg{margin-top:9px;background:#f1f5f9;border-radius:13px;padding:9px;font-weight:800;font-size:13px}
-.row{display:flex;gap:7px;margin-top:8px}.row button{flex:1}
-canvas{width:100%;max-height:68vh;border-radius:18px;border:2px solid #7c3aed;touch-action:none;background:#f8fafc}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Quiz</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; box-sizing:border-box; user-select:none; }
+    body { display:flex; justify-content:center; background:#F3ECE0; font-family:'Inter',system-ui; padding:20px 14px; }
+    .card { width:100%; max-width:440px; background:#FFFDF9; border-radius:28px; padding:24px; text-align:center; border:1px solid #E9DFCE; }
+    h1 { font-family:'Fraunces',serif; color:#3D2A18; }
+    #display { display:inline-block; background:#F6EEDD; border-radius:20px; padding:5px 16px; margin:8px 0; color:#8A6A3F; font-size:13px; }
+    canvas { width:100%; border-radius:18px; border:1px solid #E9DFCE; }
+    button { margin-top:12px; background:#B5652E; color:#fff; border:none; border-radius:999px; padding:12px 28px; font-weight:600; }
+  </style>
 </head>
 <body>
-<div class="card">
-<h1>❓ Quiz</h1><p>Responda perguntas e marque pontos.</p>
-<div id="placar">Pontos: 0</div>
-<div id="area"><div id="q" style="width:100%"></div></div>
-<div id="msg">Toque em JOGAR para começar.</div>
-<div class="row"><button onclick="resetar()" style="background:#e5e7eb">🔄 Novo</button><button onclick="som()" id="snd" style="background:#7c3aed;color:#fff">🔊 Som</button></div>
-</div>
+  <div class="card">
+    <h1>❓ Quiz</h1>
+    <div id="display">pontos 0</div>
+    <canvas id="c" width="380" height="420"></canvas>
+    <br>
+    <button onclick="novo()">🔄 Novo jogo</button>
+  </div>
 <script>
-let soundOn=true,points=0;
-function beep(freq=700,dur=.08){if(!soundOn)return;try{let a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=freq;g.gain.value=.04;o.connect(g);g.connect(a.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);o.stop(a.currentTime+dur)}catch(e){}}
-function add(n){points+=n;document.getElementById('placar').textContent='Pontos: '+points}
-function msg(t){document.getElementById('msg').textContent=t}
-function som(){soundOn=!soundOn;document.getElementById('snd').textContent=soundOn?'🔊 Som':'🔇 Som';if(soundOn)beep()}
-function resetar(){location.reload()}
-function iniciar(){document.getElementById('overlay')?.remove();beep(900,.1);if(typeof initGame==='function')initGame()}
-let qi=0,qs=[["Capital de Angola?",["Luanda","Lobito","Huambo"],0],["2 + 2?",["3","4","5"],1],["Planeta vermelho?",["Marte","Vênus","Júpiter"],0]];function initGame(){showQ()}function showQ(){let q=qs[qi%qs.length];document.getElementById("q").innerHTML="<h2>"+q[0]+"</h2><div class='grid'>"+q[1].map((x,i)=>`<button class='cell' onclick='ans(${i})'>${x}</button>`).join("")+"</div>"}function ans(i){let q=qs[qi%qs.length];if(i===q[2]){add(2);msg("✅ Correto!");beep(1000)}else{msg("❌ Errado!");beep(220)}qi++;setTimeout(showQ,500)}
-</script>
-</body></html>`;
+(function(){
+  var cv = document.getElementById('c');
+  var ctx = cv.getContext('2d');
+  var disp = document.getElementById('display');
+  var qs = [
+    { q:'Capital do Brasil?', a:['Sao Paulo','Brasilia','Rio'], c:1 },
+    { q:'2 + 2 = ?', a:['3','4','5'], c:1 },
+    { q:'Cor do ceu?', a:['Azul','Verde','Rosa'], c:0 }
+  ];
+  var qi = 0, sc = 0;
 
-async function enviarQuiz(sock, jid, quotedMsg) {
-  const htmlPayload = {
-    response_id: "quiz_" + Date.now(),
-    sections: [{
-      view_model: {
-        primitive: {
-          __typename: "GenAIaeacdsnwHtmlPrimitive",
-          payload: QUIZ_HTML,
-          trusted_sources: ["nixel.dev"]
-        },
-        __typename: "GenAISingleLayoutViewModel",
-        height: "full",
-        full_screen: true
-      }
-    }]
+  function snd(f){
+    try{ var a=new AudioContext(), o=a.createOscillator(); o.frequency.value=f; o.connect(a.destination); o.start(); o.stop(a.currentTime+0.2);}catch(e){}
+  }
+
+  window.novo = function(){
+    qi = 0; sc = 0;
+    show();
   };
-  const content = {
-    botForwardedMessage: {
-      message: {
-        richResponseMessage: {
-          messageType: 1,
-          submessages: [{ messageType: 2, messageText: "❓ Quiz" }],
-          unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
-          contextInfo: {
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" },
-            forwardOrigin: 4
-          }
-        }
-      }
+
+  function show(){
+    ctx.clearRect(0,0,380,420);
+    if(qi >= qs.length){
+      ctx.fillStyle = '#3D2A18';
+      ctx.font = '22px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Fim! '+sc+' pts', 190, 200);
+      disp.textContent = 'fim · '+sc+' pts';
+      return;
+    }
+    var q = qs[qi];
+    ctx.fillStyle = '#3D2A18';
+    ctx.font = '20px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(q.q, 190, 60);
+    q.a.forEach(function(op,i){
+      ctx.fillStyle = '#B5652E';
+      ctx.beginPath();
+      ctx.roundRect(40, 100+i*70, 300, 50, 25);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(op, 190, 132+i*70);
+    });
+    disp.textContent = 'pergunta '+(qi+1)+'/'+qs.length+' · '+sc+' pts';
+  }
+
+  cv.onclick = function(e){
+    if(qi >= qs.length) return;
+    var r = cv.getBoundingClientRect();
+    var y = (e.clientY-r.top)/r.height*420;
+    var i = Math.floor((y-100)/70);
+    if(i>=0 && i<3){
+      if(i === qs[qi].c){ sc++; snd(880); } else { snd(200); }
+      qi++;
+      setTimeout(show, 400);
     }
   };
-  const fullMsg = generateWAMessageFromContent(jid, content, {
-    userJid: sock.authState?.creds?.me?.id || sock.user?.id,
-    timestamp: new Date()
-  });
+
+  novo();
+})();
+</script>
+</body>
+</html>`;
+
+async function enviarQuiz(sock, jid) {
+  const htmlPayload = {
+    response_id: "quiz_" + Date.now(),
+    sections: [{ view_model: { primitive: { __typename: "GenAIaeacdsnwHtmlPrimitive", payload: QUIZ_HTML, trusted_sources: ["nixel.dev"] }, __typename: "GenAISingleLayoutViewModel", height: "full", full_screen: true } }]
+  };
+  const content = {
+    botForwardedMessage: { message: { richResponseMessage: {
+      messageType: 1,
+      submessages: [{ messageType: 2, messageText: "❓ Quiz" }],
+      unifiedResponse: { data: Buffer.from(JSON.stringify(htmlPayload)).toString("base64") },
+      contextInfo: { forwardingScore: 1, isForwarded: true, forwardedAiBotMessageInfo: { botJid: "867051314767696@bot" }, forwardOrigin: 4 }
+    }}}
+  };
+  const fullMsg = generateWAMessageFromContent(jid, content, { userJid: sock.authState?.creds?.me?.id || sock.user?.id, timestamp: new Date() });
   await sock.relayMessage(jid, fullMsg.message, { messageId: fullMsg.key.id });
   return fullMsg;
 }
 module.exports = { enviarQuiz };
-
