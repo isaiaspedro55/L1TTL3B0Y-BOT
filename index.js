@@ -105,6 +105,17 @@ const errosComando={};
 let ppBotUrl=null, botFotoBuffer=null;
 const BOT_FOTO_PATH="./dados/bot_foto.jpg";
 if(fs.existsSync(BOT_FOTO_PATH)){try{botFotoBuffer=fs.readFileSync(BOT_FOTO_PATH);}catch{}}
+// ✅ Vídeo/GIF do menu (!setvideo) — substitui a foto quando definido
+let botVideoBuffer=null, botVideoEhGif=false;
+const BOT_VIDEO_PATH="./dados/bot_video.mp4";
+const BOT_VIDEO_META_PATH="./dados/bot_video_meta.json";
+if(fs.existsSync(BOT_VIDEO_PATH)){
+  try{
+    botVideoBuffer=fs.readFileSync(BOT_VIDEO_PATH);
+    const metaVideo=fs.readJsonSync(BOT_VIDEO_META_PATH);
+    botVideoEhGif=!!metaVideo?.gif;
+  }catch{}
+}
 let YTDLP_CMD="yt-dlp", FFMPEG_CMD="ffmpeg", EDGETTS_CMD="edge-tts";
 // ✅ Contorno de bloqueio de IP (servidores/VPN são frequentemente bloqueados pelo YouTube, dados móveis não).
 // Opcional: define a variável de ambiente YTDLP_PROXY (ex: http://user:pass@host:porta) no teu serviço de hospedagem.
@@ -845,12 +856,14 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const em=ME.e||ME.principal||"🌀";
   const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
   try{
-    const payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Categorias"),sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
-    if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
+    payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Categorias"),sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
+    if(botVideoBuffer){payload.video=botVideoBuffer;if(botVideoEhGif)payload.gifPlayback=true;}
+    else if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
     await sock.sendMessage(jid,payload,{quoted:seloBot});return;
   }catch(e){console.log("⚠️ NativeFlow:",e.message);}
   try{
-    if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:textoMenu},{quoted:seloBot});
+    if(botVideoBuffer)await sock.sendMessage(jid,{video:botVideoBuffer,gifPlayback:botVideoEhGif,caption:textoMenu},{quoted:seloBot});
+    else if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:textoMenu},{quoted:seloBot});
     else if(ppBotUrl)await sock.sendMessage(jid,{image:{url:ppBotUrl},caption:textoMenu},{quoted:seloBot});
     else await sock.sendMessage(jid,{text:textoMenu},{quoted:seloBot});
     await new Promise(r=>setTimeout(r,600));
@@ -2403,7 +2416,7 @@ async function processarBotaoPlay(sock,msg){
 // ════════════════════════════════════════════════
 // ✅ TODOS OS COMANDOS
 // ════════════════════════════════════════════════
-const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","set","out","prefixo","prefixos","setprefixo","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd",
+const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","set","out","prefixo","prefixos","setprefixo","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd",
 "classe","classes","atributos","level","equipar","desequipar","ranking","lutar","duelo","boss","hunt","aventura","masmorra","raid","fugir","daily","quest","quests","vender","doar","saldo","analisar",
 "sticker2","toimg","tovideo","take","wm","figurinhas","figaleatoria","figanime","figmeme","figgato","figfutebol","figamor","figengracada","colecao","figrank","figdaily","figtroca","figvender","figcomprar","figduelo","rankwaifu",
 "manga","personagem","autor","estudio","episodio","temporada","personagemaleatorio","villain","protagonista","waifu","husbando","casar","divorcio","beijar","abracar","morder","matar","animerpg","confissao","provocacao","fantasia",
@@ -2878,7 +2891,38 @@ ${nomeEnviou}`;
 
         // ─── MENU / INFO ───
         if(comando==="setfoto"){const imgBuf=await downloadImagemDaMensagem(msg);if(!imgBuf){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde imagem com *${CONFIG.PREFIXO}setfoto*`)},{quoted:seloBot});return;}botFotoBuffer=imgBuf;fs.writeFileSync(BOT_FOTO_PATH,imgBuf);await sock.sendMessage(jid,{image:imgBuf,caption:bBloco("✅ FOTO ACTUALIZADA",[bLine("✅","Foto do bot actualizada!")])},{quoted:seloBot});await reagir(sock,msg,"✅");return;}
-        // ─── ALUGAR ───
+        if(comando==="setvideo"){
+  const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+  const vM=quotedMsg?.videoMessage;
+  if(!vM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde um *vídeo* ou *gif* (menos de 15s) com *${CONFIG.PREFIXO}setvideo*`)},{quoted:seloBot});return;}
+  const duracaoProto=vM.seconds||0;
+  if(duracaoProto>15){await sock.sendMessage(jid,{text:bLine("❌",`Esse vídeo tem *${duracaoProto}s* — precisa ter menos de 15 segundos.`)},{quoted:seloBot});return;}
+  try{
+    const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
+    if(!buf||buf.length<500)throw new Error("Vídeo inválido ou expirado.");
+    if(!duracaoProto){
+      const tempCheck=`./downloads/setvideo_check_${Date.now()}.mp4`;
+      fs.writeFileSync(tempCheck,buf);
+      try{
+        const ffprobeCmd=FFMPEG_CMD.replace(/ffmpeg$/,"ffprobe");
+        const dur=parseFloat(execSync(`${ffprobeCmd} -v error -show_entries format=duration -of csv=p=0 "${tempCheck}"`,{timeout:10000}).toString().trim());
+        if(dur&&dur>15){try{fs.removeSync(tempCheck);}catch{}await sock.sendMessage(jid,{text:bLine("❌",`Esse vídeo tem *${dur.toFixed(1)}s* — precisa ter menos de 15 segundos.`)},{quoted:seloBot});return;}
+      }catch{}
+      try{fs.removeSync(tempCheck);}catch{}
+    }
+    botVideoBuffer=buf;
+    botVideoEhGif=!!vM.gifPlayback;
+    fs.writeFileSync(BOT_VIDEO_PATH,buf);
+    fs.writeJsonSync(BOT_VIDEO_META_PATH,{gif:botVideoEhGif});
+    await sock.sendMessage(jid,{video:buf,gifPlayback:botVideoEhGif,caption:bBloco("✅ VÍDEO ACTUALIZADO",[bLine("✅","Vídeo do menu actualizado!"),bLine("💡","Este vídeo substitui a foto no menu principal.")])},{quoted:seloBot});
+    await reagir(sock,msg,"✅");
+  }catch(e){
+    await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro ao guardar o vídeo.")},{quoted:seloBot});
+    await reagir(sock,msg,"❌");
+  }
+  return;
+}
+        // ─── ALUGAR ──
         if(comando==="alugar"){
           if(!args[0]){await sock.sendMessage(jid,{text:gerarTextoAlugar()},{quoted:seloBot});await reagir(sock,msg,"💰");return;}
           if(!isDono){await sock.sendMessage(jid,{text:"❌ Apenas o *dono* pode activar o aluguel."},{quoted:seloBot});return;}
