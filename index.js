@@ -77,13 +77,14 @@ const { enviarInvasores } = require("./comando_invasores.js");
 //NOVO COMANDO//
 const {enviarPlay3,decodificarLink: decodificarPlay3} = require("./comando_play3.js");
 const {enviarSoundcloud1,decodificarLink: decodificarSoundcloud1} = require("./comando_soundcloud1.js");
+//
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 fs.ensureDirSync(process.env.TMPDIR);
 fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./dados");
 
 const CONFIG = {
-  PREFIXO:         ":",
+  PREFIXO:         "!",
   NUMERO_BOT:      "244950898368",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
   GEMINI_KEY: process.env.GEMINI_KEY || "",
@@ -103,6 +104,9 @@ const ARQUIVO_CONFIG_BOT="./dados/config_bot.json";
 function carregarConfigBot(){try{return fs.readJsonSync(ARQUIVO_CONFIG_BOT);}catch{return{};}}
 function salvarConfigBot(dados){try{fs.ensureDirSync("./dados");fs.writeJsonSync(ARQUIVO_CONFIG_BOT,dados);}catch(e){console.log("❌ salvarConfigBot:",e.message);}}
 try{const cfgSalva=carregarConfigBot();if(cfgSalva.prefixo&&typeof cfgSalva.prefixo==="string")CONFIG.PREFIXO=cfgSalva.prefixo;}catch{}
+// ✅ Estilo do menu: 1 = actual (molduras) | 2 = simples + carrossel de info
+let ESTILO_MENU=1;
+try{const _c=carregarConfigBot();if(_c.estilo===2)ESTILO_MENU=2;}catch{}
 const silentLogger={level:"silent",child:()=>silentLogger,info:()=>{},warn:()=>{},error:()=>{},debug:()=>{},trace:()=>{},fatal:()=>{}};
 const errosComando={};
 let ppBotUrl=null, botFotoBuffer=null;
@@ -616,7 +620,7 @@ function buildSecoes(isDono){
     {header:`${E.musicas} MENU-MÚSICAS`,title:"_músicas, letras, bio._",id:"cat_musicas"},
     {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"_stickers e criações._",id:"cat_figurinhas"},
     {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"_jogos e diversão._",id:"cat_brincadeiras"},
-    {header:"⚡️MENU-JOGOS",title:"_jogos interactivos completos._",id:"cat_jogos"},
+    {header:`${E.jogos} MENU-JOGOS`,title:"_jogos interactivos completos._",id:"cat_jogos"},
     {header:`${E.coins} MENU-COINS`,title:"_moedas e apostas._",id:"cat_coins"},
     {header:`${E.alteradores} MENU-ALTERADORES`,title:"_IA, voz, áudio, imagem._",id:"cat_alteradores"},
     {header:`${E.logos} MENU-LOGOS`,title:"_logos, memes, utilidades._",id:"cat_logos"},
@@ -841,6 +845,8 @@ function gerarSubmenu(catId,P){
     bLine(em,`*${CONFIG.PREFIXO}setmenu* [emoji] → _mudar emojis_`),
     bLine(em,`*${CONFIG.PREFIXO}setletra* [nome]`),bLine(em,`*${CONFIG.PREFIXO}verletras*`),
     bLine(em,`*${CONFIG.PREFIXO}downcase* [comando] → _extrai a case nativa_`),
+    bLine(em,`*${CONFIG.PREFIXO}setestilo1* → _menu clássico_`),
+    bLine(em,`*${CONFIG.PREFIXO}setestilo2* → _menu simples + lista_`),
     B_SEP,bLine("👑","*SUBDONOS:*"),
     bLine(em,`*${CONFIG.PREFIXO}addsubdono* @user`),bLine(em,`*${CONFIG.PREFIXO}removesubdono* @user`),bLine(em,`*${CONFIG.PREFIXO}subdonos*`),
     bLine("👑","*DONOS:*"),
@@ -848,6 +854,85 @@ function gerarSubmenu(catId,P){
     B_SEP,bLine("👑",`*${CONFIG.DONO_NOME}* | 📞 ${CONFIG.DONO_NUM}`),
   ]);
   return null;
+}
+
+function estilizarTexto(t){
+  if(FONTE_ATUAL==="Abadi"||typeof t!=="string"||!t)return t;
+  try{
+    return t.split(/(https?:\/\/[^\s]+|@[0-9]{5,})/g)
+      .map(p=>(/^https?:\/\//.test(p)||/^@[0-9]{5,}$/.test(p))?p:aplicarFonte(FONTE_ATUAL,p)).join("");
+  }catch{return t;}
+}
+
+function limparBlocoSubmenu(bloco){
+  let titulo="COMANDOS";const linhas=[];
+  for(const l of bloco.split("\n")){
+    if(l===B_TOP||l===B_MID||l===B_BOT)continue;
+    if(l===B_SEP){linhas.push("");continue;}
+    let m=l.match(/^┋𝄪°⠡⸗𝄪﹝(.*)﹞$/);
+    if(m){titulo=m[1];continue;}
+    m=l.match(/^┋°‧․ˑ(.*?)⃟⠥ʿ⇢ (.*)$/);
+    if(m){linhas.push(`${m[1]} ${m[2]}`);continue;}
+    linhas.push(l);
+  }
+  return{titulo,linhas};
+}
+
+function limparMarkdown(t){return String(t||"").replace(/[*_~`]/g,"").replace(/\s+/g," ").trim();}
+
+function montarSecoesInfo(catId,titulo,linhas){
+  const P=CONFIG.PREFIXO;
+  const blocos=[];let b=[];
+  for(const l of linhas){if(l.trim()===""){if(b.length)blocos.push(b);b=[];}else b.push(l);}
+  if(b.length)blocos.push(b);
+
+  const tituloCat=limparMarkdown(titulo).slice(0,30)||"COMANDOS";
+  const secoes=[];let n=0;
+
+  for(const bloco of blocos){
+    let tituloSec=tituloCat,linhasRow=bloco;
+    if(bloco.length>1&&!bloco[0].includes(P)&&/^\S+\s\*[^*]+\*$/.test(bloco[0].trim())){
+      tituloSec=limparMarkdown(bloco[0]).slice(0,30);
+      linhasRow=bloco.slice(1);
+    }
+    const rows=[];
+    for(const l of linhasRow){
+      const [cmd,...resto]=l.replace(/\n/g," ").split("→");
+      const header=limparMarkdown(cmd);
+      const desc=limparMarkdown(resto.join("→"));
+      if(!header&&!desc)continue;
+      rows.push({
+        header:desc?estilizarTexto(header):"",
+        title:estilizarTexto(desc||header),
+        id:`info_${catId}_${n++}`
+      });
+    }
+    if(!rows.length)continue;
+    const ultima=secoes[secoes.length-1];
+    if(ultima&&ultima._t===tituloSec)ultima.rows.push(...rows);
+    else secoes.push({_t:tituloSec,title:estilizarTexto(tituloSec),highlight_label:"",rows});
+  }
+  return secoes.map(({_t,...s})=>s);
+}
+
+async function enviarSubmenuLista(sock,jid,msg,catId,texto,seloBot){
+  const{titulo,linhas}=limparBlocoSubmenu(texto);
+  try{
+    const secoes=montarSecoesInfo(catId,titulo,linhas);
+    secoes.push({title:estilizarTexto("NAVEGAÇÃO"),highlight_label:"",rows:[{header:"",title:estilizarTexto("↩️ Voltar ao menu"),id:"estilo2_menu"}]});
+    const payload={
+      caption:`*${limparMarkdown(titulo)}*\n\nSobe e desce na lista para ver todos os comandos 👇`,
+      footer:CONFIG.NOME_BOT,
+      optionText:"≡ COMANDOS",
+      nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Comandos"),sections:secoes,icon:"default"}]
+    };
+    if(botFotoBuffer)payload.image=botFotoBuffer;
+    else if(ppBotUrl)payload.image={url:ppBotUrl};
+    await sock.sendMessage(jid,payload,{quoted:seloBot});
+  }catch(e){
+    console.log("⚠️ Lista submenu:",e.message);
+    await sock.sendMessage(jid,{text:`*${limparMarkdown(titulo)}*\n\n${linhas.join("\n")}`},{quoted:seloBot});
+  }
 }
 
 async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
@@ -858,8 +943,10 @@ async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const cargo=isDono?"👑 Criador":(isAdmin?"👮 Administrador":"👤 Utilizador");
   const secoes=buildSecoes(isDono);
   const em=ME.e||ME.principal||"🌀";
-  const textoMenu=`${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
-  try{
+  const textoMenu=ESTILO_MENU===2
+  ? `👤 *Usuário:* ${nomeUser}\n🎖️ *Cargo:* ${cargo}\n🕐 *Hora:* ${hora}`
+  : `${B_TOP}\n${bTitle(`𝑰𝑵𝑭𝑶𝒔 𝑩𝑶𝑻 𝑼𝑺𝑬𝑹`)}\n${B_MID}\n${bLine("🤖",`${nomeBotEstilizado()}`)}\n${bLine("👤",`${nomeUser}`)}\n${bLine("🎖️",`${cargo}`)}\n${bLine("⌨️",`*Prefixo*: ${P}`)}\n${bLine("🕐",`*Hora*: ${hora}`)}\n${bLine("💎",`*VIP*: ${isVip(sender)?"✅":"❌"}`)}\n${B_BOT}`;
+    try{
     payload={caption:textoMenu,footer:CONFIG.NOME_BOT,optionText:"≡ ABRIR MENU",nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Categorias"),sections:secoes,icon:"default"},{text:"📢 Canal",url:CONFIG.CANAL_URL,useWebview:false}]};
     if(botVideoBuffer){payload.video=botVideoBuffer;if(botVideoEhGif)payload.gifPlayback=true;}
     else if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
@@ -890,6 +977,7 @@ async function enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono){
   if(catId==="cat_criador"){let ppD=null;try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}const tD=bBloco("👨‍💻 CRIADOR",[bLine("🏷️",`*${CONFIG.DONO_NOME}*`),bLine("📞",CONFIG.DONO_NUM)]);if(ppD)await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:seloBot});else await sock.sendMessage(jid,{text:tD},{quoted:seloBot});return;}
   const texto=gerarSubmenu(catId,CONFIG.PREFIXO);
   if(!texto)return;
+  if(ESTILO_MENU===2){try{await reagir(sock,{key:{remoteJid:jid,...msg?.key}},"✅");}catch{}await enviarSubmenuLista(sock,jid,msg,catId,texto,seloBot);return;}
   try{await reagir(sock,{key:{remoteJid:jid,...msg?.key}},msg?.key?"✅":"⚡");}catch{}
   await new Promise(r=>setTimeout(r,300));
   if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:texto},{quoted:seloBot});
@@ -2429,7 +2517,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","aluga
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","games"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","setestilo1","setestilo2","games"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -2603,6 +2691,9 @@ async function startBot(){
           if(btnId&&btnId.startsWith("jogo_")){await processarSelecaoJogo(sock,jid,msg,btnId.replace("jogo_",""),seloBot);return;}
           if(btnId&&btnId.startsWith("use_prefix_")){const pref=btnId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
           // ✅ Botão não reconhecido (provavelmente de OUTRO bot no grupo) — ignora silenciosamente
+          if(btnId&&btnId.startsWith("info_"))return;
+          if(btnId&&btnId.startsWith("info_"))return;
+          if(btnId==="estilo2_menu"){let adm=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid);adm=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)).includes(sender);}catch{}}await enviarMenuPrincipal(sock,jid,msg,isDono,sender,adm,seloBot);return;}
           if(btnId!==null)return;
         }
 
@@ -2888,6 +2979,7 @@ ${nomeEnviou}`;
 
         // ─── SETMENU ───
         if(comando==="setmenu"){if(!isDono){await sock.sendMessage(jid,{text:bBloco("🔒 ACESSO NEGADO",[bLine("❌","Apenas o dono.")])},{quoted:seloBot});return;}const novoEmoji=args[0]?.trim();if(!novoEmoji){await sock.sendMessage(jid,{text:bBloco("⚙️ SETMENU",[bLine("💡",`*${CONFIG.PREFIXO}setmenu* [emoji]`),bLine("💡",`Ex: *${CONFIG.PREFIXO}setmenu* 🔥`),B_SEP,bLine(ME.e||"🌀",`Actual: *${ME.e||ME.principal}*`)])},{quoted:seloBot});return;}Object.keys(ME).forEach(k=>{ME[k]=novoEmoji;});ME.e=novoEmoji;salvarEmojis(ME);await sock.sendMessage(jid,{text:bBloco("✅ EMOJIS ACTUALIZADOS",[bLine("✅",`Todos os menus usam: *${novoEmoji}*`),bLine("💡",`Usa *${CONFIG.PREFIXO}menu* para ver!`)])},{quoted:seloBot});await reagir(sock,msg,"✅");return;}
+        if(comando==="setestilo1"||comando==="setestilo2"){const novo=comando==="setestilo1"?1:2;ESTILO_MENU=novo;salvarConfigBot({...carregarConfigBot(),estilo:novo});await sock.sendMessage(jid,{text:bBloco("✅ ESTILO ALTERADO",[bLine("🎨",`Estilo *${novo}* activado`),bLine("💡",novo===1?"Menu clássico com molduras.":"Menu simples + lista deslizante."),bLine("💡",`Usa *${CONFIG.PREFIXO}menu* para ver!`)])},{quoted:seloBot});await reagir(sock,msg,"🎨");return;}
 
         // ─── PP ───
         if(comando==="pp"){const codigoFornecido=args.join(" ").trim();if(!codigoFornecido){await sock.sendMessage(jid,{text:bBloco("🔑 PALAVRA-PASSE",[bLine("💡",`Uso: *${CONFIG.PREFIXO}pp [código]*`)])},{quoted:seloBot});return;}if(codigoFornecido===CONFIG.SENHA_BOT){senhasAprovadas.add(sender);await sock.sendMessage(jid,{text:bBloco("✅ ACESSO LIBERADO!",[bLine("🎉","Bem-vindo(a)!"),bLine("🤖","Chama *Isaías* no grupo!"),bLine("💡",`Usa *${CONFIG.PREFIXO}menu*!`)])},{quoted:seloBot});await reagir(sock,msg,"✅");}else{await sock.sendMessage(jid,{text:bBloco("❌ CÓDIGO ERRADO",[bLine("💡",`Contacta ${CONFIG.DONO_NUM}.`)])},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
