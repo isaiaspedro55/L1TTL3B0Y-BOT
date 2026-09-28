@@ -616,7 +616,7 @@ function buildSecoes(isDono){
     {header:`${E.musicas} MENU-MÚSICAS`,title:"_músicas, letras, bio._",id:"cat_musicas"},
     {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"_stickers e criações._",id:"cat_figurinhas"},
     {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"_jogos e diversão._",id:"cat_brincadeiras"},
-    {header:`${E.Jogos} MENU-JOGOS`,title:"_jogos interactivos completos._",id:"cat_jogos"},
+    {header:"⚡️MENU-JOGOS",title:"_jogos interactivos completos._",id:"cat_jogos"},
     {header:`${E.coins} MENU-COINS`,title:"_moedas e apostas._",id:"cat_coins"},
     {header:`${E.alteradores} MENU-ALTERADORES`,title:"_IA, voz, áudio, imagem._",id:"cat_alteradores"},
     {header:`${E.logos} MENU-LOGOS`,title:"_logos, memes, utilidades._",id:"cat_logos"},
