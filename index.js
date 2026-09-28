@@ -75,6 +75,7 @@ const { enviarSinuca } = require("./comando_sinuca.js");
 const { enviarQuebra } = require("./comando_quebra.js");
 const { enviarInvasores } = require("./comando_invasores.js");
 //NOVO COMANDO//
+const {enviarPlay3,decodificarLink: decodificarPlay3} = require("./comando_play3.js");
 const {enviarSoundcloud1,decodificarLink: decodificarSoundcloud1} = require("./comando_soundcloud1.js");
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 fs.ensureDirSync(process.env.TMPDIR);
@@ -82,7 +83,7 @@ fs.ensureDirSync("./downloads");
 fs.ensureDirSync("./dados");
 
 const CONFIG = {
-  PREFIXO:         "!",
+  PREFIXO:         ":",
   NUMERO_BOT:      "244950898368",
   NUMEROS_ADM:     ["926612801","244926612801","169853876965546"],
   GEMINI_KEY: process.env.GEMINI_KEY || "",
@@ -654,9 +655,10 @@ function gerarSubmenu(catId,P){
   if(catId==="cat_assistente")return bBloco(`𝑰𝑺𝑨Í𝑨𝑺 𝑰𝑨 【${em}】`,[bLine("💡","*Em grupos:* menciona o nome!"),bLine("📱","*No privado:* fala directamente!"),B_SEP,bLine("💬","_\"Isaías, baixa Calema te amo\"_"),bLine("💬","_\"Isaías, que tempo em Luanda?\"_"),bLine("💬","_\"Isaías, faz uma piada\"_"),B_SEP,bLine(em,`*${P}assistente* → _activar no grupo_`),bLine(em,`*${P}isaias-off* → _desactivar_`)]);
   if(catId==="cat_downloads")return bBloco(`𝐃𝐎𝐖𝐍𝐋𝐎𝐀𝐃'𝐬 【${em}】`,[
     bLine("🎵","*YOUTUBE*"),
-    bLine(em,`*${P}play* [música] → _baixa e envia directo_`),
-    bLine(em,`*${P}play1* [música] → _carrossel com 5 opções_`),
-    bLine(em,`*${P}play2* [música] → _carrossel MP3/MP4/DOC_`),
+    bLine(em,`*${P}play* [música]`),
+    bLine(em,`*${P}play1* [música]`),
+    bLine(em,`*${P}play2* [música]`),
+    bLine(em,`*${P}play3* [música]`),
     bLine(em,`*${P}mp3*`),bLine(em,`*${P}mp4*`),bLine(em,`*${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),
     B_SEP,bLine("📱","*REDES SOCIAIS*"),
     bLine(em,`*${P}tiktok*`),bLine(em,`*${P}tt* [link] → _download rápido_`),
@@ -1738,6 +1740,7 @@ async function pesquisarSoundcloud(query,limite=5){const q=`scsearch${limite}:${
 async function dlSoundcloud(query){const isUrl=query.startsWith("http"),nomeBase=`sc_${Date.now()}`,saida=`./downloads/${nomeBase}.%(ext)s`,fonte=isUrl?query:`scsearch1:${query}`;try{await runCmd(`${YTDLP_CMD} --no-check-certificate -x --audio-format mp3 --audio-quality 0 --no-playlist --no-warnings -o "${saida}" "${fonte}"`);const arq=encontrarArquivo("./downloads",nomeBase);if(arq)return{filePath:arq};}catch{}const arqFb=await downloadMusica(query,true);if(arqFb)return{filePath:arqFb};throw new Error("SoundCloud: não encontrei.");}
 async function dlMediafire(url){try{const{data}=await axios.get(url,{headers:{"User-Agent":"Mozilla/5.0"},timeout:15000,httpsAgent});const match=data.match(/href="(https:\/\/download\d+\.mediafire\.com\/[^"]+)"/);if(match)return{url:match[1],title:decodeURIComponent(match[1].split("/").pop().split("?")[0])||"file"};throw new Error("Link não encontrado.");}catch(e){throw new Error("MediaFire: "+e.message);}}
 async function dlApk(query){try{const{data}=await axios.get(`https://liteapks.com/?s=${encodeURIComponent(query)}`,{headers:{"User-Agent":"Mozilla/5.0"},timeout:15000,httpsAgent});const regex=/href="(https:\/\/liteapks\.com\/[a-z0-9-]+\.html)"/g;let m;const results=[];while((m=regex.exec(data))!==null&&results.length<3){const u=m[1];if(!u.includes("page/")&&!results.find(r=>r===u))results.push(u);}if(!results.length)throw new Error("Não encontrei.");return{url:results[0],title:results[0].split("/").pop().replace(".html","").replace(/-/g," ")};}catch(e){throw new Error("APK: "+e.message);}}
+async function pesquisarPlay3(query,limite=5){let resultados=[];try{resultados=await scraperYouTubeSearch(query,limite);}catch{}if(resultados?.length){return resultados.map(v=>({id:v.id||v.videoId||"",videoId:v.id||v.videoId||"",title:v.title||v.titulo||"Desconhecido",author:v.uploader||v.channel||v.author||v.canal||"Desconhecido",url:v.webpage_url||v.url||v.link||(v.id?`https://www.youtube.com/watch?v=${v.id}`:""),thumbnail:v.thumbnail||v.miniatura||v.thumbnails?.[0]?.url||""})).filter(v=>v.url);}try{resultados=await buscarYouTubePiped(query);}catch{}if(resultados?.length){return resultados.slice(0,limite).map(v=>({id:v.id||v.videoId||"",videoId:v.id||v.videoId||"",title:v.title||"Desconhecido",author:v.uploader||v.uploaderName||"Desconhecido",url:v.url||"",thumbnail:v.thumbnail||""})).filter(v=>v.url);}try{const j=await runCmd(`${YTDLP_CMD} --dump-json --flat-playlist --no-playlist --no-warnings ${getYtDlpArgs()} "ytsearch${limite}:${query.replace(/"/g,'\\"')}"`);const linhas=j.trim().split("\n").filter(l=>l.trim().startsWith("{"));resultados=linhas.map(l=>{try{return JSON.parse(l);}catch{return null;}}).filter(Boolean).slice(0,limite);if(resultados.length)return resultados.map(v=>({id:v.id||v.videoId||"",videoId:v.id||v.videoId||"",title:v.title||"Desconhecido",author:v.uploader||v.channel||"Desconhecido",url:v.webpage_url||v.original_url||(v.id?`https://www.youtube.com/watch?v=${v.id}`:""),thumbnail:v.thumbnail||v.thumbnails?.[0]?.url||""})).filter(v=>v.url);}catch(e){console.log("❌ pesquisarPlay3:",e.message);}return[];}
 
 // ════════════════════════════════════════════════
 // ✅ PINTEREST — busca múltiplas imagens
@@ -2426,7 +2429,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","aluga
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","games"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","games"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -2594,6 +2597,7 @@ async function startBot(){
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
           if(btnId&&btnId.startsWith("play1_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
           if(btnId&&btnId.startsWith("play2_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay2(sock,msg,formato,url);return;}
+          if(btnId&&btnId.startsWith("play3:")){const partes=btnId.split(":");const formato=partes[1];const codigo=partes.slice(2).join(":");try{const dados=JSON.parse(Buffer.from(codigo,"base64url").toString("utf8"));if(!dados?.url){await sock.sendMessage(jid,{text:bLine("❌","Link do YouTube inválido.")},{quoted:seloBot});return;}if(formato==="youtube"){await sock.sendMessage(jid,{text:`▶️ *YouTube*\n\n🎵 ${dados.title||"Música"}\n\n${dados.url}`},{quoted:seloBot});return;}if(formato==="audio"){await reagir(sock,msg,"🎧");const arq=await barraCarregamento(sock,jid,seloBot,"A baixar áudio...",()=>downloadMusica(dados.url,false));if(!arq||!fs.existsSync(arq))throw new Error("Não consegui baixar o áudio.");await enviarAudio(sock,jid,arq,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{if(fs.existsSync(arq))fs.removeSync(arq);}catch{}},15000);return;}if(formato==="video"){await reagir(sock,msg,"🎥");const arq=await barraCarregamento(sock,jid,seloBot,"A baixar vídeo...",()=>downloadVideo(dados.url,480));if(!arq||!fs.existsSync(arq))throw new Error("Não consegui baixar o vídeo.");await enviarVideo(sock,jid,arq,bLine("🎬",`*${dados.title||"Vídeo"}*`),[],seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{if(fs.existsSync(arq))fs.removeSync(arq);}catch{}},15000);return;}}catch(e){console.log("❌ play3 botão:",e.message);await sock.sendMessage(jid,{text:bLine("❌",e.message||"Não foi possível concluir o download.")},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
           if(btnId&&btnId.startsWith("pinsticker_")){const imgUrl=decodeURIComponent(btnId.replace("pinsticker_",""));await processarBotaoPinSticker(sock,msg,imgUrl);return;}
           if(btnId&&btnId.startsWith("cat_")){await enviarSubmenu(sock,jid,msg,btnId,seloBot,sender,isDono);return;}
           if(btnId&&btnId.startsWith("jogo_")){await processarSelecaoJogo(sock,jid,msg,btnId.replace("jogo_",""),seloBot);return;}
@@ -3017,6 +3021,7 @@ ${nomeEnviou}`;
         if(comando==="play"){await processarComandoPlay(sock,jid,msg,args.join(" ").trim());return;}
         if(comando==="play1"){await processarComandoPlay1(sock,jid,msg,sender,args.join(" ").trim());return;}
         if(comando==="play2"){await processarComandoPlay2(sock,jid,msg,sender,args.join(" ").trim());return;}
+        if(comando==="play3"){await enviarPlay3(sock,jid,msg,args.join(" ").trim(),seloBot,{reagir,bLine,nomeBot:nomeBotEstilizado(),pesquisarPlay3});return;}
         if(comando==="pinterest"){await processarComandoPinterest(sock,jid,msg,sender,args.join(" ").trim());return;}
         if(comando==="mp3"&&args.length>0){
           const entrada=args.join(" ");
