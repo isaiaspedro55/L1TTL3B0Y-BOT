@@ -614,23 +614,23 @@ async function rodarLoadingHacker(sock,chatJid,msgAlvo,titulo,formato){
 function buildSecoes(isDono){
   const E=ME;
   const principal={title:`${E.principal} MENUS`,highlight_label:"⚡️SHAZAM⚡️",rows:[
-    {header:`${E.principal} MENU-PRINCIPAL`,title:"_comandos principais._",id:"cat_principal"},
-    {header:`${E.downloads} MENU-DOWNLOADS`,title:"_download de conteúdo._",id:"cat_downloads"},
-    {header:`${E.redes} REDES SOCIAIS`,title:"_tiktok, instagram, youtube, facebook._",id:"cat_redes"},
-    {header:`${E.musicas} MENU-MÚSICAS`,title:"_músicas, letras, bio._",id:"cat_musicas"},
-    {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"_stickers e criações._",id:"cat_figurinhas"},
-    {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"_jogos e diversão._",id:"cat_brincadeiras"},
-    {header:`${E.jogos} MENU-JOGOS`,title:"_jogos interactivos completos._",id:"cat_jogos"},
-    {header:`${E.coins} MENU-COINS`,title:"_moedas e apostas._",id:"cat_coins"},
-    {header:`${E.alteradores} MENU-ALTERADORES`,title:"_IA, voz, áudio, imagem._",id:"cat_alteradores"},
-    {header:`${E.logos} MENU-LOGOS`,title:"_logos, memes, utilidades._",id:"cat_logos"},
-    {header:`${E.pesquisas} MENU-PESQUISAS`,title:"_pesquisas e informação._",id:"cat_pesquisas"},
-    {header:`${E.animes} MENU-ANIMES`,title:"_animes e mangás._",id:"cat_animes"},
-    {header:`${E.rpg} MENU-RPG`,title:"_aventura e batalhas._",id:"cat_rpg"},
-    {header:`${E.ias} MENU-IAs`,title:"_modelos de IA._",id:"cat_ias"},
+    {header:`${E.principal} MENU-PRINCIPAL`,title:"",id:"cat_principal"},
+    {header:`${E.downloads} MENU-DOWNLOADS`,title:"",id:"cat_downloads"},
+    {header:`${E.redes} REDES SOCIAIS`,title:"",id:"cat_redes"},
+    {header:`${E.musicas} MENU-MÚSICAS`,title:"",id:"cat_musicas"},
+    {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"",id:"cat_figurinhas"},
+    {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"",id:"cat_brincadeiras"},
+    {header:`${E.jogos} MENU-JOGOS`,title:"",id:"cat_jogos"},
+    {header:`${E.coins} MENU-COINS`,title:"",id:"cat_coins"},
+    {header:`${E.alteradores} MENU-ALTERADORES`,title:"",id:"cat_alteradores"},
+    {header:`${E.logos} MENU-LOGOS`,title:"",id:"cat_logos"},
+    {header:`${E.pesquisas} MENU-PESQUISAS`,title:"",id:"cat_pesquisas"},
+    {header:`${E.animes} MENU-ANIMES`,title:"",id:"cat_animes"},
+    {header:`${E.rpg} MENU-RPG`,title:"",id:"cat_rpg"},
+    {header:`${E.ias} MENU-IAs`,title:"",id:"cat_ias"},
     {header:`${E.plaquinhas} MENU-PLAQUINHAS`,title:"_frases e cantadas._",id:"cat_plaquinhas"},
-    {header:`${E.mais18} MENU+18`,title:"_exclusivo VIPs._",id:"cat_18"},
-    {header:`${E.adm} MENU-ADM`,title:"_administração._",id:"cat_adm"},
+    {header:`${E.mais18} MENU+18`,title:"",id:"cat_18"},
+    {header:`${E.adm} MENU-ADM`,title:"",id:"cat_adm"},
   ]};
   if(isDono)principal.rows.push({header:`${E.dono} MENU-DONO`,title:"_apenas dono._",id:"cat_dono"});
   const extras={title:`${E.extras} EXTRAS`,highlight_label:"⚡️SHAZAM⚡️",rows:[
@@ -790,7 +790,7 @@ function gerarSubmenu(catId,P){
   ]);
   if(catId==="cat_adm"||catId==="adm")return bBloco(`𝐀𝐃𝐌𝐈𝐍𝐬 【${em}】`,[
     bLine(em,`*${P}banir*`),bLine(em,`*${P}add*`),bLine(em,`*${P}addadmin*`),bLine(em,`*${P}removeadmin*`),
-    bLine(em,`*${P}silenciar*`),bLine(em,`*${P}dessilenciar*`),bLine(em,`*${P}addvip*`),bLine(em,`*${P}vips*`),
+    bLine(em,`*${P}silenciar*`),bLine(em,`*${P}dessilenciar*`),bLine(em,`*${P}addvip*`),bLine(em,`*${P}vips*`),bLine(em,`*${P}addstatus*`),
     bLine(em,`*${P}all*`),bLine(em,`*${P}att*`),bLine(em,`*${P}aviso*`),bLine(em,`*${P}link*`),bLine(em,`*${P}sorteio*`),
     bLine(em,`*${P}fechar*`),bLine(em,`*${P}abrir*`),bLine(em,`*${P}bot off* → _dono: termina o aluguel_`),
     bLine(em,`*${P}nomegrupo*`),bLine(em,`*${P}descgrupo*`),bLine(em,`*${P}fotogrupo*`),bLine(em,`*${P}scanlink*`),
@@ -935,6 +935,36 @@ async function enviarSubmenuLista(sock,jid,msg,catId,texto,seloBot){
   }
 }
 
+// ✅ ESTILO 2 — 1 botão no chat (≡ COMANDOS); ao tocar abre a janela com as secções como botões
+async function enviarSubmenuBotoes(sock,jid,msg,catId,texto,seloBot){
+  const{titulo,linhas}=limparBlocoSubmenu(texto);
+  const secoes=montarSecoesInfo(catId,titulo,linhas);
+  if(!secoes.length)throw new Error("Sem comandos para mostrar.");
+
+  // 1 botão por secção; cada um abre a sua lista de comandos
+  const nativeFlow=secoes.map(sec=>({
+    text:sec.title,
+    sections:[{title:sec.title,highlight_label:"",rows:sec.rows}],
+    icon:"default"
+  }));
+  // último botão: voltar ao menu
+  nativeFlow.push({
+    text:estilizarTexto("↩️ Voltar ao menu"),
+    sections:[{title:estilizarTexto("NAVEGAÇÃO"),highlight_label:"",rows:[{header:"",title:estilizarTexto("↩️ Voltar ao menu"),id:"estilo2_menu"}]}],
+    icon:"default"
+  });
+
+  const payload={
+    caption:`*${limparMarkdown(titulo)}*\n\nToca em ≡ COMANDOS para ver as secções 👇`,
+    footer:CONFIG.NOME_BOT,
+    optionText:"≡ COMANDOS",
+    nativeFlow
+  };
+  if(botFotoBuffer)payload.image=botFotoBuffer;
+  else if(ppBotUrl)payload.image={url:ppBotUrl};
+  await sock.sendMessage(jid,payload,{quoted:seloBot});
+}
+
 async function enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot){
   const P=CONFIG.PREFIXO;
   const agora=new Date();
@@ -977,7 +1007,7 @@ async function enviarSubmenu(sock,jid,msg,catId,seloBot,sender,isDono){
   if(catId==="cat_criador"){let ppD=null;try{ppD=await sock.profilePictureUrl(CONFIG.DONO_JID,"image");}catch{}const tD=bBloco("👨‍💻 CRIADOR",[bLine("🏷️",`*${CONFIG.DONO_NOME}*`),bLine("📞",CONFIG.DONO_NUM)]);if(ppD)await sock.sendMessage(jid,{image:{url:ppD},caption:tD},{quoted:seloBot});else await sock.sendMessage(jid,{text:tD},{quoted:seloBot});return;}
   const texto=gerarSubmenu(catId,CONFIG.PREFIXO);
   if(!texto)return;
-  if(ESTILO_MENU===2){try{await reagir(sock,{key:{remoteJid:jid,...msg?.key}},"✅");}catch{}await enviarSubmenuLista(sock,jid,msg,catId,texto,seloBot);return;}
+  if(ESTILO_MENU===2){try{await reagir(sock,{key:{remoteJid:jid,...msg?.key}},"✅");}catch{}try{await enviarSubmenuBotoes(sock,jid,msg,catId,texto,seloBot);}catch(e){console.log("⚠️ Botões submenu:",e.message);await enviarSubmenuLista(sock,jid,msg,catId,texto,seloBot);}return;}
   try{await reagir(sock,{key:{remoteJid:jid,...msg?.key}},msg?.key?"✅":"⚡");}catch{}
   await new Promise(r=>setTimeout(r,300));
   if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:texto},{quoted:seloBot});
@@ -2517,7 +2547,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","aluga
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","setestilo1","setestilo2","games"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","addstatus","setestilo1","setestilo2","games"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -2979,6 +3009,7 @@ ${nomeEnviou}`;
 
         // ─── SETMENU ───
         if(comando==="setmenu"){if(!isDono){await sock.sendMessage(jid,{text:bBloco("🔒 ACESSO NEGADO",[bLine("❌","Apenas o dono.")])},{quoted:seloBot});return;}const novoEmoji=args[0]?.trim();if(!novoEmoji){await sock.sendMessage(jid,{text:bBloco("⚙️ SETMENU",[bLine("💡",`*${CONFIG.PREFIXO}setmenu* [emoji]`),bLine("💡",`Ex: *${CONFIG.PREFIXO}setmenu* 🔥`),B_SEP,bLine(ME.e||"🌀",`Actual: *${ME.e||ME.principal}*`)])},{quoted:seloBot});return;}Object.keys(ME).forEach(k=>{ME[k]=novoEmoji;});ME.e=novoEmoji;salvarEmojis(ME);await sock.sendMessage(jid,{text:bBloco("✅ EMOJIS ACTUALIZADOS",[bLine("✅",`Todos os menus usam: *${novoEmoji}*`),bLine("💡",`Usa *${CONFIG.PREFIXO}menu* para ver!`)])},{quoted:seloBot});await reagir(sock,msg,"✅");return;}
+        if(comando==="addstatus"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Este comando só pode ser usado em grupos.")},{quoted:seloBot});return;}if(!isAdmin){await sock.sendMessage(jid,{text:bLine("❌","Apenas administradores do grupo podem publicar Status.")},{quoted:seloBot});return;}try{const midia=await downloadQualquerMidia(msg);const textoStatus=args.join(" ").trim();if(midia&&midia.mime.startsWith("image/")){await sock.sendMessage("status@broadcast",{image:midia.buffer,caption:textoStatus||undefined,mimetype:midia.mime});await sock.sendMessage(jid,{text:bLine("✅","Foto publicada no Status do WhatsApp!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}if(midia&&midia.mime.startsWith("video/")){await sock.sendMessage("status@broadcast",{video:midia.buffer,caption:textoStatus||undefined,mimetype:midia.mime});await sock.sendMessage(jid,{text:bLine("✅","Vídeo publicado no Status do WhatsApp!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}if(textoStatus){await sock.sendMessage("status@broadcast",{ text: textoStatus },{broadcast: true,statusJidList: [sock.user.id]});await sock.sendMessage(jid,{text:bLine("✅","Texto publicado no Status do WhatsApp!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}await sock.sendMessage(jid,{text:bLine("💡",`Usa *${CONFIG.PREFIXO}addstatus texto* ou responde uma foto/vídeo com *${CONFIG.PREFIXO}addstatus*.`)},{quoted:seloBot});}catch(e){console.log("❌ addstatus:",e.message);await sock.sendMessage(jid,{text:bLine("❌",`Erro ao publicar Status: ${e.message}`)},{quoted:seloBot});}return;}
         if(comando==="setestilo1"||comando==="setestilo2"){const novo=comando==="setestilo1"?1:2;ESTILO_MENU=novo;salvarConfigBot({...carregarConfigBot(),estilo:novo});await sock.sendMessage(jid,{text:bBloco("✅ ESTILO ALTERADO",[bLine("🎨",`Estilo *${novo}* activado`),bLine("💡",novo===1?"Menu clássico com molduras.":"Menu simples + lista deslizante."),bLine("💡",`Usa *${CONFIG.PREFIXO}menu* para ver!`)])},{quoted:seloBot});await reagir(sock,msg,"🎨");return;}
 
         // ─── PP ───
