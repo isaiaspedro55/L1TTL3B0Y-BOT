@@ -620,7 +620,7 @@ function buildSecoes(isDono){
     {header:`${E.musicas} MENU-MÚSICAS`,title:"",id:"cat_musicas"},
     {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"",id:"cat_figurinhas"},
     {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"",id:"cat_brincadeiras"},
-    {header:`${E.jogos} MENU-JOGOS`,title:"",id:"cat_jogos"},
+    {header: "🎮 MENU-JOGOS",title:"",id:"cat_jogos"},
     {header:`${E.coins} MENU-COINS`,title:"",id:"cat_coins"},
     {header:`${E.alteradores} MENU-ALTERADORES`,title:"",id:"cat_alteradores"},
     {header:`${E.logos} MENU-LOGOS`,title:"",id:"cat_logos"},
@@ -628,17 +628,17 @@ function buildSecoes(isDono){
     {header:`${E.animes} MENU-ANIMES`,title:"",id:"cat_animes"},
     {header:`${E.rpg} MENU-RPG`,title:"",id:"cat_rpg"},
     {header:`${E.ias} MENU-IAs`,title:"",id:"cat_ias"},
-    {header:`${E.plaquinhas} MENU-PLAQUINHAS`,title:"_frases e cantadas._",id:"cat_plaquinhas"},
+    {header:`${E.plaquinhas} MENU-PLAQUINHAS`,title:"",id:"cat_plaquinhas"},
     {header:`${E.mais18} MENU+18`,title:"",id:"cat_18"},
     {header:`${E.adm} MENU-ADM`,title:"",id:"cat_adm"},
   ]};
   if(isDono)principal.rows.push({header:`${E.dono} MENU-DONO`,title:"_apenas dono._",id:"cat_dono"});
-  const extras={title:`${E.extras} EXTRAS`,highlight_label:"⚡️SHAZAM⚡️",rows:[
-    {header:`${E.assistente} ISAÍAS IA`,title:"_chama pelo nome no grupo!_",id:"cat_assistente"},
-    {header:"👨‍💻 CRIADOR",title:"_info do criador._",id:"cat_criador"},
-    {header:"📡 PING",title:"_status do bot._",id:"cat_ping"},
-    {header:"👑 DONOS",title:"_lista de donos._",id:"cat_donos"},
-    {header:"💰 ALUGAR BOT",title:"_planos de aluguel._",id:"cat_alugar_info"},
+  const extras={title:`${E.extras} EXTRAS`,highlight_label:"ISAIAS|DEV",rows:[
+    {header:`${E.assistente} ISAÍAS IA`,title:"",id:"cat_assistente"},
+    {header:"👨‍💻 CRIADOR",title:"",id:"cat_criador"},
+    {header:"📡 PING",title:"",id:"cat_ping"},
+    {header:"👑 DONOS",title:"",id:"cat_donos"},
+    {header:"💰 ALUGAR BOT",title:"",id:"cat_alugar_info"},
   ]};
   const secoes=[principal,extras];
   if(FONTE_ATUAL!=="Abadi"){
@@ -915,6 +915,13 @@ function montarSecoesInfo(catId,titulo,linhas){
   return secoes.map(({_t,...s})=>s);
 }
 
+function anexarMidiaMenu(payload){
+  if(botVideoBuffer){payload.video=botVideoBuffer;if(botVideoEhGif)payload.gifPlayback=true;}
+  else if(botFotoBuffer)payload.image=botFotoBuffer;
+  else if(ppBotUrl)payload.image={url:ppBotUrl};
+  return payload;
+}
+
 async function enviarSubmenuLista(sock,jid,msg,catId,texto,seloBot){
   const{titulo,linhas}=limparBlocoSubmenu(texto);
   try{
@@ -926,8 +933,7 @@ async function enviarSubmenuLista(sock,jid,msg,catId,texto,seloBot){
       optionText:"≡ COMANDOS",
       nativeFlow:[{text:aplicarFonte(FONTE_ATUAL,"≡ Comandos"),sections:secoes,icon:"default"}]
     };
-    if(botFotoBuffer)payload.image=botFotoBuffer;
-    else if(ppBotUrl)payload.image={url:ppBotUrl};
+    anexarMidiaMenu(payload);
     await sock.sendMessage(jid,payload,{quoted:seloBot});
   }catch(e){
     console.log("⚠️ Lista submenu:",e.message);
@@ -960,8 +966,7 @@ async function enviarSubmenuBotoes(sock,jid,msg,catId,texto,seloBot){
     optionText:"≡ COMANDOS",
     nativeFlow
   };
-  if(botFotoBuffer)payload.image=botFotoBuffer;
-  else if(ppBotUrl)payload.image={url:ppBotUrl};
+  anexarMidiaMenu(payload);
   await sock.sendMessage(jid,payload,{quoted:seloBot});
 }
 
@@ -1476,14 +1481,21 @@ async function enviarMenuJogos(sock, jid, seloBot) {
     }
   ];
   const secoesJogos=grupos.map(g=>({title:g.title,highlight_label:"",rows:g.itens.map(montarLinhaJogo).filter(Boolean)}));
-  const textoMenu=`${B_TOP}\n${bTitle("🎮 MENU JOGOS")}\n${B_MID}\n${bLine("🎮","Escolhe um jogo na lista abaixo!")}\n${bLine("💡","Jogos com 🚧 ainda vão ser adicionados.")}\n${B_BOT}`;
-  try{
-    const payload={caption:textoMenu,footer:nomeBotEstilizado(),optionText:"🎮 ABRIR JOGOS",nativeFlow:[{text:"🎮 Ver Jogos",sections:secoesJogos,icon:"default"}]};
-    if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};
+  const textoMenu=ESTILO_MENU===2
+    ? `*🎮 MENU JOGOS*\n\nToca em ≡ COMANDOS para escolher um jogo 👇`
+    : `${B_TOP}\n${bTitle("🎮 MENU JOGOS")}\n${B_MID}\n${bLine("🎮","Escolhe um jogo na lista abaixo!")}\n${bLine("💡Diverte-se")}\n${B_BOT}`;
+   try{
+    
+    const nativeFlow=ESTILO_MENU===2
+      ? [...secoesJogos.map(sec=>({text:sec.title,sections:[sec],icon:"default"})),{text:estilizarTexto("↩️ Voltar ao menu"),sections:[{title:estilizarTexto("NAVEGAÇÃO"),highlight_label:"",rows:[{header:"",title:estilizarTexto("↩️ Voltar ao menu"),id:"estilo2_menu"}]}],icon:"default"}]
+      : [{text:"🎮 Ver Jogos",sections:secoesJogos,icon:"default"}];
+    const payload={caption:textoMenu,footer:nomeBotEstilizado(),optionText:ESTILO_MENU===2?"≡ COMANDOS":"🎮 ABRIR JOGOS",nativeFlow};
+    if(ESTILO_MENU===2)anexarMidiaMenu(payload);else{if(botFotoBuffer)payload.image=botFotoBuffer;else if(ppBotUrl)payload.image={url:ppBotUrl};}
     await sock.sendMessage(jid,payload,{quoted:seloBot});
     return;
   }catch(e){console.log("⚠️ NativeFlow jogos:",e.message);}
-  try{
+      
+   try{
     if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:textoMenu},{quoted:seloBot});
     else await sock.sendMessage(jid,{text:textoMenu},{quoted:seloBot});
     await new Promise(r=>setTimeout(r,400));
