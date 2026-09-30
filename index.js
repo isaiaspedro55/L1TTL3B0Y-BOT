@@ -2622,36 +2622,143 @@ async function startBot(){
     });
 
     sock.ev.on("group-participants.update",async(update)=>{
-      try{const{id,participants,action}=update;if(!participants||!Array.isArray(participants))return;
-        if(action==="add"){
-          if(bemVindoDesativado.has(id))return;
-          if(!verificarAluguel(id))return; // ✅ sem aluguel activo, sem boas-vindas
-          const modoBv=bemVindoModo.get(id)||2;
-          for(const participante of participants){
-            const p=extrairJid(participante);
-            if(!p||!p.includes("@"))continue;
+  try{
+    const{id,participants,action}=update;
+    if(!participants||!Array.isArray(participants))return;
+
+    if(action==="add"){
+      if(bemVindoDesativado.has(id))return;
+      if(!verificarAluguel(id))return;
+
+      const modoBv=bemVindoModo.get(id)||2;
+
+      for(const participante of participants){
+        const p=extrairJid(participante);
+        if(!p||!p.includes("@"))continue;
+
+        try{
+
+          // ═══════════════════════════════════════
+          // 👋 BEM-VINDO 1
+          // Mantém o texto original + botão
+          // ═══════════════════════════════════════
+          if(modoBv===1){
+            const meta1=await sock.groupMetadata(id).catch(()=>null);
+            const nomeGrupo=meta1?.subject||"grupo";
+
+            const textoBv1=
+              `👋 Olá @${p.split("@")[0]}! Seja bem-vindo(a) ao *${nomeGrupo}*! 🎉`;
+
+            await sock.sendMessage(id,{
+              text:textoBv1,
+              mentions:[p],
+              footer:CONFIG.NOME_BOT,
+              buttons:[
+                {
+                  buttonId:"btn_abrir_menu",
+                  buttonText:{
+                    displayText:"☷ Ver menu"
+                  },
+                  type:1
+                }
+              ],
+              headerType:1
+            });
+
+          }else{
+
+            // ═══════════════════════════════════════
+            // 🎉 BEM-VINDO 2
+            // Sem B_TOP / B_MID / B_BOT
+            // + botão Ver menu
+            // ═══════════════════════════════════════
+
+            const meta=await sock.groupMetadata(id);
+            const admins=meta.participants
+              .filter(m=>m.admin)
+              .map(m=>extrairJid(m.id||m));
+
+            const mentions=[p,...admins];
+
+            let ppUser=null;
             try{
-              if(modoBv===1){
-                // ✅ BEMVINDO 1 — simples, sem foto, sem muitas informações
-                const meta1=await sock.groupMetadata(id).catch(()=>null);
-                const nomeGrupo=meta1?.subject||"grupo";
-                await sock.sendMessage(id,{text:`👋 Olá @${p.split("@")[0]}! Seja bem-vindo(a) ao *${nomeGrupo}*! 🎉`,mentions:[p]});
-              }else{
-                // ✅ BEMVINDO 2 — completo, com foto e informações
-                const meta=await sock.groupMetadata(id);
-                const admins=meta.participants.filter(m=>m.admin).map(m=>extrairJid(m.id||m));
-                const mentions=[p,...admins];
-                let ppUser=null;try{ppUser=await sock.profilePictureUrl(p,"image");}catch{}
-                const texto=`${B_TOP}\n${bTitle("🎉 BEM-VINDO!")}\n${B_MID}\n${bLine("👋",`Olá @${p.split("@")[0]}! 🤗`)}\n${bLine("🏘️",`Bem-vindo(a) ao *${meta.subject}*!`)}\n${bLine("👥",`Membros: *${meta.participants.length}*`)}\n${B_MID}\n${bLine("📋","*REGRAS:*")}\n${bLine("❌","Sem links | Sem spam")}\n${bLine("✅","Respeita todos")}\n${B_MID}\n${bLine("🤖",`Chama *Isaías* para me falar!\n   _"Isaías, ..."_`)}\n${bLine("⌨️",`Ou usa *${CONFIG.PREFIXO}menu*`)}\n${B_BOT}`;
-                if(ppUser)await sock.sendMessage(id,{image:{url:ppUser},caption:texto,mentions});
-                else await sock.sendMessage(id,{text:texto,mentions});
+              ppUser=await sock.profilePictureUrl(p,"image");
+            }catch{}
+
+            const textoBv2=
+              `${bTitle("🎉 BEM-VINDO!")}\n`+
+              `${bLine("👋",`Olá @${p.split("@")[0]}! 🤗`)}\n`+
+              `${bLine("🏘️",`Bem-vindo(a) ao *${meta.subject}*!`)}\n`+
+              `${bLine("👥",`Membros: *${meta.participants.length}*`)}\n\n`+
+              `${bLine("📋","*REGRAS:*")}\n`+
+              `${bLine("❌","Sem links | Sem spam")}\n`+
+              `${bLine("✅","Respeita todos")}\n\n`+
+              `${bLine("🤖",`Chama *Isaías* para me falar!\n   _"Isaías, ..."_`)}`;
+
+            const botoes=[
+              {
+                buttonId:"btn_abrir_menu",
+                buttonText:{
+                  displayText:"☷ Ver menu"
+                },
+                type:1
               }
-            }catch(e){console.log("❌ Boas-vindas:",e.message);}
+            ];
+
+            if(ppUser){
+
+              await sock.sendMessage(id,{
+                image:{url:ppUser},
+                caption:textoBv2,
+                mentions,
+                footer:CONFIG.NOME_BOT,
+                buttons:botoes,
+                headerType:4
+              });
+
+            }else{
+
+              await sock.sendMessage(id,{
+                text:textoBv2,
+                mentions,
+                footer:CONFIG.NOME_BOT,
+                buttons:botoes,
+                headerType:1
+              });
+
+            }
           }
+
+        }catch(e){
+          console.log("❌ Boas-vindas:",e.message);
         }
-        if(action==="remove"){for(const participante of participants){const p=extrairJid(participante);if(!p||!p.includes("@"))continue;try{await sock.sendMessage(id,{text:bLine("👋",`@${p.split("@")[0]} BAZAAA... 😂💨`),mentions:[p]});}catch{}}}
-      }catch(e){console.log("❌ group-participants:",e.message);}
-    });
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // 👋 MEMBRO SAIU
+    // ═══════════════════════════════════════
+    if(action==="remove"){
+      for(const participante of participants){
+        const p=extrairJid(participante);
+        if(!p||!p.includes("@"))continue;
+
+        try{
+          await sock.sendMessage(id,{
+            text:bLine(
+              "👋",
+              `@${p.split("@")[0]} BAZAAA... 😂💨`
+            ),
+            mentions:[p]
+          });
+        }catch{}
+      }
+    }
+
+  }catch(e){
+    console.log("❌ group-participants:",e.message);
+  }
+});
 
     sock.ev.on("messages.upsert",async({messages,type})=>{
       try{
@@ -2724,6 +2831,7 @@ async function startBot(){
         if(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage||msg.message?.templateButtonReplyMessage){
           if(isGrupo&&!isDono&&!verificarAluguel(jid))return;
           const btnId=extrairBotaoClicado(msg);
+          if(btnId==="btn_abrir_menu"){await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot);return;}
           if(btnId&&btnId.startsWith("soundcloud1baixar_")){const codigo=btnId.replace("soundcloud1baixar_","");try{const textoDados=decodificarSoundcloud1(codigo);const dados=JSON.parse(textoDados);if(!dados?.url){await sock.sendMessage(jid,{text:bLine("❌","Link do SoundCloud inválido.")},{quoted:seloBot});return;}await reagir(sock,msg,"🎧");let arq=null;try{arq=await barraCarregamento(sock,jid,seloBot,"A baixar SoundCloud...",()=>dlSoundcloud(dados.url).then(r=>r.filePath));}catch(e){console.log("❌ soundcloud1 download:",e.message);}if(!arq||!fs.existsSync(arq)){await sock.sendMessage(jid,{text:bLine("❌","Não consegui baixar esta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}await enviarAudio(sock,jid,arq,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{if(fs.existsSync(arq)){fs.removeSync(arq);}}catch{}},15000);}catch(e){console.log("❌ soundcloud1 botão:",e.message);await sock.sendMessage(jid,{text:bLine("❌","Não foi possível baixar esta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
           if(btnId&&btnId.startsWith("play1_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
@@ -2737,6 +2845,7 @@ async function startBot(){
           if(btnId&&btnId.startsWith("info_"))return;
           if(btnId&&btnId.startsWith("info_"))return;
           if(btnId==="estilo2_menu"){let adm=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid);adm=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)).includes(sender);}catch{}}await enviarMenuPrincipal(sock,jid,msg,isDono,sender,adm,seloBot);return;}
+          if(btnId==="btn_abrir_menu"){await enviarMenuPrincipal(sock,jid,msg,isDono,sender,false,seloBot);return;}
           if(btnId!==null)return;
         }
 
