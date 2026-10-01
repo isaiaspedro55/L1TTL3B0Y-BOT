@@ -1486,7 +1486,7 @@ async function enviarMenuJogos(sock, jid, seloBot) {
     ? `*🎮 MENU JOGOS*\n\nToca em ≡ COMANDOS para escolher um jogo 👇`
     : `${B_TOP}\n${bTitle("🎮 MENU JOGOS")}\n${B_MID}\n${bLine("🎮","Escolhe um jogo na lista abaixo!")}\n${bLine("💡Diverte-se")}\n${B_BOT}`;
    try{
-    
+
     const nativeFlow=ESTILO_MENU===2
       ? [...secoesJogos.map(sec=>({text:sec.title,sections:[sec],icon:"default"})),{text:estilizarTexto("↩️ Voltar ao menu"),sections:[{title:estilizarTexto("NAVEGAÇÃO"),highlight_label:"",rows:[{header:"",title:estilizarTexto("↩️ Voltar ao menu"),id:"estilo2_menu"}]}],icon:"default"}]
       : [{text:"🎮 Ver Jogos",sections:secoesJogos,icon:"default"}];
@@ -1495,7 +1495,7 @@ async function enviarMenuJogos(sock, jid, seloBot) {
     await sock.sendMessage(jid,payload,{quoted:seloBot});
     return;
   }catch(e){console.log("⚠️ NativeFlow jogos:",e.message);}
-      
+
    try{
     if(botFotoBuffer)await sock.sendMessage(jid,{image:botFotoBuffer,caption:textoMenu},{quoted:seloBot});
     else await sock.sendMessage(jid,{text:textoMenu},{quoted:seloBot});
@@ -2831,7 +2831,7 @@ async function startBot(){
         if(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage||msg.message?.templateButtonReplyMessage){
           if(isGrupo&&!isDono&&!verificarAluguel(jid))return;
           const btnId=extrairBotaoClicado(msg);
-          if(btnId==="btn_abrir_menu"){await enviarMenuPrincipal(sock,jid,msg,isDono,sender,isAdmin,seloBot);return;}
+          if(btnId==="btn_abrir_menu"){let adm=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid);adm=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)).includes(sender);}catch{}}await enviarMenuPrincipal(sock,jid,msg,isDono,sender,adm,seloBot);return;}
           if(btnId&&btnId.startsWith("soundcloud1baixar_")){const codigo=btnId.replace("soundcloud1baixar_","");try{const textoDados=decodificarSoundcloud1(codigo);const dados=JSON.parse(textoDados);if(!dados?.url){await sock.sendMessage(jid,{text:bLine("❌","Link do SoundCloud inválido.")},{quoted:seloBot});return;}await reagir(sock,msg,"🎧");let arq=null;try{arq=await barraCarregamento(sock,jid,seloBot,"A baixar SoundCloud...",()=>dlSoundcloud(dados.url).then(r=>r.filePath));}catch(e){console.log("❌ soundcloud1 download:",e.message);}if(!arq||!fs.existsSync(arq)){await sock.sendMessage(jid,{text:bLine("❌","Não consegui baixar esta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}await enviarAudio(sock,jid,arq,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{if(fs.existsSync(arq)){fs.removeSync(arq);}}catch{}},15000);}catch(e){console.log("❌ soundcloud1 botão:",e.message);await sock.sendMessage(jid,{text:bLine("❌","Não foi possível baixar esta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
           if(btnId&&btnId.startsWith("play1_")){const partes=btnId.split("_");const formato=partes[1];const url=decodeURIComponent(partes.slice(2).join("_"));await processarBotaoPlay1(sock,msg,formato,url);return;}
@@ -2845,7 +2845,6 @@ async function startBot(){
           if(btnId&&btnId.startsWith("info_"))return;
           if(btnId&&btnId.startsWith("info_"))return;
           if(btnId==="estilo2_menu"){let adm=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid);adm=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)).includes(sender);}catch{}}await enviarMenuPrincipal(sock,jid,msg,isDono,sender,adm,seloBot);return;}
-          if(btnId==="btn_abrir_menu"){await enviarMenuPrincipal(sock,jid,msg,isDono,sender,false,seloBot);return;}
           if(btnId!==null)return;
         }
 
@@ -3887,7 +3886,7 @@ ${nomeEnviou}`;
         if(comando==="encurtar"){const url=args[0];if(!url||!url.startsWith("http")){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}encurtar* [url]`)},{quoted:seloBot});return;}try{const{data}=await axios.get(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,{timeout:10000,httpsAgent});const urlE=String(data).trim();if(!urlE.startsWith("http"))throw new Error("Falha");await sock.sendMessage(jid,{text:bBloco("🔗 LINK ENCURTADO",[bLine("🔗",urlE)])},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="cotacao"){try{const resp=await chatIA("Cotações actuais do Kwanza (AOA) para USD, EUR, BRL. Formato curto.","Sê direto.");await sock.sendMessage(jid,{text:bBloco("💱 COTAÇÕES KWANZA",[bLine("💱",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="tempo"){if(!args[0]){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}tempo* [cidade]`)},{quoted:seloBot});return;}const local=args.join(" ");try{const res=await axios.get(`https://wttr.in/${encodeURIComponent(local)}?format=j1`,{timeout:10000,httpsAgent});const cur=res.data.current_condition[0];await sock.sendMessage(jid,{text:bBloco("🌤️ "+local.toUpperCase(),[bLine("🌡️",`*${cur.temp_C}°C* — ${cur.weatherDesc[0].value}`),bLine("💧",`${cur.humidity}% | 💨 ${cur.windspeedKmph}km/h`)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Cidade não encontrada.")},{quoted:seloBot});}return;}
-        if(comando==="horario"){const agora=new Date();const opc=(tz)=>({timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false});await sock.sendMessage(jid,{text:bBloco("🕐 HORÁRIO MUNDIAL",[bLine("🇦🇴",`Angola: *${agora.toLocaleTimeString("pt-AO",opc("Africa/Luanda"))}*`),bLine("🇧🇷",`Brasil: *${agora.toLocaleTimeString("pt-BR",opc("America/Sao_Paulo"))}*`),bLine("🇵🇹",`Portugal: *${agora.toLocaleTimeString("pt-PT",opc("Europe/Lisbon"))}*`),bLine("🇺🇸",`EUA: *${agora.toLocaleTimeString("en-US",opc("America/New_York"))}*`)])},{quoted:seloBot});return;}
+        if(comando==="horario"){const agora=new Date();const opc=(tz)=>({timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false});await sock.sendMessage(jid,{text:bBloco("🕐 HORÁRIO MUNDIAL",[bLine("🇦🇴",`Angola: *${agora.toLocaleTimeString("pt-AO",opc("Africa/Luanda"))}*`),bLine("🇧🇷",`Brasil: *${agora.toLocaleTimeString("pt-BR",opc("America/Sao_Paulo"))}*`),bLine("🇵🇹",`Portugal: *${agora.toLocaleTimeString("pt-PT",opc("Europe/Lisbon"))}*`),bLine("🇺🇸",`EUA: *${agora.toLocaleTimeString("en-US",opc("America/New_York"))}*`),bLine("🇫🇷",`França: *${agora.toLocaleTimeString("fr-FR",opc("Europe/Paris"))}*`),bLine("🇲🇿",`Moçambique: *${agora.toLocaleTimeString("pt-MZ",opc("Africa/Maputo"))}*`)])},{quoted:seloBot});return;}
         if(comando==="ver"){
           const ctx=msg.message?.extendedTextMessage?.contextInfo;
           const stanzaId=ctx?.stanzaId;
