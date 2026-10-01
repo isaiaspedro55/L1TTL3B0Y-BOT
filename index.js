@@ -2814,14 +2814,12 @@ async function startBot(){
           return;
         }
 
-        // Cache msgs
-        if(!cacheMsg[jid])cacheMsg[jid]={};
-        cacheMsg[jid][msg.key.id]={sender,texto:texto||"",tipo:getTipoMsg(msg),timestamp:Date.now()};
-        const cK=Object.keys(cacheMsg[jid]);if(cK.length>MAX_CACHE_MSG)delete cacheMsg[jid][cK[0]];
+        // Cache msgs.
+        if(!cacheMsg[jid])cacheMsg[jid]={};const tipoMsg=getTipoMsg(msg);let midiaCache=null;if(msg.message?.imageMessage||msg.message?.videoMessage){try{const midia=await downloadQualquerMidia(msg);if(midia?.buffer)midiaCache={buffer:midia.buffer,mime:midia.mime};}catch(e){console.log("⚠️ Erro ao guardar mídia no cache:",e?.message||e);}}cacheMsg[jid][msg.key.id]={sender,texto:texto||"",tipo:tipoMsg,timestamp:Date.now(),midia:midiaCache};const cK=Object.keys(cacheMsg[jid]);if(cK.length>MAX_CACHE_MSG)delete cacheMsg[jid][cK[0]];
 
         // Detectar msgs apagadas
-        if(msg.message?.protocolMessage?.type===0){const kD=msg.message.protocolMessage.key,mDI=kD?.id,jD=kD?.remoteJid||jid;const mC=cacheMsg[jD]?.[mDI]||cacheMsg[jid]?.[mDI];if(mC&&(mC.texto||mC.tipo)){if(!msgApagadas[jid])msgApagadas[jid]=[];msgApagadas[jid].push({...mC,apagadoEm:Date.now()});if(msgApagadas[jid].length>30)msgApagadas[jid].shift();}return;}
-
+        if(msg.message?.protocolMessage?.type===0){const kD=msg.message.protocolMessage.key,mDI=kD?.id,jD=kD?.remoteJid||jid,mC=cacheMsg[jD]?.[mDI]||cacheMsg[jid]?.[mDI];if(mC){if(!msgApagadas[jid])msgApagadas[jid]=[];msgApagadas[jid].push({...mC,apagadoEm:Date.now()});if(msgApagadas[jid].length>30)msgApagadas[jid].shift();}return;}
+                
         // View-once cache
         {const m=msg.message;const voMsg=m?.viewOnceMessage?.message||m?.viewOnceMessageV2?.message||m?.viewOnceMessageV2Extension?.message;if(voMsg){(async()=>{try{const buf=await downloadMediaMessage(msg,"buffer",{});const tipo=voMsg.videoMessage?"video":(voMsg.audioMessage||voMsg.pttMessage)?"audio":"imagem";if(!cacheViewOnce[jid])cacheViewOnce[jid]={};cacheViewOnce[jid][msg.key.id]={tipo,buf,sender,timestamp:Date.now()};setTimeout(()=>{if(cacheViewOnce[jid]?.[msg.key.id])delete cacheViewOnce[jid][msg.key.id];},60*60*1000);}catch{}})();}}
 
@@ -3130,7 +3128,7 @@ ${nomeEnviou}`;
 
         // ─── SETMENU ───
         if(comando==="setmenu"){if(!isDono){await sock.sendMessage(jid,{text:bBloco("🔒 ACESSO NEGADO",[bLine("❌","Apenas o dono.")])},{quoted:seloBot});return;}const novoEmoji=args[0]?.trim();if(!novoEmoji){await sock.sendMessage(jid,{text:bBloco("⚙️ SETMENU",[bLine("💡",`*${CONFIG.PREFIXO}setmenu* [emoji]`),bLine("💡",`Ex: *${CONFIG.PREFIXO}setmenu* 🔥`),B_SEP,bLine(ME.e||"🌀",`Actual: *${ME.e||ME.principal}*`)])},{quoted:seloBot});return;}Object.keys(ME).forEach(k=>{ME[k]=novoEmoji;});ME.e=novoEmoji;salvarEmojis(ME);await sock.sendMessage(jid,{text:bBloco("✅ EMOJIS ACTUALIZADOS",[bLine("✅",`Todos os menus usam: *${novoEmoji}*`),bLine("💡",`Usa *${CONFIG.PREFIXO}menu* para ver!`)])},{quoted:seloBot});await reagir(sock,msg,"✅");return;}
-        if(comando==="addstatus"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Este comando só pode ser usado em grupos.")},{quoted:seloBot});return;}if(!isAdmin){await sock.sendMessage(jid,{text:bLine("❌","Apenas administradores do grupo podem publicar Status.")},{quoted:seloBot});return;}try{const midia=await downloadQualquerMidia(msg);const textoStatus=args.join(" ").trim();if(midia&&midia.mime.startsWith("image/")){await sock.sendMessage("status@broadcast",{image:midia.buffer,caption:textoStatus||undefined,mimetype:midia.mime});await sock.sendMessage(jid,{text:bLine("✅","Foto publicada no Status do WhatsApp!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}if(midia&&midia.mime.startsWith("video/")){await sock.sendMessage("status@broadcast",{video:midia.buffer,caption:textoStatus||undefined,mimetype:midia.mime});await sock.sendMessage(jid,{text:bLine("✅","Vídeo publicado no Status do WhatsApp!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}if(textoStatus){await sock.sendMessage("status@broadcast",{ text: textoStatus },{broadcast: true,statusJidList: [sock.user.id]});await sock.sendMessage(jid,{text:bLine("✅","Texto publicado no Status do WhatsApp!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}await sock.sendMessage(jid,{text:bLine("💡",`Usa *${CONFIG.PREFIXO}addstatus texto* ou responde uma foto/vídeo com *${CONFIG.PREFIXO}addstatus*.`)},{quoted:seloBot});}catch(e){console.log("❌ addstatus:",e.message);await sock.sendMessage(jid,{text:bLine("❌",`Erro ao publicar Status: ${e.message}`)},{quoted:seloBot});}return;}
+        if(comando==="addstatus"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Este comando só pode ser usado dentro de um grupo.")},{quoted:seloBot});return;}if(!isAdmin){await sock.sendMessage(jid,{text:bLine("❌","Apenas administradores do grupo podem publicar Status do grupo.")},{quoted:seloBot});return;}try{const textoStatus=args.join(" ").trim();const midia=await downloadQualquerMidia(msg);if(midia&&midia.mime?.startsWith("image/")){await sock.sendMessage(jid,{image:midia.buffer,mimetype:midia.mime,caption:textoStatus||undefined,groupStatus:true});await sock.sendMessage(jid,{text:bLine("✅","Foto publicada no Status do grupo!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}if(midia&&midia.mime?.startsWith("video/")){await sock.sendMessage(jid,{video:midia.buffer,mimetype:midia.mime,caption:textoStatus||undefined,groupStatus:true});await sock.sendMessage(jid,{text:bLine("✅","Vídeo publicado no Status do grupo!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}if(textoStatus){await sock.sendMessage(jid,{text:textoStatus,groupStatus:true},{backgroundColor:"#FF7A00",font:1});await sock.sendMessage(jid,{text:bLine("✅","Texto publicado no Status do grupo!")},{quoted:seloBot});await reagir(sock,msg,"✅");return;}await sock.sendMessage(jid,{text:bLine("💡",`Use *${CONFIG.PREFIXO}addstatus texto* ou responda uma foto/vídeo com *${CONFIG.PREFIXO}addstatus*.`)},{quoted:seloBot});}catch(e){console.log("❌ addstatus:",e);await sock.sendMessage(jid,{text:bLine("❌",`Erro ao publicar Status do grupo:\n${e?.message||e}`)},{quoted:seloBot});}return;}
         if(comando==="setestilo1"||comando==="setestilo2"){const novo=comando==="setestilo1"?1:2;ESTILO_MENU=novo;salvarConfigBot({...carregarConfigBot(),estilo:novo});await sock.sendMessage(jid,{text:bBloco("✅ ESTILO ALTERADO",[bLine("🎨",`Estilo *${novo}* activado`),bLine("💡",novo===1?"Menu clássico com molduras.":"Menu simples + lista deslizante."),bLine("💡",`Usa *${CONFIG.PREFIXO}menu* para ver!`)])},{quoted:seloBot});await reagir(sock,msg,"🎨");return;}
 
         // ─── PP ───
@@ -3887,51 +3885,8 @@ ${nomeEnviou}`;
         if(comando==="cotacao"){try{const resp=await chatIA("Cotações actuais do Kwanza (AOA) para USD, EUR, BRL. Formato curto.","Sê direto.");await sock.sendMessage(jid,{text:bBloco("💱 COTAÇÕES KWANZA",[bLine("💱",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="tempo"){if(!args[0]){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}tempo* [cidade]`)},{quoted:seloBot});return;}const local=args.join(" ");try{const res=await axios.get(`https://wttr.in/${encodeURIComponent(local)}?format=j1`,{timeout:10000,httpsAgent});const cur=res.data.current_condition[0];await sock.sendMessage(jid,{text:bBloco("🌤️ "+local.toUpperCase(),[bLine("🌡️",`*${cur.temp_C}°C* — ${cur.weatherDesc[0].value}`),bLine("💧",`${cur.humidity}% | 💨 ${cur.windspeedKmph}km/h`)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Cidade não encontrada.")},{quoted:seloBot});}return;}
         if(comando==="horario"){const agora=new Date();const opc=(tz)=>({timeZone:tz,hour:"2-digit",minute:"2-digit",hour12:false});await sock.sendMessage(jid,{text:bBloco("🕐 HORÁRIO MUNDIAL",[bLine("🇦🇴",`Angola: *${agora.toLocaleTimeString("pt-AO",opc("Africa/Luanda"))}*`),bLine("🇧🇷",`Brasil: *${agora.toLocaleTimeString("pt-BR",opc("America/Sao_Paulo"))}*`),bLine("🇵🇹",`Portugal: *${agora.toLocaleTimeString("pt-PT",opc("Europe/Lisbon"))}*`),bLine("🇺🇸",`EUA: *${agora.toLocaleTimeString("en-US",opc("America/New_York"))}*`),bLine("🇫🇷",`França: *${agora.toLocaleTimeString("fr-FR",opc("Europe/Paris"))}*`),bLine("🇲🇿",`Moçambique: *${agora.toLocaleTimeString("pt-MZ",opc("Africa/Maputo"))}*`)])},{quoted:seloBot});return;}
-        if(comando==="ver"){
-          const ctx=msg.message?.extendedTextMessage?.contextInfo;
-          const stanzaId=ctx?.stanzaId;
-          if(!ctx||!stanzaId){
-            await sock.sendMessage(jid,{text:`❌ ↩️ Responde uma mensagem view-once com *${CONFIG.PREFIXO}ver*\n\n💡 Ou usa *#revelar* a responder a mensagem`},{quoted:seloBot});
-            return;
-          }
-          const quemEnviou=ctx.participant||ctx.remoteJid||"";
-          const nomeEnviou=quemEnviou?`@${quemEnviou.split("@")[0].split(":")[0]}`:"alguém";
-          const mentions=quemEnviou?[quemEnviou]:[];
-          // Tenta cache primeiro
-          const cached=cacheViewOnce[jid]?.[stanzaId];
-          const revelarMidia=async(buf,tipo)=>{
-            const caption=`👁️ *IMAGEM REVELADA*\n\n📝\n\n📩 Originalmente enviado por:\n${nomeEnviou}`;
-            if(tipo==="video") await sock.sendMessage(jid,{video:buf,caption,mentions},{quoted:seloBot});
-            else if(tipo==="audio") await sock.sendMessage(jid,{audio:buf,mimetype:"audio/ogg; codecs=opus",ptt:false},{quoted:seloBot});
-            else await sock.sendMessage(jid,{image:buf,caption,mentions},{quoted:seloBot});
-            await reagir(sock,msg,"👁️");
-            addXP(sender,5);
-          };
-          if(cached){try{await revelarMidia(cached.buf,cached.tipo);return;}catch{}}
-          // Tenta descarregar directamente
-          const qMsg=ctx.quotedMessage;
-          if(qMsg){
-            let innerMsg=null;
-            for(const key of["viewOnceMessage","viewOnceMessageV2","viewOnceMessageV2Extension"]){
-              if(qMsg[key]?.message){innerMsg=qMsg[key].message;break;}
-            }
-            if(innerMsg){
-              try{
-                const fakeMsg={key:{remoteJid:jid,id:stanzaId,participant:ctx.participant||"",fromMe:false},message:innerMsg};
-                const buf=await downloadMediaMessage(fakeMsg,"buffer",{});
-                let tipo="imagem";
-                if(innerMsg.videoMessage) tipo="video";
-                else if(innerMsg.audioMessage||innerMsg.pttMessage) tipo="audio";
-                await revelarMidia(buf,tipo);
-                return;
-              }catch{}
-            }
-          }
-          await sock.sendMessage(jid,{text:"❌ Não consegui revelar. A mensagem pode ter expirado."},{quoted:seloBot});
-          await reagir(sock,msg,"❌");
-          return;
-        }
-        if(comando==="apagadas"){const lista=msgApagadas[jid]||[];if(!lista.length){await sock.sendMessage(jid,{text:bLine("📭","Nenhuma msg apagada.")},{quoted:seloBot});return;}const ultimas=lista.slice(-10).reverse();const textoLista=ultimas.map(m=>{const hora=new Date(m.apagadoEm).toLocaleTimeString("pt-AO",{timeZone:"Africa/Luanda",hour:"2-digit",minute:"2-digit"});return `${bLine("👤",`+${m.sender?.split("@")[0]||"?"} 🕐 ${hora}`)}\n${bLine("💬",m.texto?`_"${m.texto.slice(0,60)}"_`:`_(${m.tipo})_`)}`;}).join("\n│\n");await sock.sendMessage(jid,{text:bBloco("🕵️ MSGS APAGADAS",[textoLista])},{quoted:seloBot});return;}
+        if(comando==="ver"){try{const ctx=msg.message?.extendedTextMessage?.contextInfo;const stanzaId=ctx?.stanzaId;if(!ctx||!stanzaId){await sock.sendMessage(jid,{text:`❌ ↩️ Responde uma mensagem de visualização única com *${CONFIG.PREFIXO}ver*`},{quoted:seloBot});return;}const quemEnviou=ctx.participant||ctx.remoteJid||"";const nomeEnviou=quemEnviou?`@${quemEnviou.split("@")[0].split(":")[0]}`:"alguém";const mentions=quemEnviou?[quemEnviou]:[];const revelarMidia=async(buf,tipo,mime)=>{if(!buf)return false;const caption=`👁️ *MÍDIA REVELADA*\n\n📩 Originalmente enviado por:\n${nomeEnviou}`;if(tipo==="video")await sock.sendMessage(jid,{video:buf,caption,mentions,mimetype:mime||"video/mp4"},{quoted:seloBot});else if(tipo==="audio")await sock.sendMessage(jid,{audio:buf,mimetype:mime||"audio/ogg; codecs=opus",ptt:false},{quoted:seloBot});else await sock.sendMessage(jid,{image:buf,caption,mentions,mimetype:mime||"image/jpeg"},{quoted:seloBot});await reagir(sock,msg,"👁️");addXP(sender,5);return true;};const cached=cacheViewOnce[jid]?.[stanzaId];if(cached?.buf){try{if(await revelarMidia(cached.buf,cached.tipo,cached.mime))return;}catch(e){console.log("⚠️ Cache View Once:",e.message);}}const qMsg=ctx.quotedMessage;if(qMsg){try{let conteudo=qMsg;let tipo=null;let media=null;if(qMsg.viewOnceMessage?.message){conteudo=qMsg.viewOnceMessage.message;}else if(qMsg.viewOnceMessageV2?.message){conteudo=qMsg.viewOnceMessageV2.message;}else if(qMsg.viewOnceMessageV2Extension?.message){conteudo=qMsg.viewOnceMessageV2Extension.message;}if(conteudo.imageMessage){media=conteudo.imageMessage;tipo="imagem";}else if(conteudo.videoMessage){media=conteudo.videoMessage;tipo="video";}else if(conteudo.audioMessage){media=conteudo.audioMessage;tipo="audio";}else if(conteudo.pttMessage){media=conteudo.pttMessage;tipo="audio";}if(media){const fakeMsg={key:{remoteJid:jid,id:stanzaId,participant:ctx.participant||"",fromMe:false},message:qMsg};const buf=await downloadMediaMessage(fakeMsg,"buffer",{});if(buf){const mime=media.mimetype||media.mimeType||"";if(await revelarMidia(buf,tipo,mime))return;}}}catch(e){console.log("⚠️ Download View Once:",e.message);}}await sock.sendMessage(jid,{text:"❌ Não consegui revelar esta mídia.\n\n💡 A mensagem pode ter expirado ou ter sido recebida antes do cache estar activo."},{quoted:seloBot});await reagir(sock,msg,"❌");}catch(e){console.log("❌ Ver View Once:",e.message);await sock.sendMessage(jid,{text:`❌ Erro ao revelar a mídia: ${e.message}`},{quoted:seloBot});}return;}
+        if(comando==="apagadas"){const lista=msgApagadas[jid]||[];if(!lista.length){await sock.sendMessage(jid,{text:bLine("📭","Nenhuma msg apagada.")},{quoted:seloBot});return;}const ultimas=lista.slice(-10).reverse();for(const m of ultimas){const hora=new Date(m.apagadoEm).toLocaleTimeString("pt-AO",{timeZone:"Africa/Luanda",hour:"2-digit",minute:"2-digit"});const remetente=`+${m.sender?.split("@")[0]||"?"}`;if(m.midia?.buffer&&m.midia?.mime?.startsWith("image/")){await sock.sendMessage(jid,{image:m.midia.buffer,mimetype:m.midia.mime,caption:bLine("👤",`${remetente} 🕐 ${hora}`)},{quoted:seloBot});}else if(m.midia?.buffer&&m.midia?.mime?.startsWith("video/")){await sock.sendMessage(jid,{video:m.midia.buffer,mimetype:m.midia.mime,caption:bLine("👤",`${remetente} 🕐 ${hora}`)},{quoted:seloBot});}else{await sock.sendMessage(jid,{text:`${bLine("👤",`${remetente} 🕐 ${hora}`)}\n${bLine("💬",m.texto?`_"${m.texto.slice(0,60)}"_`:`_(${m.tipo})_`)}`},{quoted:seloBot});}}return;}
         if(comando==="placar"){const busca=args.join(" ").trim();if(!busca){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}placar* [equipa/jogo]`)},{quoted:seloBot});return;}try{const resp=await chatIA(`Dá o último placar de: "${busca}". Direto.`,"Especialista desportivo.");await sock.sendMessage(jid,{text:bBloco("⚽ PLACAR",[bLine("⚽",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Não encontrei.")},{quoted:seloBot});}return;}
 
         // ─── PLAQUINHAS ───
