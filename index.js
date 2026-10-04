@@ -77,6 +77,8 @@ const { enviarInvasores } = require("./comando_invasores.js");
 //NOVO COMANDO//
 const {enviarPlay3,decodificarLink: decodificarPlay3} = require("./comando_play3.js");
 const {enviarSoundcloud1,decodificarLink: decodificarSoundcloud1} = require("./comando_soundcloud1.js");
+const {enviarAppleMusic,decodificarLink: decodificarAppleMusic} = require("./comando_applemusic.js");
+const{enviarApp,decodificarLink:decodificarApp,obterDownloadUptodown}=require("./comando_app.js");
 //
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 fs.ensureDirSync(process.env.TMPDIR);
@@ -667,11 +669,11 @@ function gerarSubmenu(catId,P){
     bLine(em,`*${P}mp3*`),bLine(em,`*${P}mp4*`),bLine(em,`*${P}mp4hd*`),bLine(em,`*${P}ytsearch* [pesquisa]`),
     B_SEP,bLine("📱","*REDES SOCIAIS*"),
     bLine(em,`*${P}tiktok*`),bLine(em,`*${P}tt* [link] → _download rápido_`),
-    bLine(em,`*${P}instagram*`),bLine(em,`*${P}twitter*`),bLine(em,`*${P}facebook*`),bLine(em,`*${P}kwai*`),bLine(em,`*${P}spotify*`),bLine(em,`*${P}soundcloud*`),bLine(em,`*${P}soundcloud1* [pesquisa]`),
+    bLine(em,`*${P}instagram*`),bLine(em,`*${P}twitter*`),bLine(em,`*${P}facebook*`),bLine(em,`*${P}kwai*`),bLine(em,`*${P}spotify*`),bLine(em,`*${P}soundcloud*`),bLine(em,`*${P}soundcloud1* [pesquisa]`),bLine(em,`*${P}applemusic* [pesquisa]`),
     B_SEP,bLine("📌","*PINTEREST*"),
     bLine(em,`*${P}pin* [busca] → _imagens_`),bLine(em,`*${P}pinterest* [busca] → _carrossel com sticker_`),bLine(em,`*${P}pinpack* [busca] → _pack de stickers_`),bLine(em,`*${P}pinvideo* [link] → _vídeo de pin_`),
     B_SEP,bLine("🖼️","*FICHEIROS*"),
-    bLine(em,`*${P}mediafire*`),bLine(em,`*${P}apk*`),bLine(em,`*${P}qr*`),bLine(em,`*${P}tourl*`),bLine(em,`*${P}mostre*`),
+    bLine(em,`*${P}mediafire*`),bLine(em,`*${P}apk*`),bLine(em,`*${P}app*`),bLine(em,`*${P}qr*`),bLine(em,`*${P}tourl*`),bLine(em,`*${P}mostre*`),
   ]);
   if(catId==="cat_musicas")return bBloco(`𝐌Ú𝐒𝐈𝐂𝐀𝐬 【${em}】`,[bLine("🎙️","*IDENTIFICAÇÃO*"),bLine(em,`*${P}busca* ↩️ áudio → _reconhece música_`),bLine(em,`*${P}shazam* → _diversão ⚡⚡_`),B_SEP,bLine("📝","*INFORMAÇÃO*"),bLine(em,`*${P}letra*`),bLine(em,`*${P}cifra*`),bLine(em,`*${P}bio*`),bLine(em,`*${P}album*`),B_SEP,bLine("📻","*DESCOBERTA*"),bLine(em,`*${P}recomenda* [género]`),bLine(em,`*${P}top10* [país]`)]);
   if(catId==="cat_figurinhas")return bBloco(`𝐅𝐈𝐆𝐔𝐑𝐈𝐍𝐇𝐀𝐬 【${em}】`,[
@@ -2560,7 +2562,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","aluga
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","addstatus","setestilo1","setestilo2","games"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","addstatus","app","setestilo1","setestilo2","applemusic","games"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -2799,20 +2801,7 @@ async function startBot(){
         const mencoes=msg.message?.extendedTextMessage?.contextInfo?.mentionedJid||[];
 
         // ✅ "prefixo"/"prefix" — funciona para QUALQUER pessoa, mesmo sem aluguel activo (é só informativo)
-        if(texto&&!chatsDesativados.has(jid)&&(/^prefixo$/i.test(texto.trim())||/^prefix$/i.test(texto.trim()))){
-          const msgPref=`*${CONFIG.PREFIXO}*`;
-          try{
-            await sock.sendMessage(jid,{
-              text:msgPref,
-              footer:`Prefixo do ${CONFIG.NOME_BOT}`,
-              buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
-              headerType:1
-            },{quoted:seloBot});
-          }catch{
-            await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
-          }
-          return;
-        }
+        if(texto&&!chatsDesativados.has(jid)&&(/^prefixo$/i.test(texto.trim())||/^prefix$/i.test(texto.trim()))){const msgPref=`》Prefixo『 ${CONFIG.PREFIXO} 』`;try{await sock.sendMessage(jid,{text:msgPref,footer:`Prefixo do ${CONFIG.NOME_BOT}`,buttons:[{buttonId:"btn_abrir_menu",buttonText:{displayText:"☷ Ver menu"},type:1}],headerType:1},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});}return;}
 
         // Cache msgs.
         if(!cacheMsg[jid])cacheMsg[jid]={};const tipoMsg=getTipoMsg(msg);let midiaCache=null;if(msg.message?.imageMessage||msg.message?.videoMessage){try{const midia=await downloadQualquerMidia(msg);if(midia?.buffer)midiaCache={buffer:midia.buffer,mime:midia.mime};}catch(e){console.log("⚠️ Erro ao guardar mídia no cache:",e?.message||e);}}cacheMsg[jid][msg.key.id]={sender,texto:texto||"",tipo:tipoMsg,timestamp:Date.now(),midia:midiaCache};const cK=Object.keys(cacheMsg[jid]);if(cK.length>MAX_CACHE_MSG)delete cacheMsg[jid][cK[0]];
@@ -2839,6 +2828,9 @@ async function startBot(){
           if(btnId&&btnId.startsWith("cat_")){await enviarSubmenu(sock,jid,msg,btnId,seloBot,sender,isDono);return;}
           if(btnId&&btnId.startsWith("jogo_")){await processarSelecaoJogo(sock,jid,msg,btnId.replace("jogo_",""),seloBot);return;}
           if(btnId&&btnId.startsWith("use_prefix_")){const pref=btnId.replace("use_prefix_","");await sock.sendMessage(jid,{text:`✅ Prefixo copiado: *${pref}*\nUsa antes de qualquer comando. Ex: *${pref}menu*`},{quoted:seloBot});return;}
+          if(btnId&&btnId.startsWith("applebaixar_")){const codigo=btnId.replace("applebaixar_","");try{const dados=JSON.parse(decodificarAppleMusic(codigo));const link=dados?.url;if(!link){await sock.sendMessage(jid,{text:bLine("❌","Link do Apple Music inválido.")},{quoted:seloBot});return;}await reagir(sock,msg,"🎧");const downloadRes=await fetch(`https://nexus-light-7uyb.onrender.com/download/applemusic?url=${encodeURIComponent(link)}`);if(!downloadRes.ok)throw new Error(`API HTTP ${downloadRes.status}`);const downloadJson=await downloadRes.json();const data=downloadJson?.data||downloadJson?.result||{};const audioUrl=data.dl_url||data.url||data.download||data.download_url||data.audio||data.audio_url||data.link||data.mp3||data.file;if(!audioUrl){console.log("❌ API Apple Music não retornou URL do áudio:",downloadJson);await sock.sendMessage(jid,{text:bLine("❌","A API não retornou o arquivo de áudio desta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}const nomeArquivo=(data.title||dados.title||"AppleMusic").replace(/[\\/:*?"<>|]/g,"").trim()||"AppleMusic";const extensao=(data.quality?.format||"m4a").toLowerCase();await sock.sendMessage(jid,{audio:{url:audioUrl},mimetype:extensao==="mp3"?"audio/mpeg":"audio/mp4",fileName:`${nomeArquivo}.${extensao}`},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){console.log("❌ applemusic download:",e.message);await sock.sendMessage(jid,{text:bLine("❌","Não foi possível baixar esta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");}return;} 
+          if(btnId&&btnId.startsWith("appbaixar_")){const codigo=btnId.replace("appbaixar_","");try{const dados=JSON.parse(decodificarApp(codigo));await reagir(sock,msg,"📥");const arquivo=await obterDownloadUptodown(dados.downloadPage);if(!arquivo)throw new Error("Não encontrei o arquivo para download.");const nome=(dados.title||"Aplicativo").replace(/[\\/:*?"<>|]/g,"").trim()||"Aplicativo";const ext=arquivo.toLowerCase().includes(".xapk")?"xapk":"apk";await sock.sendMessage(jid,{document:{url:arquivo},mimetype:ext==="xapk"?"application/octet-stream":"application/vnd.android.package-archive",fileName:`${nome}.${ext}`,caption:`📱 ${dados.title||nome}\n📦 Versão: ${dados.version||"Não informada"}\n🌐 Uptodown`},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){console.log("❌ app download:",e.message);await sock.sendMessage(jid,{text:bLine("❌",`Não foi possível baixar o aplicativo.\n\n${e.message}`)},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
+          if(btnId&&btnId.startsWith("appcopiar_")){const codigo=btnId.replace("appcopiar_","");try{const dados=JSON.parse(decodificarApp(codigo));if(!dados.url)throw new Error("Link não encontrado.");await sock.sendMessage(jid,{text:`🔗 *Link do aplicativo:*\n\n${dados.url}`},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌","Não foi possível obter o link.")},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
           // ✅ Botão não reconhecido (provavelmente de OUTRO bot no grupo) — ignora silenciosamente
           if(btnId&&btnId.startsWith("info_"))return;
           if(btnId&&btnId.startsWith("info_"))return;
@@ -3208,21 +3200,7 @@ ${nomeEnviou}`;
         if(comando==="set"){const novaSenha=args.join(" ").replace(/['"]/g,"").trim();if(!novaSenha){await sock.sendMessage(jid,{text:bLine("🔑",`*${CONFIG.PREFIXO}set [nova_senha]*`)},{quoted:seloBot});return;}CONFIG.SENHA_BOT=novaSenha;senhasAprovadas.clear();await sock.sendMessage(jid,{text:bBloco("✅ SENHA ALTERADA",[bLine("🔑",`Senha: *${novaSenha}*`)])},{quoted:seloBot});await reagir(sock,msg,"🔑");return;}
         if(comando==="id"){await sock.sendMessage(jid,{text:bBloco("📱 INFO",[bLine("📱",`_${sender}_`),bLine("👑",`Dono: ${isDono?"✅":"❌"} | 👮 Admin: ${isAdmin?"✅":"❌"}`),bLine("💎",`VIP: ${isVip(sender)?"✅":"❌"}`),bLine("🔑",`Acesso: ${senhasAprovadas.has(sender)||isDono?"✅":"❌"}`)])},{quoted:seloBot});return;}
         if(comando==="out"){if(!isGrupo){await sock.sendMessage(jid,{text:bLine("❌","Só em grupos.")},{quoted:seloBot});return;}try{await sock.sendMessage(jid,{text:bLine("👋","*Bot a sair...*")},{quoted:seloBot});await new Promise(r=>setTimeout(r,1000));await sock.groupLeave(jid);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
-        if(comando==="prefixo"||comando==="prefixos"){
-          // Apenas mostra o prefixo com botão de copiar. Para trocar, usa !setprefixo
-          const msgPref=`*${CONFIG.PREFIXO}*`;
-          try{
-            await sock.sendMessage(jid,{
-              text:msgPref,
-              footer:`Prefixo do ${CONFIG.NOME_BOT}${args[0]?` • Usa *${CONFIG.PREFIXO}setprefixo* para trocar`:""}`,
-              buttons:[{buttonId:`use_prefix_${CONFIG.PREFIXO}`,buttonText:{displayText:`『 ${CONFIG.PREFIXO} 』`},type:1}],
-              headerType:1
-            },{quoted:seloBot});
-          }catch{
-            await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});
-          }
-          return;
-        }
+        if(comando==="prefixo"||comando==="prefixos"){const msgPref=`*${CONFIG.PREFIXO}*`;try{await sock.sendMessage(jid,{text:msgPref,footer:CONFIG.NOME_BOT,buttons:[{buttonId:"btn_abrir_menu",buttonText:{displayText:"☷ Ver menu"},type:1}],headerType:1},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:msgPref},{quoted:seloBot});}return;}
         if(comando==="setprefixo"){
           if(!isDono){await sock.sendMessage(jid,{text:bLine("🔒","Apenas o dono pode trocar o prefixo.")},{quoted:seloBot});return;}
           const novoPrefixo=(args[0]||"").trim();
@@ -3604,8 +3582,10 @@ ${nomeEnviou}`;
         if(comando==="spotify"&&args.length>0){const entrada=args.join(" ");await reagir(sock,msg,"🟢");let arq=null;try{arq=await barraCarregamento(sock,jid,seloBot,`A baixar Spotify...`,()=>dlSpotify(entrada).then(r=>r.filePath));}catch{}if(!arq){await sock.sendMessage(jid,{text:bLine("❌","Não encontrei.")},{quoted:seloBot});return;}try{await enviarAudio(sock,jid,arq,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="soundcloud"&&args.length>0){const entrada=args.join(" ");await reagir(sock,msg,"🔶");let arq=null;try{arq=await barraCarregamento(sock,jid,seloBot,"A baixar SoundCloud...",()=>dlSoundcloud(entrada).then(r=>r.filePath));}catch{}if(!arq){await sock.sendMessage(jid,{text:bLine("❌","Não encontrei.")},{quoted:seloBot});return;}try{await enviarAudio(sock,jid,arq,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="soundcloud1"){await enviarSoundcloud1(sock,jid,msg,args.join(" ").trim(),seloBot,{reagir,bBloco,bLine,nomeBot:nomeBotEstilizado(),pesquisarSoundcloud});return;}
+        if(comando==="applemusic"){console.log("🍎 APPLE TEXTO:",texto,typeof texto);await enviarAppleMusic(sock,jid,msg,texto,seloBot,{reagir,bLine});return;}
         if(comando==="mediafire"&&args.length>0){const url=args[0];await reagir(sock,msg,"📦");try{const result=await dlMediafire(url);await sock.sendMessage(jid,{document:{url:result.url},fileName:result.title,mimetype:"application/octet-stream",caption:bLine("📦",`*${result.title}*`)},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="apk"&&args.length>0){const query=args.join(" ");await reagir(sock,msg,"📲");try{const result=await dlApk(query);await sock.sendMessage(jid,{text:bBloco("📲 APK",[bLine("📱",`*${result.title}*`),bLine("🔗",result.url)])},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
+        if(comando==="app"){await enviarApp(sock,jid,msg,texto,seloBot,{reagir,bLine,nomeBot:nomeBotEstilizado()});return;}
         if(comando==="qr"){const dado=args.join(" ");if(!dado){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}qr* [texto/url]`)},{quoted:seloBot});return;}try{await sock.sendMessage(jid,{image:{url:`https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encodeURIComponent(dado)}&qzone=2&ecc=M`},caption:bLine("🔲","*QR CODE*")},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});}return;}
         if(comando==="mostre"&&args.length>0){const query=args.join(" ");let loadMsg=null;try{loadMsg=await sock.sendMessage(jid,{text:bBloco("🔍 MOSTRE",[bLine("🔍",`_${query}_`),FRAMES_LOADING[2]])},{quoted:seloBot});}catch{}const imageUrl=await buscarImagemInternet(query);if(loadMsg){try{await sock.sendMessage(jid,{text:bBloco("🔍 MOSTRE",[FRAMES_LOADING[5]]),edit:loadMsg.key});}catch{}}await new Promise(r=>setTimeout(r,300));if(!imageUrl){await sock.sendMessage(jid,{text:bLine("❌","Não encontrei.")},{quoted:seloBot});return;}await sock.sendMessage(jid,{image:{url:imageUrl},caption:bLine("🖼️",`*${query}*`)},{quoted:seloBot});await reagir(sock,msg,"✅");return;}
         if(comando==="foto"&&args[0]){try{await sock.sendMessage(jid,{image:{url:args.join("")},caption:"📷"},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
@@ -3614,7 +3594,7 @@ ${nomeEnviou}`;
 
         // ─── FIGURINHAS ───
         if(comando==="s"){const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;const iM=quotedMsg?.imageMessage,vM=quotedMsg?.videoMessage;if(!iM&&!vM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde imagem/vídeo com *${CONFIG.PREFIXO}s*`)},{quoted:seloBot});return;}const isAnim=!!vM;await sock.sendMessage(jid,{text:bLine("🎭","A criar sticker... ⏳")},{quoted:seloBot});try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});const webpBuf=await criarSticker(buf,isAnim);await sock.sendMessage(jid,{sticker:webpBuf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});await sock.sendMessage(jid,{sticker:buf},{quoted:seloBot});await reagir(sock,msg,"✅");}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}}return;}
-
+                   
         // ─── SISTEMA DE FIGURINHAS ───
         if(comando==="sticker2"){
           const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -3659,20 +3639,8 @@ ${nomeEnviou}`;
           finally{try{fs.removeSync(tIn);}catch{}try{fs.removeSync(tOut);}catch{}}
           return;
         }
-        if(comando==="take"){
-          const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
-          const stM=quotedMsg?.stickerMessage;
-          const novoNome=args.join(" ").trim();
-          if(!stM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde uma *figurinha* com *${CONFIG.PREFIXO}take* [novo nome]`)},{quoted:seloBot});return;}
-          if(!novoNome){await sock.sendMessage(jid,{text:bLine("💡",`*${CONFIG.PREFIXO}take* [novo nome/autor]`)},{quoted:seloBot});return;}
-          try{
-            const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});
-            const comExif=await adicionarExifPack(buf,novoNome,nomeBotEstilizado(),`com.take.${Date.now().toString(16)}`);
-            await sock.sendMessage(jid,{sticker:comExif},{quoted:seloBot});
-            await reagir(sock,msg,"✅");
-          }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}
-          return;
-        }
+        if(comando==="take"){const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;const stM=quotedMsg?.stickerMessage;if(!stM){await sock.sendMessage(jid,{text:bLine("💡",`↩️ Responde uma *figurinha* com *${CONFIG.PREFIXO}take*`)},{quoted:seloBot});return;}try{const buf=await downloadMediaMessage({message:quotedMsg,key:msg.key},"buffer",{});const nomeUsuario=msg.pushName||"Usuário";const nomeBot=nomeBotEstilizado();const comExif=await adicionarExifPack(buf,nomeUsuario,nomeBot,`com.take.${Date.now().toString(16)}`);await sock.sendMessage(jid,{sticker:comExif},{quoted:seloBot});await reagir(sock,msg,"✅");}catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message||"Erro.")},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
+
         if(comando==="wm"){
           const quotedMsg=msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
           const iM=quotedMsg?.imageMessage;
@@ -5533,7 +5501,6 @@ return;
           }catch(e){await sock.sendMessage(jid,{text:bLine("❌",e.message)},{quoted:seloBot});await reagir(sock,msg,"❌");}
           return;
         }
-
       }catch(e){console.error("❌ Erro handler:",e.message);try{await reagir(sock,msg,"❌");}catch{}}
     });
 
