@@ -1,471 +1,137 @@
-const {
-  prepareWAMessageMedia,
-  generateWAMessageFromContent
-} = require("@itsliaaa/baileys");
+const{prepareWAMessageMedia,generateWAMessageFromContent}=require("@itsliaaa/baileys");
 
-const API_APPLE = "https://nexus-light-7uyb.onrender.com";
+function codificarLink(valor){return Buffer.from(valor,"utf8").toString("base64url");}
+function decodificarLink(valor){return Buffer.from(valor,"base64url").toString("utf8");}
 
-function codificarLink(valor) {
-  return Buffer.from(valor, "utf8").toString("base64url");
+async function pesquisarAppleMusic(query){
+  const url=`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&country=ao&limit=5`;
+  const res=await fetch(url);
+  if(!res.ok)throw new Error(`Apple Search HTTP ${res.status}`);
+  const json=await res.json();
+  if(!json.results?.length)return null;
+
+  const r=json.results[0];
+
+  return{
+    title:r.trackName||query,
+    artist:r.artistName||"Desconhecido",
+    album:r.collectionName||"Apple Music",
+    url:r.trackViewUrl||r.collectionViewUrl||"",
+    thumbnail:(r.artworkUrl600||r.artworkUrl100||"").replace(/100x100bb/,"600x600bb"),
+    duration:r.trackTimeMillis?`${Math.floor(r.trackTimeMillis/60000)}:${String(Math.floor((r.trackTimeMillis%60000)/1000)).padStart(2,"0")}`:"--:--",
+    previewUrl:r.previewUrl||"",
+    trackId:r.trackId
+  };
 }
 
-function decodificarLink(valor) {
-  return Buffer.from(valor, "base64url").toString("utf8");
-}
+async function enviarAppleMusic(sock,jid,msg,texto,seloBot,helpers={}){
+  const{reagir,bLine,nomeBot=""}=helpers||{};
 
-async function baixarCapa(url) {
-  if (!url) return null;
+  try{
+    texto=typeof texto==="string"?texto:texto?.text||texto?.body||texto?.caption||"";
+    texto=String(texto).trim();
+    texto=texto.replace(/^[.!:\/]applemusic(?:\s+|$)/i,"").trim();
 
-  try {
-    const resposta = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
-    });
-
-    if (!resposta.ok) return null;
-
-    const buffer = Buffer.from(
-      await resposta.arrayBuffer()
-    );
-
-    return buffer.length ? buffer : null;
-
-  } catch (e) {
-    console.log(
-      "⚠️ Apple Music capa:",
-      e.message
-    );
-
-    return null;
-  }
-}
-
-function obterLinkApple(texto) {
-  try {
-    const url = new URL(texto);
-
-    if (
-      /^music\.apple\.com$/i.test(url.hostname) ||
-      /\.music\.apple\.com$/i.test(url.hostname)
-    ) {
-      return texto;
+    if(!texto){
+      await sock.sendMessage(jid,{text:bLine("🍎","Digite o nome da música.\n\nExemplo: *:applemusic Calema Te Amo*")},{quoted:seloBot});
+      return;
     }
 
-    return null;
+    await reagir(sock,msg,"🔎");
 
-  } catch {
-    return null;
-  }
-}
+    const musica=await pesquisarAppleMusic(texto);
 
-async function enviarAppleMusic(
-  sock,
-  jid,
-  msg,
-  texto,
-  seloBot,
-  helpers = {}
-) {
-  const {
-    reagir,
-    bLine,
-    nomeBot = ""
-  } = helpers || {};
+    if(!musica){
+      await sock.sendMessage(jid,{text:bLine("❌",`Não encontrei *${texto}* no Apple Music.`)},{quoted:seloBot});
+      await reagir(sock,msg,"❌");
+      return;
+    }
 
-  texto =
-    typeof texto === "string"
-      ? texto
-      : texto?.text ||
-        texto?.body ||
-        texto?.caption ||
-        "";
+    const dados=codificarLink(JSON.stringify({
+      url:musica.url,
+      title:musica.title,
+      artist:musica.artist,
+      previewUrl:musica.previewUrl,
+      trackId:musica.trackId
+    }));
 
-  texto = String(texto).trim();
+    const textoCard=`🍎 *${musica.title}*\n\n👤 Artista: ${musica.artist}\n💿 Álbum: ${musica.album}\n⏱️ Duração: ${musica.duration}\n\n🎵 Apple Music`;
 
-  texto = texto
-    .replace(
-      /^[.!:\/]applemusic(?:\s+|$)/i,
-      ""
-    )
-    .trim();
-
-  if (!texto) {
-    await sock.sendMessage(
-      jid,
+    const botoes=[
       {
-        text: bLine(
-          "🎵",
-          "Digita o nome da música ou artista.\n\nExemplo:\n.applemusic Calema"
-        )
-      },
-      { quoted: seloBot }
-    );
-
-    return;
-  }
-
-  try {
-    await reagir(
-      sock,
-      msg,
-      "🔎"
-    );
-
-    let link = obterLinkApple(
-      texto
-    );
-
-    let track = null;
-
-    /*
-     * 🔎 PESQUISA APPLE MUSIC
-     */
-    if (!link) {
-
-      const respostaPesquisa =
-        await fetch(
-          `${API_APPLE}/search/applemusic?q=${encodeURIComponent(texto)}`,
-          {
-            headers: {
-              "User-Agent": "Mozilla/5.0"
-            }
-          }
-        );
-
-      if (!respostaPesquisa.ok) {
-        throw new Error(
-          `API pesquisa HTTP ${respostaPesquisa.status}`
-        );
-      }
-
-      const pesquisa =
-        await respostaPesquisa.json();
-
-      track =
-        pesquisa?.results?.[0];
-
-      link =
-        track?.link ||
-        track?.apple_music_url ||
-        track?.url;
-
-      if (
-        !track ||
-        !link
-      ) {
-        await sock.sendMessage(
-          jid,
-          {
-            text: bLine(
-              "❌",
-              "Não encontrei essa música no Apple Music."
-            )
-          },
-          { quoted: seloBot }
-        );
-
-        await reagir(
-          sock,
-          msg,
-          "❌"
-        );
-
-        return;
-      }
-    }
-
-    /*
-     * 🎧 API DE DOWNLOAD / INFORMAÇÕES
-     */
-    const respostaDownload =
-      await fetch(
-        `${API_APPLE}/download/applemusic?url=${encodeURIComponent(link)}`,
-        {
-          headers: {
-            "User-Agent": "Mozilla/5.0"
-          }
-        }
-      );
-
-    if (!respostaDownload.ok) {
-      throw new Error(
-        `API download HTTP ${respostaDownload.status}`
-      );
-    }
-
-    const download =
-      await respostaDownload.json();
-
-    const data =
-      download?.data ||
-      download?.result ||
-      {};
-
-    if (
-      !data ||
-      typeof data !== "object"
-    ) {
-      throw new Error(
-        "API não retornou os dados da música."
-      );
-    }
-
-    /*
-     * 📀 DADOS DA MÚSICA
-     */
-    const info = {
-
-      title:
-        data.title ||
-        track?.title ||
-        "Desconhecido",
-
-      artist:
-        data.artist ||
-        track?.artist ||
-        "Desconhecido",
-
-      album:
-        data.album ||
-        track?.album ||
-        "Desconhecido",
-
-      duration:
-        data.duration ||
-        track?.duration ||
-        "N/A",
-
-      genre:
-        data.genre ||
-        track?.genre ||
-        "N/A",
-
-      explicit:
-        data.explicit ??
-        track?.explicit ??
-        false,
-
-      cover:
-        data.thumbnail ||
-        data.cover ||
-        data.image ||
-        data.cover_url ||
-        data.artwork ||
-        track?.cover ||
-        track?.thumbnail ||
-        track?.image ||
-        track?.artwork ||
-        ""
-    };
-
-    /*
-     * 🖼️ BAIXAR CAPA
-     */
-    const capa =
-      await baixarCapa(
-        info.cover
-      );
-
-    /*
-     * 📝 TEXTO DA MENSAGEM
-     */
-    const textoResultado = [
-      "🎵 *APPLE MUSIC*",
-      "",
-      `🗣 *Título:* ${info.title}`,
-      `👤 *Artista:* ${info.artist}`,
-      `💿 *Álbum:* ${info.album}`,
-      `⏱️ *Duração:* ${info.duration}`,
-      `🎧 *Gênero:* ${info.genre}`,
-      `🔞 *Explícita:* ${info.explicit ? "Sim" : "Não"}`,
-      "",
-      "Escolhe uma opção abaixo:"
-    ].join("\n");
-
-    /*
-     * 🔐 CODIFICAR DADOS DO BOTÃO
-     */
-    const dadosBotao =
-      codificarLink(
-        JSON.stringify({
-          url: link,
-          title: info.title,
-          artist: info.artist,
-          album: info.album,
-          thumbnail: info.cover || ""
+        name:"quick_reply",
+        buttonParamsJson:JSON.stringify({
+          display_text:"📥 Baixar",
+          id:`applebaixar_${dados}`
         })
-      );
-
-    /*
-     * 🔘 BOTÕES
-     */
-    const botoes = [
-      {
-        name: "quick_reply",
-
-        buttonParamsJson:
-          JSON.stringify({
-            display_text:
-              "🎧 BAIXAR MÚSICA",
-
-            id:
-              `applebaixar_${dadosBotao}`
-          })
       },
-
       {
-        name: "cta_copy",
-
-        buttonParamsJson:
-          JSON.stringify({
-            display_text:
-              "🔗 COPIAR LINK",
-
-            copy_code:
-              link
-          })
+        name:"quick_reply",
+        buttonParamsJson:JSON.stringify({
+          display_text:"🔗 Copiar link",
+          id:`applecopiar_${dados}`
+        })
       }
     ];
 
-    /*
-     * 🖼️ MENSAGEM INTERATIVA COM CAPA
-     */
-    if (capa) {
+    let header={title:"🍎 Apple Music"};
 
-      try {
+    if(musica.thumbnail){
+      const media=await prepareWAMessageMedia(
+        {image:{url:musica.thumbnail}},
+        {upload:sock.waUploadToServer}
+      );
 
-        const media =
-          await prepareWAMessageMedia(
-            {
-              image: capa
-            },
-            {
-              upload:
-                sock.waUploadToServer
-            }
-          );
-
-        const mensagem =
-          generateWAMessageFromContent(
-            jid,
-            {
-              viewOnceMessage: {
-                message: {
-                  interactiveMessage: {
-
-                    header: {
-                      hasMediaAttachment:
-                        true,
-
-                      ...media
-                    },
-
-                    body: {
-                      text:
-                        textoResultado
-                    },
-
-                    footer: {
-                      text:
-                        nomeBot || ""
-                    },
-
-                    nativeFlowMessage: {
-                      buttons:
-                        botoes
-                    }
-                  }
-                }
-              }
-            },
-            {
-              userJid:
-                jid
-            }
-          );
-
-        await sock.relayMessage(
-          jid,
-          mensagem.message,
-          {
-            messageId:
-              mensagem.key.id
-          }
-        );
-
-        await reagir(
-          sock,
-          msg,
-          "✅"
-        );
-
-        return;
-
-      } catch (e) {
-
-        console.log(
-          "⚠️ Apple Music imagem:",
-          e.message
-        );
-      }
+      header={
+        title:"",
+        hasMediaAttachment:true,
+        imageMessage:media.imageMessage
+      };
     }
 
-    /*
-     * 📱 FALLBACK SEM CAPA
-     */
+    const conteudo={
+      viewOnceMessage:{
+        message:{
+          interactiveMessage:{
+            body:{text:textoCard},
+            footer:{text:nomeBot||""},
+            header,
+            nativeFlowMessage:{buttons:botoes}
+          }
+        }
+      }
+    };
+
+    const waMsg=generateWAMessageFromContent(
+      jid,
+      conteudo,
+      {userJid:sock.user.id}
+    );
+
+    await sock.relayMessage(
+      jid,
+      waMsg.message,
+      {messageId:waMsg.key.id}
+    );
+
+    await reagir(sock,msg,"✅");
+
+  }catch(e){
+    console.log("❌ Apple Music:",e.message);
+
     await sock.sendMessage(
       jid,
-      {
-        text:
-          `${textoResultado}\n\n🔗 ${link}`,
-
-        buttons:
-          botoes
-      },
-      {
-        quoted:
-          seloBot
-      }
+      {text:bLine("❌",`Erro ao pesquisar no Apple Music.\n\n${e.message}`)},
+      {quoted:seloBot}
     );
 
-    await reagir(
-      sock,
-      msg,
-      "✅"
-    );
-
-  } catch (e) {
-
-    console.log(
-      "❌ enviarAppleMusic:",
-      e.message
-    );
-
-    await sock.sendMessage(
-      jid,
-      {
-        text: bLine(
-          "❌",
-          "Ocorreu um erro ao procurar a música no Apple Music."
-        )
-      },
-      {
-        quoted:
-          seloBot
-      }
-    );
-
-    await reagir(
-      sock,
-      msg,
-      "❌"
-    );
+    await reagir(sock,msg,"❌");
   }
 }
 
-module.exports = {
+module.exports={
   enviarAppleMusic,
+  pesquisarAppleMusic,
   codificarLink,
   decodificarLink
 };
