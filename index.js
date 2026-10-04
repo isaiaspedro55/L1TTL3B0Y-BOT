@@ -2287,94 +2287,254 @@ async function processarComandoPlay(sock,chatJid,msg,query){
   await sock.sendMessage(chatJid,{react:{text:"✅",key:msg.key}});
 }
 
+const YOUTUBE_API_URL = "https://beans-papua-hanging-advance.trycloudflare.com";
+
+async function baixarPelaYouTubeAPI(url, tipo = "mp3") {
+  if (!url) throw new Error("URL do YouTube não informada.");
+
+  const endpoint = tipo === "mp3"
+    ? "/api/youtube/download"
+    : "/api/youtube/download-video";
+
+  const resposta = await fetch(
+    `${YOUTUBE_API_URL}${endpoint}?url=${encodeURIComponent(url)}`
+  );
+
+  const dados = await resposta.json().catch(() => ({}));
+
+  if (!resposta.ok || !dados.status || !dados.url) {
+    throw new Error(
+      dados.detalhe ||
+      dados.error ||
+      "A API não conseguiu baixar o ficheiro."
+    );
+  }
+
+  const download = await fetch(dados.url);
+
+  if (!download.ok) {
+    throw new Error("Não foi possível obter o ficheiro da API.");
+  }
+
+  const buffer = Buffer.from(await download.arrayBuffer());
+
+  const extensao = tipo === "mp3" ? "mp3" : "mp4";
+  const arquivo = path.join(
+    __dirname,
+    `youtube_api_${Date.now()}_${Math.random().toString(36).slice(2)}.${extensao}`
+  );
+
+  fs.writeFileSync(arquivo, buffer);
+
+  return arquivo;
+}
+
 async function processarBotaoPlay1(sock,msg,formato,url){
   const chatJid=msg.key.remoteJid;
   const seloBotL=criarSeloBot(chatJid);
+
   await reagir(sock,msg,formato==="mp3"?"🎧":"🎬");
+
+  let arq=null;
+
   try{
     if(formato==="mp3"){
-      const arq=await barraCarregamento(sock,chatJid,seloBotL,"A baixar áudio",()=>downloadMusica(url,false));
-      if(!arq||!fs.existsSync(arq))throw new Error("Áudio não encontrado. Tenta outro link.");
+
+      arq=await barraCarregamento(
+        sock,
+        chatJid,
+        seloBotL,
+        "A baixar áudio pela API",
+        ()=>baixarPelaYouTubeAPI(url,"mp3")
+      );
+
+      if(!arq||!fs.existsSync(arq)){
+        throw new Error("Áudio não encontrado. Tenta outro link.");
+      }
+
       await enviarAudio(sock,chatJid,arq,seloBotL);
-      await reagir(sock,msg,"✅");
-      setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+
     }else{
-      const arq=await barraCarregamento(sock,chatJid,seloBotL,"A baixar vídeo",()=>downloadVideo(url,480));
-      if(!arq||!fs.existsSync(arq))throw new Error("Vídeo não encontrado. Tenta outro link.");
-      await enviarVideo(sock,chatJid,arq,bLine("🎬",`_© ${nomeBotEstilizado()}_`),[],seloBotL);
-      await reagir(sock,msg,"✅");
-      setTimeout(()=>{try{fs.removeSync(arq);}catch{}},15000);
+
+      arq=await barraCarregamento(
+        sock,
+        chatJid,
+        seloBotL,
+        "A baixar vídeo pela API",
+        ()=>baixarPelaYouTubeAPI(url,"mp4")
+      );
+
+      if(!arq||!fs.existsSync(arq)){
+        throw new Error("Vídeo não encontrado. Tenta outro link.");
+      }
+
+      await enviarVideo(
+        sock,
+        chatJid,
+        arq,
+        bLine("🎬",`_© ${nomeBotEstilizado()}_`),
+        [],
+        seloBotL
+      );
     }
-  }catch(e){
-    await sock.sendMessage(chatJid,{text:bBloco("❌ ERRO",[bLine("💡",e.message||"Erro ao baixar.")])},{quoted:seloBotL});
-    await reagir(sock,msg,"❌");
-  }
-}
 
-async function processarComandoPlay2(sock,chatJid,msg,sender,query){
-  const seloBotL=criarSeloBot(chatJid);
-  try{
-    if(!query||!query.trim()){await sock.sendMessage(chatJid,{text:bBloco("⚠️ PLAY2",[bLine("💡",`*${CONFIG.PREFIXO}play2* [nome da música]`)])},{quoted:seloBotL});return;}
-    if(!yts)throw new Error("Módulo yt-search não instalado. Corre: npm i yt-search");
-    await reagir(sock,msg,"🔍");
-
-    const busca=await yts(query);
-    const resultados=(busca.all||busca.videos||[]).slice(0,15);
-    if(!resultados.length){await reagir(sock,msg,"❌");await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY2",[bLine("💡","Nenhuma música encontrada!")])},{quoted:seloBotL});return;}
-
-    const montarRows=(formato)=>resultados.map((m,i)=>({
-      header:"",
-      title:`${i+1}. ${(m.title||"Sem título").slice(0,45)}`,
-      description:`⏱️ ${m.timestamp||"N/A"} • 👤 ${m.author?.name||"?"}`,
-      id:`play2_${formato}_${encodeURIComponent(m.url)}`,
-    }));
-
-    const listaMp3={title:"🎵 MP3",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp3")}]};
-    const listaMp4={title:"🎬 MP4",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("mp4")}]};
-    const listaDoc={title:"📄 DOC",icon:"DEFAULT",sections:[{title:`Resultados: ${query}`,highlight_label:"",rows:montarRows("doc")}]};
-
-    const buttons=[
-      {name:"single_select",buttonParamsJson:JSON.stringify(listaMp3)},
-      {name:"single_select",buttonParamsJson:JSON.stringify(listaMp4)},
-      {name:"single_select",buttonParamsJson:JSON.stringify(listaDoc)},
-    ];
-    const messageParamsJson=JSON.stringify({bottom_sheet:{in_thread_buttons_limit:3,divider_indices:[0,1,2],list_title:"📄 Selecionar opção",button_title:"≡ FORMATO"}});
-
-    const primeiraMusica=resultados[0];
-    const fotoUrl=primeiraMusica?.thumbnail;
-    const textoMenu=`🎵 *RESULTADOS DA BUSCA:* _"${query}"_\n\nAbra a lista, escolha a secção (MP3, MP4 ou Documento) e depois a música desejada.`;
-    const contextInfo=seloBotL?{stanzaId:seloBotL.key?.id,participant:seloBotL.key?.participant||seloBotL.key?.remoteJid,quotedMessage:seloBotL.message,mentionedJid:[sender]}:{mentionedJid:[sender]};
-
-    let headerContent={hasMediaAttachment:false};
-    try{
-      const{prepareWAMessageMedia}=require("@itsliaaa/baileys");
-      const mediaPrep=await prepareWAMessageMedia({image:{url:fotoUrl||CONFIG.CANAL_URL}},{upload:sock.waUploadToServer});
-      headerContent={hasMediaAttachment:true,imageMessage:mediaPrep.imageMessage};
-    }catch{headerContent={hasMediaAttachment:false};}
-
-    const content={
-      viewOnceMessage:{
-        message:{
-          interactiveMessage:{
-            header:headerContent,
-            body:{text:textoMenu},
-            footer:{text:nomeBotEstilizado()},
-            nativeFlowMessage:{buttons,messageParamsJson},
-            contextInfo,
-          },
-        },
-      },
-    };
-    const fullMsg=generateWAMessageFromContent(chatJid,content,{});
-    const bizNode={tag:"biz",attrs:{},content:[{tag:"interactive",attrs:{type:"native_flow",v:"1"},content:[{tag:"native_flow",attrs:{name:"mixed",v:"9"}}]}]};
-    await sock.relayMessage(chatJid,fullMsg.message,{messageId:fullMsg.key.id,additionalNodes:[bizNode]});
     await reagir(sock,msg,"✅");
+
   }catch(e){
-    console.error("❌ play2:",e.message);
+
+    console.error("❌ PLAY1 API:",e.message);
+
+    await sock.sendMessage(
+      chatJid,
+      {
+        text:bBloco(
+          "❌ ERRO",
+          [bLine("💡",e.message||"Erro ao baixar.")]
+        )
+      },
+      {quoted:seloBotL}
+    );
+
     await reagir(sock,msg,"❌");
-    await sock.sendMessage(chatJid,{text:bBloco("❌ PLAY2",[bLine("💡","Erro ao buscar músicas!"),bLine("🔴",e.message)])},{quoted:seloBotL});
+
+  }finally{
+
+    if(arq&&fs.existsSync(arq)){
+      setTimeout(()=>{
+        try{fs.removeSync(arq);}catch{}
+      },15000);
+    }
+
   }
 }
+
+async function processarBotaoPlay2(sock,msg,formato,url){
+  const chatJid=msg.key.remoteJid;
+  const seloBotL=criarSeloBot(chatJid);
+
+  await reagir(
+    sock,
+    msg,
+    formato==="mp4"?"🎬":formato==="doc"?"📄":"🎧"
+  );
+
+  let arq=null;
+
+  try{
+
+    if(formato==="mp3"){
+
+      arq=await barraCarregamento(
+        sock,
+        chatJid,
+        seloBotL,
+        "A baixar áudio pela API",
+        ()=>baixarPelaYouTubeAPI(url,"mp3")
+      );
+
+      if(!arq||!fs.existsSync(arq)){
+        throw new Error("Áudio não encontrado. Tenta outro link.");
+      }
+
+      await enviarAudio(
+        sock,
+        chatJid,
+        arq,
+        seloBotL
+      );
+
+    }else if(formato==="doc"){
+
+      /*
+       * DOC continua a usar MP3.
+       * Assim o documento fica com o áudio.
+       */
+
+      arq=await barraCarregamento(
+        sock,
+        chatJid,
+        seloBotL,
+        "A preparar documento",
+        ()=>baixarPelaYouTubeAPI(url,"mp3")
+      );
+
+      if(!arq||!fs.existsSync(arq)){
+        throw new Error("Ficheiro não encontrado.");
+      }
+
+      const nomeArquivo="audio.mp3";
+
+      await sock.sendMessage(
+        chatJid,
+        {
+          document:fs.readFileSync(arq),
+          mimetype:"audio/mpeg",
+          fileName:nomeArquivo,
+          caption:bLine(
+            "📄",
+            `_© ${nomeBotEstilizado()}_`
+          )
+        },
+        {quoted:seloBotL}
+      );
+
+    }else{
+
+      arq=await barraCarregamento(
+        sock,
+        chatJid,
+        seloBotL,
+        "A baixar vídeo pela API",
+        ()=>baixarPelaYouTubeAPI(url,"mp4")
+      );
+
+      if(!arq||!fs.existsSync(arq)){
+        throw new Error("Vídeo não encontrado.");
+      }
+
+      await enviarVideo(
+        sock,
+        chatJid,
+        arq,
+        bLine(
+          "🎬",
+          `_© ${nomeBotEstilizado()}_`
+        ),
+        [],
+        seloBotL
+      );
+    }
+
+    await reagir(sock,msg,"✅");
+
+  }catch(e){
+
+    console.error("❌ PLAY2 API:",e.message);
+
+    await sock.sendMessage(
+      chatJid,
+      {
+        text:bBloco(
+          "❌ ERRO",
+          [bLine("💡",e.message||"Erro ao baixar.")]
+        )
+      },
+      {quoted:seloBotL}
+    );
+
+    await reagir(sock,msg,"❌");
+
+  }finally{
+
+    if(arq&&fs.existsSync(arq)){
+      setTimeout(()=>{
+        try{fs.removeSync(arq);}catch{}
+      },15000);
+    }
+
+  }
+}
+
 async function processarBotaoPlay2(sock,msg,formato,url){
   const chatJid=msg.key.remoteJid;
   const seloBotL=criarSeloBot(chatJid);
