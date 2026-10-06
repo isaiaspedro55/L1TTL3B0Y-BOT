@@ -1,354 +1,738 @@
-// ════════════════════════════════════════════════
-// ✅ comando_anime.js — !ep <anime> <episódio>
-// ════════════════════════════════════════════════
-// Por padrão, NÃO baixa nada: procura o anime na Jikan API (dados
-// públicos do MyAnimeList, grátis, sem chave) e mostra em que
-// plataformas oficiais/legais dá para ver o anime, lembrando o
-// número do episódio pedido.
-//
-// Só tenta baixar um ficheiro se o operador do bot tiver
-// explicitamente configurado ANIME_EPISODE_API, apontando para
-// uma fonte própria sobre a qual tenha autorização de distribuição
-// (ex: conteúdo licenciado hospedado pelo próprio operador).
-// Este módulo nunca inventa nem embute nenhuma fonte de vídeo.
-// ════════════════════════════════════════════════
+const { generateWAMessageFromContent, prepareWAMessageMedia } = require("@itsliaaa/baileys");
 
-const fs = require("fs-extra");
-const path = require("path");
-const axios = require("axios");
-const { exec } = require("child_process");
+const API_ANIMEFIRE = "https://api.animefire.one";
 
-const PASTA_ANIMES = "./downloads/animes";
-const LIMITE_BYTES = 90 * 1024 * 1024; // 90 MB
+const sessoesAnime = new Map();
 
-function garantirPasta() {
-  try {
-    fs.ensureDirSync(PASTA_ANIMES);
-  } catch (e) {
-    console.error("❌ [ep] Não consegui criar a pasta de animes:", e.message);
-  }
+function gerarSessionId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function validarEpisodio(valor) {
-  if (!/^\d+$/.test(String(valor).trim())) return null;
-  const n = parseInt(valor, 10);
-  if (!Number.isInteger(n) || n <= 0) return null;
-  return n;
+function nomeAnime(anime) {
+  return anime?.titles?.BR ||
+         anime?.titles?.PT ||
+         anime?.titles?.EN ||
+         anime?.title ||
+         "Anime";
 }
 
-function limparArquivo(caminho) {
-  if (!caminho) return;
-  try {
-    if (fs.existsSync(caminho)) fs.removeSync(caminho);
-  } catch (e) {
-    console.error("⚠️ [ep] Falha ao apagar arquivo temporário:", e.message);
-  }
+function nomeEpisodio(ep) {
+  return ep?.title || `Episódio ${ep?.number || "?"}`;
 }
 
-function encontrarArquivoGerado(pasta, prefixoNome) {
-  try {
-    const arquivos = fs.readdirSync(pasta);
-    const achado = arquivos.find((f) => f.startsWith(prefixoNome));
-    return achado ? path.join(pasta, achado) : null;
-  } catch (e) {
-    return null;
-  }
+function descricaoAnime(anime) {
+  const status = anime?.status || "Sem status";
+  const audio = anime?.audio || "Áudio não informado";
+  return `${status} • ${audio}`.slice(0, 72);
 }
 
-async function buscarAnimeJikan(nome) {
-  const { data } = await axios.get("https://api.jikan.moe/v4/anime", {
-    params: { q: nome, limit: 1 },
-    timeout: 15000,
+async function animeRequest(endpoint) {
+  const r = await fetch(`${API_ANIMEFIRE}${endpoint}`, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "Mozilla/5.0"
+    }
   });
-  const anime = data && data.data && data.data[0];
-  if (!anime) throw new Error("ANIME_NAO_ENCONTRADO");
-  return anime;
-}
 
-async function buscarStreamingJikan(malId) {
+  const texto = await r.text();
+
+  let json;
+
   try {
-    const { data } = await axios.get(`https://api.jikan.moe/v4/anime/${malId}/streaming`, {
-      timeout: 15000,
-    });
-    return (data && data.data) || [];
-  } catch (e) {
-    return [];
+    json = JSON.parse(texto);
+  } catch {
+    throw new Error(`Resposta inválida da AnimeFire: HTTP ${r.status}`);
   }
+
+  if (!r.ok) {
+    throw new Error(json?.message || `AnimeFire HTTP ${r.status}`);
+  }
+
+  return json;
 }
 
-async function buscarEpisodioFontePropria(animeNome, numeroEpisodio) {
-  const apiUrl = process.env.ANIME_EPISODE_API;
-  if (!apiUrl) throw new Error("ANIME_EPISODE_API_NAO_CONFIGURADA");
-  let resposta;
-  try {
-    resposta = await axios.get(apiUrl, {
-      params: { anime: animeNome, episode: numeroEpisodio },
-      timeout: 20000,
-    });
-  } catch (e) {
-    if (e.code === "ECONNABORTED") throw new Error("TIMEOUT_API");
-    if (e.response && e.response.status === 404) throw new Error("EPISODIO_NAO_ENCONTRADO");
-    throw new Error("ERRO_API: " + (e.message || "desconhecido"));
-  }
-  const data = resposta && resposta.data;
-  if (!data || typeof data !== "object") throw new Error("RESPOSTA_API_INVALIDA");
-  if (!data.url || !/^https?:\/\//i.test(data.url)) throw new Error("URL_INVALIDA");
-  return data;
+async function pesquisarAnime(query) {
+  const dados = await animeRequest(`/animes/pesquisar?q=${encodeURIComponent(query)}`);
+  return dados?.data || dados?.results || [];
 }
 
-function baixarViaYtDlp(url, destinoBase, ytdlpCmd, ffmpegCmd) {
-  return new Promise((resolve, reject) => {
-    const saida = `${destinoBase}.%(ext)s`;
-    const partesCmd = [
-      ytdlpCmd,
-      `-f "best[height<=720][ext=mp4]/best[height<=720]/best"`,
-      "--no-playlist --no-warnings --no-check-certificate",
-      ffmpegCmd ? `--ffmpeg-location "${ffmpegCmd}"` : "",
-      "--merge-output-format mp4 --retries 2",
-      `-o "${saida}"`,
-      `"${url}"`,
-    ].filter(Boolean);
-    exec(partesCmd.join(" "), { timeout: 180000, maxBuffer: 200 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) {
-        console.error("❌ [ep] yt-dlp falhou:", (stderr || err.message || "").slice(0, 500));
-        return reject(new Error("ERRO_YTDLP"));
-      }
-      resolve();
-    });
+async function obterAnime(id) {
+  const dados = await animeRequest(`/anime/${id}`);
+  return dados?.data?.hero || dados?.data || dados;
+}
+
+async function obterEpisodio(id) {
+  const dados = await animeRequest(`/episode/${id}`);
+  return dados?.data || dados;
+}
+
+function montarRowsAnimes(resultados, sessionId) {
+  return resultados.slice(0, 15).map((anime, index) => ({
+    header: "",
+    title: `${index + 1}. ${nomeAnime(anime)}`.slice(0, 72),
+    description: descricaoAnime(anime),
+    id: `anime_select ${sessionId} ${index}`
+  }));
+}
+
+function montarRowsEpisodios(episodios, sessionId, pagina = 0) {
+  const inicio = pagina * 15;
+  const lista = episodios.slice(inicio, inicio + 15);
+
+  return lista.map((ep, index) => ({
+    header: "",
+    title: `EP ${ep.number ?? inicio + index + 1} • ${nomeEpisodio(ep)}`.slice(0, 72),
+    description: `${ep.audio || "Áudio"}${ep.season ? ` • Temporada ${ep.season}` : ""}`.slice(0, 72),
+    id: `anime_episode ${sessionId} ${inicio + index}`
+  }));
+}
+
+function montarRowsAudio(streams, sessionId) {
+  return streams.map((stream, index) => {
+    let titulo = "🎧 Áudio";
+
+    if (stream.audio === "dublado") {
+      titulo = "🇧🇷 Dublado";
+    }
+
+    if (stream.audio === "legendado") {
+      titulo = "🇯🇵 Legendado";
+    }
+
+    const qualidade =
+      Array.isArray(stream.qualities) && stream.qualities.length
+        ? stream.qualities.join(", ")
+        : "Qualidade disponível";
+
+    return {
+      header: "",
+      title: titulo,
+      description: qualidade.slice(0, 72),
+      id: `anime_audio ${sessionId} ${index}`
+    };
   });
 }
 
-async function baixarDireto(url, destinoFinal) {
-  let resposta;
+async function enviarMenuAnime(clover, from, seloMeta, fotoUrl, resultados) {
+  const sessionId = gerarSessionId();
+
+  sessoesAnime.set(sessionId, {
+    tipo: "anime",
+    resultados,
+    criadoEm: Date.now()
+  });
+
+  const rows = montarRowsAnimes(resultados, sessionId);
+
+  let media = null;
+
   try {
-    resposta = await axios.get(url, {
-      responseType: "arraybuffer",
-      timeout: 120000,
-      maxContentLength: 200 * 1024 * 1024,
-      maxBodyLength: 200 * 1024 * 1024,
-    });
-  } catch (e) {
-    console.error("❌ [ep] Download directo falhou:", e.message);
-    throw new Error("ERRO_DOWNLOAD");
-  }
-  try {
-    fs.writeFileSync(destinoFinal, Buffer.from(resposta.data));
-  } catch (e) {
-    console.error("❌ [ep] Falha ao gravar arquivo:", e.message);
-    throw new Error("ERRO_GRAVACAO");
-  }
-}
-
-async function processarComandoEp(ctx) {
-  const {
-    sock, jid, msg, seloBot, args, sender,
-    bLine, bBloco, reagir, enviarVideo, addXP,
-    CONFIG, YTDLP_CMD, FFMPEG_CMD,
-  } = ctx;
-
-  if (!args || args.length === 0) {
-    await sock.sendMessage(jid, {
-      text: bBloco("🍥 ANIME", [
-        bLine("💡", `Uso: *${CONFIG.PREFIXO}ep* [anime] [episódio]`),
-        bLine("💡", `Ex: *${CONFIG.PREFIXO}ep* Naruto 1`),
-      ]),
-    }, { quoted: seloBot });
-    return;
-  }
-
-  if (args.length < 2) {
-    await sock.sendMessage(jid, {
-      text: bLine("❌", "Falta o número do episódio. Ex: *" + CONFIG.PREFIXO + "ep* " + args.join(" ") + " 1"),
-    }, { quoted: seloBot });
-    return;
-  }
-
-  const numeroStr = args[args.length - 1];
-  const nomeAnime = args.slice(0, -1).join(" ").trim();
-  const numeroEpisodio = validarEpisodio(numeroStr);
-
-  if (!nomeAnime) {
-    await sock.sendMessage(jid, { text: bLine("❌", "Nome do anime inválido.") }, { quoted: seloBot });
-    return;
-  }
-  if (numeroEpisodio === null) {
-    await sock.sendMessage(jid, { text: bLine("❌", "Número de episódio inválido.") }, { quoted: seloBot });
-    return;
-  }
-
-  await reagir(sock, msg, "🍥");
-
-  // ═══ CAMINHO A: fonte própria licenciada do operador (opt-in via ANIME_EPISODE_API) ═══
-  if (process.env.ANIME_EPISODE_API) {
-    await sock.sendMessage(jid, {
-      text: bBloco("🍥 ANIME DOWNLOADER", [
-        bLine("🎌", `Anime: *${nomeAnime}*`),
-        bLine("🎬", `Episódio: *${numeroEpisodio}*`),
-        "",
-        bLine("🔎", "Procurando episódio..."),
-        bLine("⏳", "Aguarde..."),
-      ]),
-    }, { quoted: seloBot });
-
-    let dadosEpisodio;
-    try {
-      dadosEpisodio = await buscarEpisodioFontePropria(nomeAnime, numeroEpisodio);
-    } catch (e) {
-      console.error("❌ [ep] Busca (fonte própria) falhou:", e.message);
-      let msgErro = "Não encontrei este episódio na fonte configurada.";
-      if (e.message === "TIMEOUT_API") msgErro = "A fonte de episódios demorou demasiado a responder. Tenta novamente.";
-      else if (e.message === "EPISODIO_NAO_ENCONTRADO") msgErro = "Episódio não encontrado. Confirma o nome do anime e o número do episódio.";
-      else if (e.message === "URL_INVALIDA") msgErro = "A fonte devolveu uma URL de vídeo inválida.";
-      else if (e.message === "RESPOSTA_API_INVALIDA") msgErro = "A fonte de episódios devolveu uma resposta inválida.";
-      await sock.sendMessage(jid, { text: bLine("❌", msgErro) }, { quoted: seloBot });
-      await reagir(sock, msg, "❌");
-      return;
-    }
-
-    garantirPasta();
-    const animeExibido = dadosEpisodio.anime || nomeAnime;
-    const episodioExibido = dadosEpisodio.episode || numeroEpisodio;
-    const tituloExibido = dadosEpisodio.title || `${animeExibido} - Episódio ${episodioExibido}`;
-
-    await sock.sendMessage(jid, {
-      text: bBloco("🎌 " + animeExibido, [
-        bLine("🎬", `Episódio ${episodioExibido}`),
-        "",
-        bLine("⬇️", "Baixando..."),
-        bLine("📺", "Qualidade máxima: 720p"),
-      ]),
-    }, { quoted: seloBot });
-
-    const timestamp = Date.now();
-    const nomeSeguro = nomeAnime.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "anime";
-    const nomeBase = `${timestamp}_${nomeSeguro}_EP${numeroEpisodio}`;
-    const destinoBase = path.join(PASTA_ANIMES, nomeBase);
-    let arquivoFinal = null;
-
-    try {
-      const preferirYtDlp = dadosEpisodio.usarYtDlp === true || /\.m3u8($|\?)/i.test(dadosEpisodio.url);
-      if (preferirYtDlp) {
-        await baixarViaYtDlp(dadosEpisodio.url, destinoBase, YTDLP_CMD, FFMPEG_CMD);
-        arquivoFinal = encontrarArquivoGerado(PASTA_ANIMES, nomeBase);
-      } else {
-        arquivoFinal = `${destinoBase}.mp4`;
-        await baixarDireto(dadosEpisodio.url, arquivoFinal);
+    media = await prepareWAMessageMedia(
+      {
+        image: {
+          url: fotoUrl || "https://animefire.one/"
+        }
+      },
+      {
+        upload: clover.waUploadToServer
       }
-    } catch (e) {
-      console.error("❌ [ep] Download falhou:", e.message);
-      limparArquivo(arquivoFinal);
-      await sock.sendMessage(jid, { text: bLine("❌", "Erro ao baixar o episódio. Tenta novamente mais tarde.") }, { quoted: seloBot });
-      await reagir(sock, msg, "❌");
-      return;
-    }
+    );
+  } catch {
+    media = null;
+  }
 
-    if (!arquivoFinal || !fs.existsSync(arquivoFinal)) {
-      await sock.sendMessage(jid, { text: bLine("❌", "Arquivo não encontrado após o download.") }, { quoted: seloBot });
-      await reagir(sock, msg, "❌");
-      return;
-    }
+  const texto =
+    `🎌 *ANIMEFIRE*\n\n` +
+    `🔎 Resultado da pesquisa\n` +
+    `📺 Foram encontrados *${resultados.length}* animes.\n\n` +
+    `Escolha um anime para continuar.`;
 
-    let tamanhoBytes;
-    try {
-      tamanhoBytes = fs.statSync(arquivoFinal).size;
-    } catch (e) {
-      limparArquivo(arquivoFinal);
-      await sock.sendMessage(jid, { text: bLine("❌", "Arquivo corrompido ou inacessível.") }, { quoted: seloBot });
-      await reagir(sock, msg, "❌");
-      return;
+  const mensagem = generateWAMessageFromContent(
+    from,
+    {
+      viewOnceMessage: {
+        message: {
+          interactiveMessage: {
+            body: {
+              text: texto
+            },
+            footer: {
+              text: "⚡️ SHAZAM ⚡️"
+            },
+            ...(media?.imageMessage
+              ? {
+                  header: {
+                    title: "🎌 ANIMEFIRE",
+                    hasMediaAttachment: true,
+                    imageMessage: media.imageMessage
+                  }
+                }
+              : {
+                  header: {
+                    title: "🎌 ANIMEFIRE",
+                    hasMediaAttachment: false
+                  }
+                }),
+            nativeFlowMessage: {
+              buttons: [
+                {
+                  name: "single_select",
+                  buttonParamsJson: JSON.stringify({
+                    title: "🎌 Escolher anime",
+                    sections: [
+                      {
+                        title: "ANIMES ENCONTRADOS",
+                        rows
+                      }
+                    ]
+                  })
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      userJid: from,
+      quoted: seloMeta
     }
+  );
 
-    if (tamanhoBytes === 0) {
-      limparArquivo(arquivoFinal);
-      await sock.sendMessage(jid, { text: bLine("❌", "Arquivo corrompido (vazio).") }, { quoted: seloBot });
-      await reagir(sock, msg, "❌");
-      return;
+  await clover.relayMessage(
+    from,
+    mensagem.message,
+    {
+      messageId: mensagem.key.id
     }
+  );
 
-    if (tamanhoBytes > LIMITE_BYTES) {
-      limparArquivo(arquivoFinal);
-      await sock.sendMessage(jid, { text: bLine("❌", "O episódio ultrapassa o limite de 90 MB.") }, { quoted: seloBot });
-      await reagir(sock, msg, "❌");
-      return;
-    }
+  return sessionId;
+}
 
-    const tamanhoMB = (tamanhoBytes / (1024 * 1024)).toFixed(1);
-    await sock.sendMessage(jid, {
-      text: bBloco("🍥 " + animeExibido, [
-        bLine("🎬", `Episódio: ${episodioExibido}`),
-        bLine("📦", `Tamanho: ${tamanhoMB} MB`),
-      ]),
-    }, { quoted: seloBot });
+async function enviarMenuEpisodios(clover, from, seloMeta, anime, sessionId, pagina = 0) {
+  const episodios = anime?.episodes || [];
 
-    try {
-      await enviarVideo(sock, jid, arquivoFinal, bLine("🍥", tituloExibido), [sender], seloBot);
-      await sock.sendMessage(jid, { text: bLine("✅", "Episódio enviado com sucesso!") }, { quoted: seloBot });
-      await reagir(sock, msg, "✅");
-      if (typeof addXP === "function") { try { addXP(sender, 5); } catch {} }
-    } catch (e) {
-      console.error("❌ [ep] Falha no envio:", e.message);
-      await sock.sendMessage(jid, { text: bLine("❌", "Falha ao enviar o episódio.") }, { quoted: seloBot });
-      await reagir(sock, msg, "❌");
-    } finally {
-      limparArquivo(arquivoFinal);
-    }
+  if (!episodios.length) {
+    await clover.sendMessage(
+      from,
+      {
+        text:
+          `❌ *${nomeAnime(anime)}*\n\n` +
+          `Nenhum episódio encontrado.`
+      },
+      {
+        quoted: seloMeta
+      }
+    );
+
     return;
   }
 
-  // ═══ CAMINHO B (padrão): mostra onde assistir legalmente, sem baixar nada ═══
-  await sock.sendMessage(jid, {
-    text: bBloco("🍥 ANIME", [
-      bLine("🎌", `Anime: *${nomeAnime}*`),
-      bLine("🎬", `Episódio: *${numeroEpisodio}*`),
-      "",
-      bLine("🔎", "A procurar onde assistir..."),
-    ]),
-  }, { quoted: seloBot });
+  const totalPaginas = Math.ceil(episodios.length / 15);
 
-  let anime;
-  try {
-    anime = await buscarAnimeJikan(nomeAnime);
-  } catch (e) {
-    console.error("❌ [ep] Busca Jikan falhou:", e.message);
-    await sock.sendMessage(jid, { text: bLine("❌", "Não encontrei este anime.") }, { quoted: seloBot });
-    await reagir(sock, msg, "❌");
+  const rows = montarRowsEpisodios(
+    episodios,
+    sessionId,
+    pagina
+  );
+
+  if (pagina > 0) {
+    rows.push({
+      header: "",
+      title: "⬅️ Página anterior",
+      description: `Página ${pagina}`,
+      id: `anime_page ${sessionId} ${pagina - 1}`
+    });
+  }
+
+  if (pagina < totalPaginas - 1) {
+    rows.push({
+      header: "",
+      title: "➡️ Próxima página",
+      description: `Página ${pagina + 2}`,
+      id: `anime_page ${sessionId} ${pagina + 1}`
+    });
+  }
+
+  const texto =
+    `🎌 *${nomeAnime(anime)}*\n\n` +
+    `📺 Total de episódios: *${episodios.length}*\n` +
+    `📖 Página: *${pagina + 1}/${totalPaginas}*\n\n` +
+    `Escolha o episódio.`;
+
+  const mensagem = generateWAMessageFromContent(
+    from,
+    {
+      viewOnceMessage: {
+        message: {
+          interactiveMessage: {
+            body: {
+              text: texto
+            },
+            footer: {
+              text: "⚡️ SHAZAM ⚡️"
+            },
+            header: {
+              title: "📺 EPISÓDIOS",
+              hasMediaAttachment: false
+            },
+            nativeFlowMessage: {
+              buttons: [
+                {
+                  name: "single_select",
+                  buttonParamsJson: JSON.stringify({
+                    title: "📺 Escolher episódio",
+                    sections: [
+                      {
+                        title: `EPISÓDIOS • ${pagina + 1}/${totalPaginas}`,
+                        rows
+                      }
+                    ]
+                  })
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      userJid: from,
+      quoted: seloMeta
+    }
+  );
+
+  await clover.relayMessage(
+    from,
+    mensagem.message,
+    {
+      messageId: mensagem.key.id
+    }
+  );
+}
+
+async function enviarMenuAudio(clover, from, seloMeta, episodio, sessionId, dados) {
+  const streams = dados?.streams || [];
+
+  if (!streams.length) {
+    await clover.sendMessage(
+      from,
+      {
+        text:
+          `❌ *Nenhum stream disponível.*\n\n` +
+          `📺 Episódio ${episodio.number || "?"}`
+      },
+      {
+        quoted: seloMeta
+      }
+    );
+
     return;
   }
 
-  const plataformas = await buscarStreamingJikan(anime.mal_id);
+  sessoesAnime.set(sessionId, {
+    ...sessoesAnime.get(sessionId),
+    tipo: "audio",
+    episodio,
+    streams,
+    criadoEm: Date.now()
+  });
 
-  const linhas = [
-    bLine("🎌", `*${anime.title}*`),
-    bLine("🎬", `Procuras o episódio *${numeroEpisodio}*`),
-    "",
-  ];
+  const rows = montarRowsAudio(streams, sessionId);
 
-  if (plataformas.length) {
-    linhas.push(bLine("📺", "*Disponível oficialmente em:*"));
-    for (const p of plataformas.slice(0, 6)) {
-      linhas.push(bLine("▶️", `*${p.name}* — ${p.url}`));
+  const animeNome =
+    dados?.anime?.titles?.BR ||
+    dados?.anime?.titles?.PT ||
+    "Anime";
+
+  const texto =
+    `🎌 *${animeNome}*\n\n` +
+    `📺 Episódio: *${episodio.number || "?"}*\n` +
+    `📝 ${nomeEpisodio(episodio)}\n\n` +
+    `🎧 Escolha o áudio:`;
+
+  const mensagem = generateWAMessageFromContent(
+    from,
+    {
+      viewOnceMessage: {
+        message: {
+          interactiveMessage: {
+            body: {
+              text: texto
+            },
+            footer: {
+              text: "⚡️ SHAZAM ⚡️"
+            },
+            header: {
+              title: "🎧 ÁUDIO",
+              hasMediaAttachment: false
+            },
+            nativeFlowMessage: {
+              buttons: [
+                {
+                  name: "single_select",
+                  buttonParamsJson: JSON.stringify({
+                    title: "🎧 Escolher áudio",
+                    sections: [
+                      {
+                        title: "ÁUDIO DISPONÍVEL",
+                        rows
+                      }
+                    ]
+                  })
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      userJid: from,
+      quoted: seloMeta
     }
-  } else {
-    linhas.push(bLine("💡", "Não encontrei plataformas de streaming listadas para este anime no MyAnimeList."));
-    linhas.push(bLine("🔎", `Pesquisa por: *${anime.title} episódio ${numeroEpisodio}* numa plataforma licenciada (Crunchyroll, Netflix, etc).`));
-  }
+  );
 
-  linhas.push("");
-  linhas.push(bLine("⚠️", "Este bot não distribui episódios — só aponta para fontes oficiais/legais."));
+  await clover.relayMessage(
+    from,
+    mensagem.message,
+    {
+      messageId: mensagem.key.id
+    }
+  );
+}
 
-  const caption = bBloco("📺 ONDE ASSISTIR", linhas);
+async function processarComandoAnime(
+  clover,
+  from,
+  info,
+  sender,
+  pushname,
+  args,
+  prefix,
+  botName,
+  donoName,
+  fotomenu,
+  seloMeta,
+  selo2,
+  reagir,
+  reply,
+  data,
+  hora,
+  config,
+  isAdmin2,
+  donoJid,
+  obterMembroValido,
+  donoLid,
+  isBotAdmin
+) {
   try {
-    if (anime.images && anime.images.jpg && anime.images.jpg.image_url) {
-      await sock.sendMessage(jid, { image: { url: anime.images.jpg.image_url }, caption }, { quoted: seloBot });
-    } else {
-      await sock.sendMessage(jid, { text: caption }, { quoted: seloBot });
+    const query = Array.isArray(args)
+      ? args.join(" ").trim()
+      : String(args || "").trim();
+
+    if (!query) {
+      await reply(
+        `🎌 *ANIMEFIRE*\n\n` +
+        `Use:\n` +
+        `${prefix}anime nome do anime\n\n` +
+        `Exemplo:\n` +
+        `${prefix}anime Naruto`
+      );
+
+      return;
     }
-    await reagir(sock, msg, "✅");
-  } catch (e) {
-    console.error("❌ [ep] Envio falhou:", e.message);
-    await sock.sendMessage(jid, { text: caption }, { quoted: seloBot });
+
+    if (reagir) {
+      try {
+        await reagir("🔎");
+      } catch {}
+    }
+
+    const resultados = await pesquisarAnime(query);
+
+    if (!resultados.length) {
+      await reply(
+        `❌ Nenhum anime encontrado para:\n*${query}*`
+      );
+
+      return;
+    }
+
+    await enviarMenuAnime(
+      clover,
+      from,
+      seloMeta,
+      fotomenu,
+      resultados
+    );
+
+  } catch (erro) {
+    console.error("[ANIME]", erro);
+
+    await reply(
+      `❌ *Erro no AnimeFire*\n\n${erro.message}`
+    );
   }
 }
 
-module.exports = { processarComandoEp };
+async function processarInteracaoAnime(
+  clover,
+  from,
+  info,
+  id,
+  seloMeta,
+  reply
+) {
+  try {
+    if (!id || typeof id !== "string") {
+      return false;
+    }
 
+    if (id.startsWith("anime_select ")) {
+      const partes = id.split(" ");
+
+      const sessionId = partes[1];
+      const index = Number(partes[2]);
+
+      const sessao = sessoesAnime.get(sessionId);
+
+      if (!sessao) {
+        await reply(
+          "⌛ Essa pesquisa expirou. Use o comando novamente."
+        );
+
+        return true;
+      }
+
+      const animeSelecionado = sessao.resultados[index];
+
+      if (!animeSelecionado?.id) {
+        await reply(
+          "❌ Anime não encontrado."
+        );
+
+        return true;
+      }
+
+      await clover.sendMessage(
+        from,
+        {
+          text: "⏳ Carregando episódios..."
+        },
+        {
+          quoted: seloMeta
+        }
+      );
+
+      const anime = await obterAnime(
+        animeSelecionado.id
+      );
+
+      sessoesAnime.set(
+        sessionId,
+        {
+          tipo: "episodios",
+          anime,
+          resultados: sessao.resultados,
+          criadoEm: Date.now()
+        }
+      );
+
+      await enviarMenuEpisodios(
+        clover,
+        from,
+        seloMeta,
+        anime,
+        sessionId,
+        0
+      );
+
+      return true;
+    }
+
+    if (id.startsWith("anime_page ")) {
+      const partes = id.split(" ");
+
+      const sessionId = partes[1];
+      const pagina = Number(partes[2]);
+
+      const sessao = sessoesAnime.get(sessionId);
+
+      if (!sessao?.anime) {
+        await reply(
+          "⌛ Essa lista expirou. Faça a pesquisa novamente."
+        );
+
+        return true;
+      }
+
+      await enviarMenuEpisodios(
+        clover,
+        from,
+        seloMeta,
+        sessao.anime,
+        sessionId,
+        pagina
+      );
+
+      return true;
+    }
+
+    if (id.startsWith("anime_episode ")) {
+      const partes = id.split(" ");
+
+      const sessionId = partes[1];
+      const index = Number(partes[2]);
+
+      const sessao = sessoesAnime.get(sessionId);
+
+      if (!sessao?.anime) {
+        await reply(
+          "⌛ Essa lista expirou. Faça a pesquisa novamente."
+        );
+
+        return true;
+      }
+
+      const episodio =
+        sessao.anime.episodes?.[index];
+
+      if (!episodio?.id) {
+        await reply(
+          "❌ Episódio não encontrado."
+        );
+
+        return true;
+      }
+
+      await clover.sendMessage(
+        from,
+        {
+          text: "⏳ Carregando opções de áudio..."
+        },
+        {
+          quoted: seloMeta
+        }
+      );
+
+      const dados = await obterEpisodio(
+        episodio.id
+      );
+
+      sessoesAnime.set(
+        sessionId,
+        {
+          ...sessao,
+          tipo: "audio",
+          episodio,
+          streams: dados?.streams || [],
+          criadoEm: Date.now()
+        }
+      );
+
+      await enviarMenuAudio(
+        clover,
+        from,
+        seloMeta,
+        episodio,
+        sessionId,
+        dados
+      );
+
+      return true;
+    }
+
+    if (id.startsWith("anime_audio ")) {
+      const partes = id.split(" ");
+
+      const sessionId = partes[1];
+      const index = Number(partes[2]);
+
+      const sessao = sessoesAnime.get(sessionId);
+
+      if (!sessao?.streams) {
+        await reply(
+          "⌛ Essa seleção expirou. Faça a pesquisa novamente."
+        );
+
+        return true;
+      }
+
+      const stream = sessao.streams[index];
+
+      if (!stream) {
+        await reply(
+          "❌ Stream não encontrado."
+        );
+
+        return true;
+      }
+
+      const url = stream.url;
+
+      const animeNome =
+        sessao.anime?.titles?.BR ||
+        sessao.anime?.titles?.PT ||
+        "Anime";
+
+      const audio =
+        stream.audio === "dublado"
+          ? "🇧🇷 Dublado"
+          : stream.audio === "legendado"
+          ? "🇯🇵 Legendado"
+          : `🎧 ${stream.audio || "Áudio"}`;
+
+      await clover.sendMessage(
+        from,
+        {
+          text:
+            `🎬 *${animeNome}*\n\n` +
+            `📺 Episódio ${sessao.episodio?.number || "?"}\n` +
+            `${audio}\n` +
+            `🎞️ ${stream.qualities?.join(", ") || "N/A"}\n\n` +
+            `🔗 *Stream recebido:*\n` +
+            `${url || "Nenhuma URL"}`
+        },
+        {
+          quoted: seloMeta
+        }
+      );
+
+      return true;
+    }
+
+    return false;
+
+  } catch (erro) {
+    console.error(
+      "[ANIME INTERAÇÃO]",
+      erro
+    );
+
+    await reply(
+      `❌ *Erro no AnimeFire*\n\n${erro.message}`
+    );
+
+    return true;
+  }
+}
+
+setInterval(() => {
+  const agora = Date.now();
+
+  for (const [id, sessao] of sessoesAnime) {
+    if (
+      agora - sessao.criadoEm >
+      30 * 60 * 1000
+    ) {
+      sessoesAnime.delete(id);
+    }
+  }
+}, 10 * 60 * 1000);
+
+module.exports = {
+  processarComandoAnime,
+  processarInteracaoAnime
+};

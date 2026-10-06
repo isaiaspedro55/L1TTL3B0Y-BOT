@@ -79,6 +79,7 @@ const {enviarPlay3,decodificarLink: decodificarPlay3} = require("./comando_play3
 const {enviarSoundcloud1,decodificarLink: decodificarSoundcloud1} = require("./comando_soundcloud1.js");
 const {enviarAppleMusic,decodificarLink: decodificarAppleMusic} = require("./comando_applemusic.js");
 const{enviarApp,decodificarLink:decodificarApp,obterDownloadAPKPure}=require("./comando_app.js");
+const { enviarIPTV } = require('./comando_iptv');
 //
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 fs.ensureDirSync(process.env.TMPDIR);
@@ -624,6 +625,7 @@ function buildSecoes(isDono){
     {header:`${E.figurinhas} MENU-FIGURINHAS`,title:"",id:"cat_figurinhas"},
     {header:`${E.brincadeiras} MENU-BRINCADEIRAS`,title:"",id:"cat_brincadeiras"},
     {header: "🎮 MENU-JOGOS",title:"",id:"cat_jogos"},
+    {header: "📺 MENU-IPTV",title:"",id:"cat_iptv"},
     {header:`${E.coins} MENU-COINS`,title:"",id:"cat_coins"},
     {header:`${E.alteradores} MENU-ALTERADORES`,title:"",id:"cat_alteradores"},
     {header:`${E.logos} MENU-LOGOS`,title:"",id:"cat_logos"},
@@ -2562,7 +2564,7 @@ const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","aluga
 "ttmp3","ttinfo","ttfoto","ttsemwater","ttuser","ttsearch","tttrend","ttcaption","tthashtag","ttidea","ttscript","ttbio",
 "ig","igreels","igstory","igfoto","igvideo","iguser","igpost","igcaption","ighashtag","igbio","igideia","igreel","igscript",
 "yt","ytmp3","ytmp4","ytshort","ytthumb","ytinfo","ytchannel","ytmusic","ytsum","ytcaption","yttags","yttitle","ytscript","ytideia","ytseo","ytthumbnail","ytcalendario","ytshortidea",
-"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","addstatus","app","setestilo1","setestilo2","applemusic","games"]);
+"fb","fbvideo","fbfoto","fbinfo","fbcaption","fbpost","fbhashtag","fbideia","fbbio","fbviral","fbreels","fbengagement","play2","play3","ep","cobra","snake","dama","damas","xo","jogodavelha","velha","jogos","addstatus","app","setestilo1","setestilo2","applemusic","iptv","games"]);
 
 // ════════════════════════════════════════════════
 // ✅ START BOT
@@ -2818,6 +2820,7 @@ async function startBot(){
         if(msg.message?.buttonsResponseMessage||msg.message?.interactiveResponseMessage?.nativeFlowResponseMessage||msg.message?.templateButtonReplyMessage){
           if(isGrupo&&!isDono&&!verificarAluguel(jid))return;
           const btnId=extrairBotaoClicado(msg);
+          if(btnId==="cat_iptv"){await enviarIPTV(sock,jid,seloBot);return;}
           if(btnId==="btn_abrir_menu"){let adm=isDono;if(isGrupo&&!isDono){try{const meta=await sock.groupMetadata(jid);adm=meta.participants.filter(p=>p.admin).map(p=>extrairJid(p.id||p)).includes(sender);}catch{}}await enviarMenuPrincipal(sock,jid,msg,isDono,sender,adm,seloBot);return;}
           if(btnId&&btnId.startsWith("soundcloud1baixar_")){const codigo=btnId.replace("soundcloud1baixar_","");try{const textoDados=decodificarSoundcloud1(codigo);const dados=JSON.parse(textoDados);if(!dados?.url){await sock.sendMessage(jid,{text:bLine("❌","Link do SoundCloud inválido.")},{quoted:seloBot});return;}await reagir(sock,msg,"🎧");let arq=null;try{arq=await barraCarregamento(sock,jid,seloBot,"A baixar SoundCloud...",()=>dlSoundcloud(dados.url).then(r=>r.filePath));}catch(e){console.log("❌ soundcloud1 download:",e.message);}if(!arq||!fs.existsSync(arq)){await sock.sendMessage(jid,{text:bLine("❌","Não consegui baixar esta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");return;}await enviarAudio(sock,jid,arq,seloBot);await reagir(sock,msg,"✅");addXP(sender,5);setTimeout(()=>{try{if(fs.existsSync(arq)){fs.removeSync(arq);}}catch{}},15000);}catch(e){console.log("❌ soundcloud1 botão:",e.message);await sock.sendMessage(jid,{text:bLine("❌","Não foi possível baixar esta música.")},{quoted:seloBot});await reagir(sock,msg,"❌");}return;}
           if(btnId&&btnId.startsWith("play_")){const tratou=await processarBotaoPlay(sock,msg);if(tratou)return;}
@@ -3795,6 +3798,9 @@ ${nomeEnviou}`;
         if(comando==="shazam"){await reagir(sock,msg,"⚡");await sock.sendMessage(jid,{text:"⚡️"},{quoted:seloBot});await new Promise(r=>setTimeout(r,500));await sock.sendMessage(jid,{text:"⚡️"});return;}
         if(comando==="busca"){await executarReconhecimentoMusica(sock,jid,msg,sender,seloBot);return;}
 
+        //______IPTV__________
+        if(comando==="iptv"){await enviarIPTV(sock,jid,seloBot);return;}
+        
         // ─── BRINCADEIRAS ───
         if(comando==="piada"){try{const p=await chatIA("Conta uma piada curta e engraçada em português de Angola.");await sock.sendMessage(jid,{text:bBloco("😂 PIADA",[bLine("😂",p)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
         if(comando==="conselho"&&args.length>0){const sit=args.join(" ");try{const resp=await chatIA(`Dá um conselho para: "${sit}".`);await sock.sendMessage(jid,{text:bBloco("💡 CONSELHO",[bLine("💡",resp)])},{quoted:seloBot});}catch{await sock.sendMessage(jid,{text:bLine("❌","Erro.")},{quoted:seloBot});}return;}
@@ -5512,3 +5518,4 @@ return;
 }
 
 startBot();
+
