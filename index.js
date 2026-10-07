@@ -80,6 +80,7 @@ const {enviarSoundcloud1,decodificarLink: decodificarSoundcloud1} = require("./c
 const {enviarAppleMusic,decodificarLink: decodificarAppleMusic} = require("./comando_applemusic.js");
 const{enviarApp,decodificarLink:decodificarApp,obterDownloadAPKPure}=require("./comando_app.js");
 const { enviarIPTV } = require('./comando_iptv');
+const { enviarGerarCod } = require('./comando_gerarcod');
 //
 const { FONTES, NOMES_FONTES, encontrarFonte, aplicarFonte } = require("./fontes.js");
 fs.ensureDirSync(process.env.TMPDIR);
@@ -2557,7 +2558,7 @@ async function processarBotaoPlay(sock,msg){
 // ════════════════════════════════════════════════
 // ✅ TODOS OS COMANDOS
 // ════════════════════════════════════════════════
-const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","soundcloud1","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","set","out","prefixo","prefixos","setprefixo","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd",
+const TODOS_COMANDOS=new Set(["menu","ajuda","sobre","setfoto","setvideo","alugar","ativaraluguel","statusbot","addai","pp","assistente","isaias-on","isaias-off","isaias-reset","setmenu","play","mp3","mp4","mp4hd","mostre","foto","doc","qr","tourl","ytsearch","tiktok","ttsearch","tttrend","ttuser","instagram","twitter","facebook","kwai","spotify","soundcloud","soundcloud1","mediafire","apk","pinterest","pinvideo","pin","s","sf","brat","figurinha","figu","piada","conselho","historia","poema","perfil","denunciar","cara","ship","fofoca","quiz","completar","vof","caca","guerra","stop","rank","toprank","matematica","jokenpo","dado","cara-coroa","adivinhar","velocidade","roleta","aki","aposta","shazam","busca","moedas","diario","dar","roubar","topcoins","vz","transcrever","audiotexto","resumiraudio","traduziraudio","audioparaia","ia","resumir","traduzir","fotocopia","fotoparaia","resumirfoto","traduzirfoto","editar","meme","logo","card","calc","encurtar","cotacao","tempo","horario","ping","stats","regras","info","dono","donos","id","ver","apagadas","placar","scanlink","criador","piada18","truth","dare","crush","seduzir","beijo","abraco","tapa","flirt","casal","banir","add","addadmin","removeadmin","fechar","abrir","silenciar","dessilenciar","silenciados","all","att","aviso","link","sorteio","nomegrupo","descgrupo","fotogrupo","apagar","bloq","desbloq","bot","anti-link","vozbot","verifica","addvip","removevip","vips","set","out","prefixo","prefixos","setprefixo","chaton","sms","gsms","cantada","inunca","conselhobiblico","frasemotivacional","piadacurta","curiosidade","bomdia","boanoite","anime","topanimes","animealeatorio","fraseanime","quizanime","gpt","gemini","deepseek","letra","cifra","bio","album","recomenda","top10","noticias","hoje","fato","pais","wikipedia","signo","definir","sinonimo","previsao","filme","serie","livro","cripto","converter","bau","trabalhar","minerar","pescar","cacada","treinar","missao","dormir","8ball","batalha","inventario","loja","comprar","nivel","crimes","mendigar","explorar","viajar","pinpack","addcase","extraircase","cases","delcase","addsubdono","removesubdono","subdonos","adddono","removedono","bemvindo","grupoinfo","inactivos","marcaradmins","adms","dino","piano","teclado","tt","play1","status","setletra","verletras","bemvindo1","bemvindo2","downcase","totalcmd","gerarcod",
 "classe","classes","atributos","level","equipar","desequipar","ranking","lutar","duelo","boss","hunt","aventura","masmorra","raid","fugir","daily","quest","quests","vender","doar","saldo","analisar",
 "sticker2","toimg","tovideo","take","wm","figurinhas","figaleatoria","figanime","figmeme","figgato","figfutebol","figamor","figengracada","colecao","figrank","figdaily","figtroca","figvender","figcomprar","figduelo","rankwaifu",
 "manga","personagem","autor","estudio","episodio","temporada","personagemaleatorio","villain","protagonista","waifu","husbando","casar","divorcio","beijar","abracar","morder","matar","animerpg","confissao","provocacao","fantasia",
@@ -3112,8 +3113,8 @@ ${nomeEnviou}`;
 
         const CMDS_ADMIN=["banir","addadmin","removeadmin","fechar","abrir","all","att","anti-link","link","sorteio","verifica","silenciar","dessilenciar","silenciados","add","aviso","apagar","vozbot","bloq","desbloq","nomegrupo","descgrupo","fotogrupo","scanlink","addai","addvip","removevip","vips","bemvindo","bemvindo1","bemvindo2","grupoinfo","inactivos","marcaradmins","adms","status"];
         if(CMDS_ADMIN.includes(comando)&&!isAdmin){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas administradores.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
-        const CMDS_DONO=["out","set","chaton","sms","gsms","setfoto","adddono","removedono","addsubdono","removesubdono","setletra","downcase","setprefixo"];
-        if(CMDS_DONO.includes(comando)&&!isDono){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas o dono.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
+        const CMDS_DONO=["out","set","chaton","sms","gsms","setfoto","adddono","removedono","addsubdono","removesubdono","setletra","downcase","setprefixo","gerarcod"];
+        if(CMDS_DONO.includes(comando)&&!isDonoReal){await sock.sendMessage(jid,{text:bLine("🔒","*Apenas o dono.*")},{quoted:seloBot});await reagir(sock,msg,"🚫");return;}
         const CMDS_18=["piada18","truth","dare","crush","seduzir","beijo","beijar","abraco","abracar","tapa","flirt","casal","confissao","provocacao","fantasia"];
         if(CMDS_18.includes(comando)&&!isDono&&!isVip(sender)){await sock.sendMessage(jid,{text:bBloco("🔞 VIP EXCLUSIVO",[bLine("💡",`Usa *${CONFIG.PREFIXO}alugar* para ser VIP 💎`)])},{quoted:seloBot});await reagir(sock,msg,"🔞");return;}
 
@@ -5341,6 +5342,17 @@ return;
 if(comando==="caraoucoroa"){
 try{await enviarCaraOuCoroa(sock,jid);await reagir(sock,msg,"🪙");}
 catch(e){await sock.sendMessage(jid,{text:bBloco("❌ ERRO",[bLine("💡 Use *!extraircase caraoucoroa*")])});}
+return;
+}
+if(comando==="gerarcod"){
+try{
+const duracao=(texto||"").trim().split(/\s+/)[1]||"";
+await enviarGerarCod(sock,jid,duracao,seloBot);
+await reagir(sock,msg,"🔐");
+}catch(e){
+console.error("[GERARCOD]",e);
+await sock.sendMessage(jid,{text:bLine("❌","Erro ao gerar acesso IPTV.")},{quoted:seloBot});
+}
 return;
 }
 if(comando==="othello"){
